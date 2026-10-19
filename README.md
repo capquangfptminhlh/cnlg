@@ -10,6 +10,11 @@ Hệ thống kết nối tự động hóa toàn diện giữa **hoangminh.com**
 4. **Relay Đơn Hàng & Cấp VietQR 1.5s**: Khách đặt hàng nhận ngay mã VietQR chuẩn Napas 24/7, tự động cập nhật trạng thái khi thanh toán thành công.
 5. **Giao Diện Dark Luxury Theme v2.0**: Thiết kế tông màu Deep Navy & Gold cao cấp, tối ưu tốc độ tải trang và trải nghiệm người dùng.
 
+---
+
+## 🤖 Dành Cho Nhà Phát Triển & AI Agent Tiếp Theo
+👉 Xem chi tiết toàn bộ kiến trúc, luồng xử lý và quy tắc kỹ thuật tại file [AGENT_INSTRUCTIONS.md](AGENT_INSTRUCTIONS.md).
+
 ## 📦 Cài đặt & Khởi chạy
 
 ```bash
