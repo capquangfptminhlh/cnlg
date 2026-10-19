@@ -140,6 +140,7 @@ async function fetchProducts(append = false) {
       rememberProducts(json.data);
       state.products = append ? [...state.products, ...json.data] : json.data;
       renderProducts();
+      window.dispatchEvent(new CustomEvent('storefront:products', { detail: { products: state.products } }));
       renderPagination(json.page, json.totalPages);
       catalogCount.innerText = `Đang hiển thị ${state.products.length} / tổng ${json.total.toLocaleString('vi-VN')} SP`;
       if (heroTotalProd && state.currentCategory === 'all' && !state.searchQuery && !state.minPrice && !state.maxPrice) {
@@ -242,6 +243,7 @@ function renderProducts() {
     <div class="luxury-card${soldOut ? ' is-sold-out' : ''}" data-id="${p.id}">
       <div class="card-media">
         ${productBadges(p)}
+        <button type="button" class="card-heart" data-favorite-id="${p.id}" aria-label="Lưu sản phẩm" aria-pressed="false"><i class="fa-regular fa-heart"></i></button>
         <img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'400\\' height=\\'400\\' viewBox=\\'0 0 400 400\\'><rect fill=\\'%23111422\\' width=\\'400\\' height=\\'400\\'/><text fill=\\'%238b92b3\\' font-size=\\'18\\' font-family=\\'sans-serif\\' x=\\'50%\\' y=\\'50%\\' text-anchor=\\'middle\\'>HOANGMINH.COM</text></svg>'">
 
         <div class="card-quick-overlay">
@@ -256,7 +258,7 @@ function renderProducts() {
         <h3 class="card-title" title="${esc(p.name)}" onclick="openProductDetail(${p.id})">${esc(p.name)}</h3>
 
         <div class="card-meta">
-          <span><i class="fa-solid fa-shield-halved"></i> ${esc(p.warranty || 'Bảo hành chính hãng')}</span>
+          <span><i class="fa-solid fa-shield-halved"></i> ${esc(p.warranty || 'Xem chi tiết sản phẩm')}</span>
         </div>
 
         <div class="card-pricing">
