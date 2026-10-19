@@ -9,7 +9,6 @@ const ordersTableBody = document.getElementById('ordersTableBody');
 
 // Form inputs
 const cfgSimulationMode = document.getElementById('cfgSimulationMode');
-const cfgMarkup = document.getElementById('cfgMarkup');
 const cfgBankId = document.getElementById('cfgBankId');
 const cfgAccountNo = document.getElementById('cfgAccountNo');
 const cfgAccountName = document.getElementById('cfgAccountName');
@@ -68,7 +67,6 @@ async function loadData() {
         document.getElementById('dropbuyLoginUser').value = cfg.dropbuy?.username || '';
       }
       cfgSimulationMode.checked = cfg.dropbuy?.simulationMode !== false;
-      cfgMarkup.value = cfg.pricing?.markupPercent ?? 15;
       cfgBankId.value = cfg.bank?.bankId || '970422';
       cfgAccountNo.value = cfg.bank?.accountNo || '0386888999';
       cfgAccountName.value = cfg.bank?.accountName || 'HOANG MINH STORE';
@@ -177,9 +175,6 @@ configForm.addEventListener('submit', async e => {
     dropbuy: {
       username: userEl ? userEl.value.trim() : '',
       simulationMode: cfgSimulationMode.checked
-    },
-    pricing: {
-      markupPercent: Number.isFinite(parseFloat(cfgMarkup.value)) ? parseFloat(cfgMarkup.value) : 15
     },
     bank: {
       bankId: cfgBankId.value,
@@ -294,13 +289,19 @@ async function updateDaemonStatusUI() {
       const d = res.data;
       const lastStr = d.lastSyncTime ? new Date(d.lastSyncTime).toLocaleTimeString('vi-VN') : 'chưa có';
       const nextStr = d.nextSyncTime ? new Date(d.nextSyncTime).toLocaleTimeString('vi-VN') : '5 phút nữa';
-      if (daemonStatusText) {
+      const badge = document.getElementById('daemonBadgeText');
+      if (badge && d.stock && d.price) badge.innerText = `Realtime: tồn kho ${d.stock.intervalSeconds}s · giá ${Math.round(d.price.intervalSeconds / 60)} phút`;
+      if (daemonStatusText && d.stock && d.price) {
+        const t = x => (x ? new Date(x).toLocaleTimeString('vi-VN') : 'chưa có');
+        const err = [d.stock.lastError && `tồn kho: ${esc(d.stock.lastError)}`, d.price.lastError && `giá: ${esc(d.price.lastError)}`].filter(Boolean).join(' · ');
+        daemonStatusText.innerHTML = `<strong>${(d.totalProducts || 0).toLocaleString('vi-VN')} SP</strong> · Tồn kho cập nhật lúc <strong>${t(d.stock.lastOk)}</strong> (${d.stock.lastDurationMs ?? '-'}ms) · Giá cập nhật lúc <strong>${t(d.price.lastOk)}</strong> · Lần quét giá kế tiếp: <strong>${t(d.price.nextRun)}</strong>${err ? ` · <span style="color:#ef4444;">Lỗi: ${err}</span>` : ''}`;
+      } else if (daemonStatusText) {
         daemonStatusText.innerHTML = `Đang đồng bộ <strong>${(d.totalProducts || 0).toLocaleString('vi-VN')} SP</strong> (giá & tồn kho) mỗi <strong>${d.intervalMinutes} phút</strong>. Quét gần nhất: <strong>${lastStr}</strong> ➔ Lần kế tiếp: <strong>${nextStr}</strong>${d.lastError ? ` · <span style="color:#ef4444;">Lỗi lần trước: ${esc(d.lastError)}</span>` : ''}`;
       }
     }
   } catch (e) {}
 }
-setInterval(updateDaemonStatusUI, 15000);
+setInterval(updateDaemonStatusUI, 10000);
 
 socket.on('REALTIME_HEARTBEAT', data => {
   updateDaemonStatusUI();
@@ -431,3 +432,194 @@ if (btnSaveCookie) {
 
 loadData();
 updateAuthStatusUI();
+
+
+// ============================ THIẾT LẬP GIÁ BÁN ============================
+const pricingState = { page: 1, search: '', filter: '', categories: [] };
+
+function fmtPct(v) {
+  return v == null || v === '' ? '' : String(v);
+}
+
+async function loadPricing() {
+  try {
+    const json = await (await adminFetch('/api/admin/pricing')).json();
+    if (!json.success) throw new Error(json.error);
+    const { rules, categories, stats, dropbuy } = json.data;
+    pricingState.categories = categories;
+
+    document.getElementById('prBase').value = rules.base;
+    document.getElementById('prMarkup').value = rules.markupPercent;
+    document.getElementById('prMinProfit').value = rules.minProfit;
+    document.getElementById('prRoundTo').value = String(rules.roundTo);
+    document.getElementById('prCapAtPublic').checked = !!rules.capAtPublic;
+
+    const badge = document.getElementById('pricingAuthBadge');
+    const note = document.getElementById('pricingAuthNote');
+    if (dropbuy.authenticated) {
+      badge.className = 'auth-badge badge-connected';
+      badge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Đang lấy giá CTV của ${esc(dropbuy.username || 'tài khoản DropBuy')}`;
+      note.innerHTML = `Đã có giá CTV cho <strong>${stats.wholesaleCount.toLocaleString('vi-VN')}/${stats.total.toLocaleString('vi-VN')}</strong> sản phẩm. Giá CTV được cập nhật lại mỗi lần quét giá.`;
+    } else {
+      badge.className = 'auth-badge badge-disconnected';
+      badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Chưa đăng nhập DropBuy';
+      note.innerHTML = `<span style="color:#f59e0b;">Chưa đăng nhập DropBuy nên chưa có giá CTV – giá gốc đang là <strong>giá niêm yết công khai</strong>. Đăng nhập ở thẻ <strong>Đăng Nhập DropBuy</strong> phía trên để lấy giá CTV chính xác.</span>`;
+    }
+
+    document.getElementById('pricingStats').innerHTML = [
+      ['Sản phẩm', stats.total.toLocaleString('vi-VN')],
+      ['Có giá CTV', stats.wholesaleCount.toLocaleString('vi-VN')],
+      ['Lãi TB / SP còn hàng', formatPrice(stats.avgProfit)],
+      ['SP bị lỗ', stats.negativeProfit],
+      ['Giá bán > niêm yết DropBuy', stats.abovePublic.toLocaleString('vi-VN')]
+    ].map(([k, v]) => `<div class="pricing-stat"><span>${k}</span><strong>${v}</strong></div>`).join('');
+
+    document.getElementById('prCategoryList').innerHTML = categories.map(c => `
+      <label class="pricing-cat">
+        <span>${esc(c.name)} <small>(${c.product_count})</small></span>
+        <input type="number" min="0" max="300" step="0.5" data-cat="${c.id}" value="${fmtPct(c.markupPercent)}" placeholder="${rules.markupPercent}">
+        <span>%</span>
+      </label>`).join('');
+  } catch (e) {
+    document.getElementById('pricingAuthNote').innerText = 'Lỗi tải thiết lập giá: ' + e.message;
+  }
+}
+
+document.getElementById('pricingForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const categoryMarkups = {};
+  document.querySelectorAll('#prCategoryList input[data-cat]').forEach(inp => {
+    if (inp.value !== '') categoryMarkups[inp.dataset.cat] = parseFloat(inp.value);
+  });
+  const body = {
+    base: document.getElementById('prBase').value,
+    markupPercent: parseFloat(document.getElementById('prMarkup').value),
+    minProfit: parseFloat(document.getElementById('prMinProfit').value) || 0,
+    roundTo: parseInt(document.getElementById('prRoundTo').value, 10),
+    capAtPublic: document.getElementById('prCapAtPublic').checked,
+    categoryMarkups
+  };
+  const msg = document.getElementById('pricingSaveMsg');
+  msg.innerText = 'Đang áp dụng...';
+  try {
+    const json = await (await adminFetch('/api/admin/pricing', { method: 'POST', body: JSON.stringify(body) })).json();
+    if (!json.success) throw new Error(json.error);
+    msg.innerText = json.message;
+    loadPricing();
+    loadPricingTable();
+  } catch (err) {
+    msg.innerText = 'Lỗi: ' + err.message;
+  }
+});
+
+async function loadPricingTable() {
+  const params = new URLSearchParams({ page: pricingState.page, limit: 20, search: pricingState.search, filter: pricingState.filter });
+  const tbody = document.getElementById('pricingTableBody');
+  try {
+    const json = await (await adminFetch(`/api/admin/pricing/products?${params}`)).json();
+    if (!json.success) throw new Error(json.error);
+    if (json.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#9ca3af; padding:16px;">Không có sản phẩm</td></tr>';
+    } else {
+      tbody.innerHTML = json.data.map(r => `
+        <tr data-id="${r.id}">
+          <td style="max-width:320px;">
+            <a href="${esc(r.dropbuy_url)}" target="_blank" rel="noopener" style="color:#e2e8f0;">${esc(r.name)}</a><br>
+            <small style="color:#64748b;">${esc(r.sku)} · ${esc(r.category_name || '')}${r.in_stock ? '' : ' · <span style="color:#ef4444;">hết hàng</span>'}</small>
+          </td>
+          <td>${formatPrice(r.public_price)}</td>
+          <td>${r.wholesale_price ? `<strong>${formatPrice(r.wholesale_price)}</strong>` : '<small style="color:#64748b;">chưa có</small>'}</td>
+          <td><strong style="color:#c9a84c;">${formatPrice(r.price)}</strong><br><small style="color:#64748b;">${esc(r.rule || '')}</small></td>
+          <td style="color:${r.profit < 0 ? '#ef4444' : '#10b981'};"><strong>${formatPrice(r.profit)}</strong></td>
+          <td style="white-space:nowrap;">
+            <select class="pr-ov-type" style="width:auto;">
+              <option value="percent" ${r.override?.type === 'percent' ? 'selected' : ''}>% lãi</option>
+              <option value="fixed" ${r.override?.type === 'fixed' ? 'selected' : ''}>giá cố định</option>
+            </select>
+            <input class="pr-ov-value" type="number" min="0" style="width:110px;" value="${r.override ? r.override.value : ''}" placeholder="mặc định">
+            <button type="button" class="btn-check-paid pr-ov-save" style="padding:4px 8px; font-size:11px;">Lưu</button>
+            ${r.override ? '<button type="button" class="btn-ghost pr-ov-clear" style="padding:4px 8px; font-size:11px;">Bỏ</button>' : ''}
+          </td>
+        </tr>`).join('');
+    }
+    const pag = document.getElementById('pricingPagination');
+    pag.innerHTML = json.totalPages > 1 ? `
+      <button type="button" class="pag-btn" ${json.page <= 1 ? 'disabled' : ''} data-page="${json.page - 1}">‹ Trước</button>
+      <span>Trang ${json.page}/${json.totalPages} · ${json.total.toLocaleString('vi-VN')} SP</span>
+      <button type="button" class="pag-btn" ${json.page >= json.totalPages ? 'disabled' : ''} data-page="${json.page + 1}">Sau ›</button>` : `<span>${json.total.toLocaleString('vi-VN')} SP</span>`;
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:#ef4444;">Lỗi: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+document.getElementById('pricingPagination').addEventListener('click', e => {
+  const b = e.target.closest('[data-page]');
+  if (!b || b.disabled) return;
+  pricingState.page = Number(b.dataset.page);
+  loadPricingTable();
+});
+
+let prSearchTimer = null;
+document.getElementById('prSearch').addEventListener('input', e => {
+  clearTimeout(prSearchTimer);
+  prSearchTimer = setTimeout(() => {
+    pricingState.search = e.target.value.trim();
+    pricingState.page = 1;
+    loadPricingTable();
+  }, 300);
+});
+document.getElementById('prFilter').addEventListener('change', e => {
+  pricingState.filter = e.target.value;
+  pricingState.page = 1;
+  loadPricingTable();
+});
+
+document.getElementById('pricingTableBody').addEventListener('click', async e => {
+  const row = e.target.closest('tr[data-id]');
+  if (!row) return;
+  const clear = e.target.closest('.pr-ov-clear');
+  if (!clear && !e.target.closest('.pr-ov-save')) return;
+  const body = {
+    product_id: Number(row.dataset.id),
+    type: row.querySelector('.pr-ov-type').value,
+    value: clear ? null : row.querySelector('.pr-ov-value').value
+  };
+  try {
+    const json = await (await adminFetch('/api/admin/pricing/override', { method: 'POST', body: JSON.stringify(body) })).json();
+    if (!json.success) throw new Error(json.error);
+    loadPricingTable();
+    loadPricing();
+  } catch (err) {
+    alert('Lỗi: ' + err.message);
+  }
+});
+
+// ============================ KIỂM TRA KẾT NỐI DROPBUY ============================
+document.getElementById('healthCheckBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('healthCheckBtn');
+  const out = document.getElementById('healthResult');
+  btn.disabled = true;
+  out.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra các API DropBuy...';
+  try {
+    const json = await (await adminFetch('/api/admin/dropbuy-health')).json();
+    if (!json.success) throw new Error(json.error);
+    const r = json.data;
+    out.innerHTML = `
+      <div style="margin-bottom:8px;"><strong style="color:${r.ok ? '#10b981' : '#ef4444'};">${r.ok ? '✅ Các API bắt buộc hoạt động bình thường' : '❌ Có API bắt buộc đang lỗi'}</strong> · ${new Date(r.checked_at).toLocaleTimeString('vi-VN')}</div>
+      <table class="orders-table"><tbody>${r.checks.map(c => `
+        <tr><td>${c.ok ? '✅' : c.required ? '❌' : '⚠️'} ${esc(c.name)}</td><td>${c.ms} ms</td><td>${esc(c.detail)}</td></tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) {
+    out.innerText = 'Lỗi: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+socket.on('PRODUCTS_UPDATED', () => {
+  clearTimeout(window.__prReload);
+  window.__prReload = setTimeout(() => { loadPricing(); loadPricingTable(); }, 1500);
+});
+
+loadPricing();
+loadPricingTable();

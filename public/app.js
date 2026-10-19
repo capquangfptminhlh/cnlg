@@ -621,9 +621,16 @@ checkoutForm.addEventListener('submit', async e => {
     const res = await fetch('/api/orders/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customer, items: state.cart.map(i => ({ id: i.id, quantity: i.quantity })) })
+      body: JSON.stringify({ customer, items: state.cart.map(i => ({ id: i.id, quantity: i.quantity, price: i.price })) })
     });
     const json = await res.json();
+    if (res.status === 409 && Array.isArray(json.items)) {
+      // Giá / tồn kho vừa đổi trên DropBuy: cập nhật giỏ rồi để khách xác nhận lại tổng tiền
+      applyProductPatches(json.items);
+      openCheckoutModal();
+      alert(json.error + '\n\nGiỏ hàng đã được cập nhật theo dữ liệu mới nhất, vui lòng kiểm tra lại tổng tiền và bấm đặt hàng lần nữa.');
+      return;
+    }
     if (!json.success) {
       alert('Không tạo được đơn: ' + json.error);
       if (/hết hàng|không còn/.test(json.error || '')) refreshCartPrices();
@@ -728,11 +735,64 @@ socket.on('PAYMENT_CONFIRMED', data => {
   updateCartUI();
 });
 
-socket.on('REALTIME_CATALOG_SYNC', data => {
-  showToast(esc(data.message || 'Kho DropBuy vừa cập nhật dữ liệu!'));
-  fetchProducts();
-  refreshCartPrices();
+/**
+ * Cập nhật tại chỗ khi DropBuy đổi giá / tồn kho (server đẩy qua socket `PRODUCTS_UPDATED`):
+ * lưới sản phẩm, giỏ hàng và cửa sổ chi tiết đang mở – không tải lại cả trang.
+ */
+function applyProductPatches(patches) {
+  if (!Array.isArray(patches) || patches.length === 0) return;
+  let gridDirty = false;
+  const cartNotes = [];
+  for (const patch of patches) {
+    const cached = productCache.get(patch.id);
+    if (cached) Object.assign(cached, patch);
+    const inGrid = state.products.find(p => p.id === patch.id);
+    if (inGrid) {
+      Object.assign(inGrid, patch);
+      gridDirty = true;
+    }
+    const line = state.cart.find(i => i.id === patch.id);
+    if (line) {
+      if (patch.in_stock === false) {
+        state.cart = state.cart.filter(i => i.id !== patch.id);
+        cartNotes.push(`"${patch.name}" vừa hết hàng`);
+      } else if (patch.price !== line.price) {
+        cartNotes.push(`"${patch.name}" đổi giá ${formatPrice(line.price)} → ${formatPrice(patch.price)}`);
+        line.price = patch.price;
+      }
+    }
+    if (state.activeDetailProduct?.id === patch.id && productDetailModal.classList.contains('open')) {
+      Object.assign(state.activeDetailProduct, patch);
+      renderDetailModal(state.activeDetailProduct);
+    }
+  }
+  if (gridDirty) renderProducts();
+  if (cartNotes.length) {
+    updateCartUI();
+    showToast(esc(cartNotes.join(' · ').slice(0, 160)));
+  }
+}
+
+socket.on('PRODUCTS_UPDATED', data => {
+  applyProductPatches(data.items);
+  setLiveStamp(data.at);
 });
+
+socket.on('REALTIME_HEARTBEAT', data => setLiveStamp(data?.stock?.lastOk || data?.lastSyncTime));
+
+function setLiveStamp(at) {
+  if (!at) return;
+  let el = document.getElementById('liveSyncStamp');
+  if (!el) {
+    el = document.createElement('span');
+    el.id = 'liveSyncStamp';
+    el.className = 'catalog-badge live-sync-badge';
+    catalogCount.insertAdjacentElement('afterend', el);
+  }
+  el.innerHTML = `<span class="live-dot"></span> Giá & tồn kho đồng bộ DropBuy lúc ${new Date(at).toLocaleTimeString('vi-VN')}`;
+}
+
+fetch('/api/realtime/status').then(r => r.json()).then(j => j.success && setLiveStamp(j.data.stock?.lastOk || j.data.lastSyncTime)).catch(() => {});
 
 // Khách chỉ BÁO đã chuyển khoản; cửa hàng đối soát rồi mới xác nhận (trước đây nút này tự đánh dấu "đã thanh toán")
 reportPaidBtn.addEventListener('click', async () => {

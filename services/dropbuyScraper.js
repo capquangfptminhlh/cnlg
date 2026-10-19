@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const pricing = require('./pricing');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
@@ -8,6 +9,7 @@ const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 
 const DROPBUY_API_SEARCH = 'https://dropbuy.vn/api/proxy/bff/variations/search';
 const DROPBUY_API_PRICE = 'https://dropbuy.vn/api/proxy/bff/variations/get-price';
+const DROPBUY_API_IN_STOCK = 'https://dropbuy.vn/api/proxy/bff/variations/in-stock';
 const DROPBUY_CATEGORIES_URL = 'https://r6s.pen.dropbuy.vn/dalon-web-public/categories/categories-all.json';
 const CDN_BASE = 'https://r6i.pen.dropbuy.vn';
 
@@ -20,10 +22,14 @@ function getConfig() {
   return { pricing: { markupPercent: 15 } };
 }
 
-/** % lợi nhuận cộng thêm. Cho phép 0% (không dùng `||` để 0 không bị đổi thành 15). */
+/** Quy tắc giá bán (xem services/pricing.js) + bản đồ danh mục con → gốc */
+function getPricingContext(config = getConfig()) {
+  return { rules: pricing.normalizeRules(config.pricing || {}), rootMap: pricing.rootCategoryMap(getCategories()) };
+}
+
+/** Giữ tương thích: % lãi mặc định dạng thập phân */
 function getMarkup(config = getConfig()) {
-  const m = Number(config.pricing?.markupPercent);
-  return Number.isFinite(m) && m >= 0 ? m / 100 : 0.15;
+  return pricing.normalizeRules(config.pricing || {}).markupPercent / 100;
 }
 
 function dropbuyHeaders(config = getConfig()) {
@@ -147,14 +153,16 @@ async function fetchWholesalePrices(items, config = getConfig()) {
   return map;
 }
 
-/** Chuyển 1 item tìm kiếm của DropBuy thành sản phẩm của hoangminh.com. */
-function mapItem(item, { markup, priceMap }) {
+/**
+ * Chuyển 1 item tìm kiếm của DropBuy thành sản phẩm của hoangminh.com.
+ * opts: { ctx: getPricingContext(), priceMap, previous (SP cũ), keepWholesale (đang đăng nhập nhưng lô giá lỗi → giữ giá sỉ cũ) }
+ */
+function mapItem(item, { ctx = getPricingContext(), priceMap, previous, keepWholesale } = {}) {
   const pid = item.product_id || item.id;
   const publicPrice = Number(item.price_public || item.regular_price || 0);
-  const wholesale = priceMap?.get(item.unique_id);
-  const cost = wholesale ? wholesale.cost : publicPrice;
-  const retailPrice = Math.round((cost * (1 + markup)) / 1000) * 1000;
-  return {
+  const live = priceMap?.get(item.unique_id);
+  const wholesale = live ? live.cost : keepWholesale && previous?.wholesale_price ? previous.wholesale_price : null;
+  const base = {
     id: pid,
     dropbuy_id: pid,
     variation_id: item.unique_id || null,
@@ -164,13 +172,8 @@ function mapItem(item, { markup, priceMap }) {
     dropbuy_url: `https://dropbuy.vn/${item.slug}_p${pid}`,
     category_id: item.category_id,
     category_name: item.category_name,
-    price: retailPrice,
-    // Chỉ hiện giá gạch ngang khi có giá tham chiếu thật (giá niêm yết DropBuy) cao hơn giá bán
-    original_price: publicPrice > retailPrice ? publicPrice : null,
-    dropbuy_cost: cost,
     public_price: publicPrice,
-    profit_margin: retailPrice - cost,
-    is_wholesale_price: !!wholesale,
+    wholesale_price: wholesale,
     image: formatImageUrl(item.res_thumbnail_url, '256x256'),
     image_hd: formatImageUrl(item.res_thumbnail_url, '1024x1024'),
     in_stock: item.in_stock !== false,
@@ -180,24 +183,49 @@ function mapItem(item, { markup, priceMap }) {
     is_flash_sale: !!item.is_flash_sale,
     updated_at: new Date().toISOString()
   };
+  return applyPricing(base, ctx);
+}
+
+/** Tính lại giá bán của 1 SP theo quy tắc hiện tại (không cần gọi DropBuy). */
+function applyPricing(p, ctx = getPricingContext()) {
+  const r = pricing.computePrice(p, ctx.rules, ctx.rootMap);
+  p.price = r.price;
+  p.original_price = r.original_price;
+  p.dropbuy_cost = r.cost;
+  p.profit_margin = r.price - r.cost;
+  p.is_wholesale_price = r.base_used === 'wholesale';
+  p.pricing_rule = r.rule;
+  return p;
+}
+
+/** Tính lại toàn bộ catalog sau khi admin đổi quy tắc giá. Trả về danh sách SP đổi giá. */
+function repriceAll(products, ctx = getPricingContext()) {
+  const changed = [];
+  for (const p of products) {
+    const before = `${p.price}|${p.original_price}`;
+    applyPricing(p, ctx);
+    if (`${p.price}|${p.original_price}` !== before) changed.push(p);
+  }
+  return changed;
 }
 
 // Sync catalog: page by page until complete or up to maxItems
 async function syncCatalog(options = {}) {
   const { maxPages = 20, pageSize = 100, onProgress } = options;
   const config = getConfig();
-  const markup = getMarkup(config);
+  const ctx = getPricingContext(config);
 
-  console.log(`[Scraper] Starting full catalog sync from Dropbuy (Markup: +${markup * 100}%)...`);
+  console.log(`[Scraper] Starting full catalog sync from Dropbuy (lãi mặc định +${ctx.rules.markupPercent}%)...`);
   await syncCategories();
 
   const { items, totalRecords } = await fetchAllSearchItems(config, { maxPages, pageSize, onProgress });
   const priceMap = await fetchWholesalePrices(items, config);
   console.log(`[Scraper] Đã tải ${items.length}/${totalRecords} SP; giá sỉ F1: ${priceMap.size} SP${config.dropbuy?.cookieHeader ? '' : ' (chưa đăng nhập DropBuy → dùng giá công khai)'}`);
 
+  const previous = new Map(getProducts().map(p => [p.id, p]));
   const map = new Map();
   for (const item of items) {
-    const p = mapItem(item, { markup, priceMap });
+    const p = mapItem(item, { ctx, priceMap, previous: previous.get(item.product_id), keepWholesale: !!config.dropbuy?.cookieHeader });
     if (!map.has(p.id)) map.set(p.id, p);
   }
   const uniqueProducts = Array.from(map.values());
@@ -207,19 +235,68 @@ async function syncCatalog(options = {}) {
     console.warn('[Scraper] Không tải được sản phẩm nào – giữ nguyên dữ liệu cũ.');
     return getProducts();
   }
-  fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(uniqueProducts, null, 2), 'utf8');
+  // Tồn kho chuẩn theo API in-stock (cấp sản phẩm, giống nhãn hết hàng trên dropbuy.vn)
+  try {
+    const stock = await fetchStockMap(uniqueProducts.map(p => p.id), config);
+    for (const p of uniqueProducts) if (stock.has(p.id)) p.in_stock = stock.get(p.id);
+  } catch (e) {
+    console.warn('[Scraper] Không lấy được tồn kho in-stock:', e.message);
+  }
+  saveProducts(uniqueProducts);
   console.log(`[Scraper] DONE! Successfully saved ${uniqueProducts.length} products to ${PRODUCTS_FILE}`);
   return uniqueProducts;
 }
 
-// Get loaded products
+/**
+ * Tồn kho realtime: `variations/in-stock` nhận danh sách product_ids, trả [{product_id, in_stock}].
+ * ~1,6s cho toàn bộ ~1.300 SP → đủ nhanh để quét mỗi 30 giây.
+ */
+async function fetchStockMap(ids, config = getConfig(), batchSize = 700) {
+  const map = new Map();
+  for (let i = 0; i < ids.length; i += batchSize) {
+    const res = await fetch(DROPBUY_API_IN_STOCK, { method: 'POST', headers: dropbuyHeaders(config), body: JSON.stringify({ product_ids: ids.slice(i, i + batchSize) }) });
+    if (!res.ok) throw new Error(`in-stock HTTP ${res.status}`);
+    const json = await res.json();
+    if (!json.success || !Array.isArray(json.data)) throw new Error(`in-stock: ${json.message || 'dữ liệu không hợp lệ'}`);
+    for (const r of json.data) map.set(r.product_id, !!r.in_stock);
+  }
+  return map;
+}
+
+/** Tra 1 sản phẩm trực tiếp trên DropBuy theo SKU (dùng khi khách đặt hàng / mở chi tiết). */
+async function searchBySku(sku, config = getConfig()) {
+  const res = await fetch(DROPBUY_API_SEARCH, { method: 'POST', headers: dropbuyHeaders(config), body: JSON.stringify({ page_num: 1, page_size: 5, in_stock_mode: 'ALL', keyword: sku }) });
+  if (!res.ok) throw new Error(`search HTTP ${res.status}`);
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message || 'search lỗi');
+  return (json.data.items || []).find(i => i.sku === sku) || null;
+}
+
+// --- Bộ nhớ đệm sản phẩm: tránh parse lại file JSON ~1,3MB ở mỗi request ---
+let productsCache = null;
+let productsMtime = 0;
+
 function getProducts() {
   try {
-    if (fs.existsSync(PRODUCTS_FILE)) {
-      return JSON.parse(fs.readFileSync(PRODUCTS_FILE, 'utf8'));
+    if (!fs.existsSync(PRODUCTS_FILE)) return [];
+    const mtime = fs.statSync(PRODUCTS_FILE).mtimeMs;
+    if (!productsCache || mtime !== productsMtime) {
+      productsCache = JSON.parse(fs.readFileSync(PRODUCTS_FILE, 'utf8'));
+      productsMtime = mtime;
     }
-  } catch (e) {}
-  return [];
+    return productsCache.slice();
+  } catch (e) {
+    return productsCache ? productsCache.slice() : [];
+  }
+}
+
+/** Ghi products.json an toàn (file tạm + đổi tên) và cập nhật bộ nhớ đệm. */
+function saveProducts(list) {
+  const tmp = `${PRODUCTS_FILE}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(list, null, 2), 'utf8');
+  fs.renameSync(tmp, PRODUCTS_FILE);
+  productsCache = list;
+  productsMtime = fs.statSync(PRODUCTS_FILE).mtimeMs;
 }
 
 // Get loaded categories
@@ -238,8 +315,15 @@ module.exports = {
   fetchAllSearchItems,
   fetchWholesalePrices,
   mapItem,
+  applyPricing,
+  repriceAll,
+  getPricingContext,
   getMarkup,
+  getConfig,
+  fetchStockMap,
+  searchBySku,
   getProducts,
+  saveProducts,
   getCategories,
   formatImageUrl,
   cleanCategoryName

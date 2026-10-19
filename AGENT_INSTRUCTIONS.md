@@ -97,3 +97,12 @@ Server chạy mặc định tại cổng `3000` (URL: `http://localhost:3000`).
 6. **Giá sỉ F1**: API `variations/search` của DropBuy chỉ trả `price_public`. Giá đại lý lấy qua `variations/get-price` với `{ variation_id: item.unique_id, product_id }` và cookie đăng nhập (`fetchWholesalePrices` trong `dropbuyScraper.js`). Chưa đăng nhập → giá vốn = giá công khai.
 7. **Không bịa số liệu trên giao diện**: không hiển thị "đã bán", sao đánh giá, % giảm giá cố định. Giá gạch ngang chỉ khi giá niêm yết DropBuy cao hơn giá bán; nhãn Mall theo `is_mall`; hết hàng theo `in_stock`.
 8. **Bot đặt hàng LIVE trên DropBuy mặc định tắt** (`RELAY_LIVE_BOT=true` mới bật). Form DropBuy cần Tỉnh/Huyện/Xã có cấu trúc trong khi form hoangminh chỉ có địa chỉ dạng chữ, và bot chưa được kiểm thử đầu-cuối (đặt hàng bằng tiền thật). Mặc định: khách trả tiền vào TK của shop, admin đặt đơn trên DropBuy rồi bấm "Đã đặt bên DropBuy".
+
+## ⚡ 7. ĐỒNG BỘ REALTIME & THIẾT LẬP GIÁ (cập nhật 19/10/2026)
+
+- `services/realtimeSync.js` chạy 2 vòng: **tồn kho** mỗi `STOCK_SYNC_SECONDS` (mặc định 30s, 1 lần gọi `variations/in-stock` cho mọi SP ~1,6s) và **giá & catalog** mỗi `PRICE_SYNC_SECONDS` (mặc định 120s, quét `variations/search` + `get-price` khi đã đăng nhập). Lỗi → giãn nhịp lũy thừa tới 10 phút.
+- Thay đổi được đẩy qua socket `PRODUCTS_UPDATED` (chỉ các SP đổi); `public/app.js` cập nhật tại chỗ lưới, giỏ hàng, cửa sổ chi tiết. Không tải lại cả trang.
+- Đặt hàng: `liveCheck()` tra lại từng SP trên DropBuy theo SKU + in-stock. Giá lệch với giá khách thấy hoặc hết hàng → HTTP 409 kèm dữ liệu mới, frontend cập nhật giỏ và yêu cầu khách xác nhận lại.
+- Giá bán = `services/pricing.js` (`computePrice`): giá gốc (CTV/F1 nếu đã đăng nhập, ngược lại giá niêm yết) + % lãi (mặc định / theo danh mục gốc / riêng từng SP hoặc giá cố định), lãi tối thiểu, làm tròn lên, tuỳ chọn không vượt giá niêm yết. Lưu ở `config.pricing`; đổi quy tắc → `repriceNow()` tính lại toàn bộ ngay, không cần gọi DropBuy.
+- SP lưu cả `public_price` và `wholesale_price`; mất phiên tạm thời thì giữ `wholesale_price` cũ.
+- Admin: mục "Thiết Lập Giá Bán" (`/api/admin/pricing*`) và "Kiểm Tra Kết Nối API DropBuy" (`/api/admin/dropbuy-health`). Dòng lệnh: `npm run test:dropbuy`.

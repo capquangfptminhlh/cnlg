@@ -13,6 +13,8 @@ const relay = require('./services/dropbuyRelay');
 const dropbuyAuth = require('./services/dropbuyAuth');
 const realtimeSync = require('./services/realtimeSync');
 const { requireAdmin, getAdminPassword, sanitizeHtml, maskPhone } = require('./services/security');
+const pricing = require('./services/pricing');
+const { checkDropbuy } = require('./services/dropbuyHealth');
 
 const app = express();
 const server = http.createServer(app);
@@ -48,7 +50,7 @@ function readConfig() {
 /** Trường nội bộ (giá vốn, lãi) không được trả ra cho khách. */
 function publicProduct(p) {
   if (!p) return p;
-  const { dropbuy_cost, profit_margin, is_wholesale_price, public_price, ...rest } = p;
+  const { dropbuy_cost, profit_margin, is_wholesale_price, public_price, wholesale_price, pricing_rule, ...rest } = p;
   const discount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
   return { ...rest, discount_percent: discount };
 }
@@ -156,12 +158,19 @@ app.get('/api/products', (req, res) => {
   }
 });
 
+const liveRefreshAt = new Map();
 app.get('/api/products/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const product = scraper.getProducts().find(p => p.id === id);
     if (!product) {
       return res.status(404).json({ success: false, error: 'Product not found' });
+    }
+    // Làm mới giá/tồn kho trực tiếp từ DropBuy (chạy nền, tối đa 1 lần / 30s mỗi SP); thay đổi được đẩy qua socket
+    const last = liveRefreshAt.get(id) || 0;
+    if (Date.now() - last > 30000) {
+      liveRefreshAt.set(id, Date.now());
+      realtimeSync.liveCheck([id]).catch(() => {});
     }
     const detail = await detailScraper.fetchProductFullDetail(product, false);
     // Giá / tồn kho luôn lấy từ catalog hiện tại (bản cache chi tiết có thể đã cũ)
@@ -197,30 +206,44 @@ app.post('/api/orders/checkout', async (req, res) => {
     }
     if (items.length > 30) return res.status(400).json({ success: false, error: 'Tối đa 30 mặt hàng mỗi đơn.' });
 
-    const catalog = new Map(scraper.getProducts().map(p => [p.id, p]));
+    const known = new Map(scraper.getProducts().map(p => [p.id, p]));
     const merged = new Map();
+    const expected = new Map();
     for (const it of items) {
       const id = Number(it?.id);
       const qty = Number(it?.quantity);
       if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY_PER_ITEM) {
         return res.status(400).json({ success: false, error: `Số lượng không hợp lệ (1–${MAX_QTY_PER_ITEM}).` });
       }
-      const p = catalog.get(id);
-      if (!p) return res.status(400).json({ success: false, error: `Sản phẩm #${it?.id} không còn tồn tại.` });
-      if (p.in_stock === false) return res.status(400).json({ success: false, error: `"${p.name}" đã hết hàng.` });
+      if (!known.has(id)) return res.status(400).json({ success: false, error: `Sản phẩm #${it?.id} không còn tồn tại.` });
       merged.set(id, (merged.get(id) || 0) + qty);
+      if (Number.isFinite(Number(it?.price))) expected.set(id, Number(it.price));
+    }
+
+    // Kiểm tra trực tiếp trên DropBuy (giá theo SKU + tồn kho) ngay trước khi tạo đơn
+    const live = await realtimeSync.liveCheck([...merged.keys()]);
+    const catalog = live.products;
+    const problems = [];
+    for (const id of merged.keys()) {
+      const p = catalog.get(id);
+      if (p.in_stock === false) problems.push({ id, name: p.name, reason: 'OUT_OF_STOCK', message: `"${p.name}" vừa hết hàng trên kho DropBuy.` });
+      else if (expected.has(id) && expected.get(id) !== p.price) problems.push({ id, name: p.name, reason: 'PRICE_CHANGED', old_price: expected.get(id), price: p.price, message: `Giá "${p.name}" vừa đổi từ ${expected.get(id).toLocaleString('vi-VN')} đ thành ${p.price.toLocaleString('vi-VN')} đ.` });
+    }
+    if (problems.length) {
+      return res.status(409).json({ success: false, error: problems.map(x => x.message).join(' '), problems, items: [...merged.keys()].map(id => publicProduct(catalog.get(id))) });
     }
 
     const orderItems = [...merged.entries()].map(([id, quantity]) => {
       const p = catalog.get(id);
-      return { id, sku: p.sku, variation_id: p.variation_id || null, name: p.name, price: p.price, quantity, image: p.image, dropbuy_url: p.dropbuy_url, dropbuy_cost: p.dropbuy_cost };
+      return { id, sku: p.sku, variation_id: p.variation_id || null, name: p.name, price: p.price, quantity, image: p.image, dropbuy_url: p.dropbuy_url, dropbuy_cost: p.dropbuy_cost, cost_is_wholesale: !!p.is_wholesale_price };
     });
     const total_amount = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
 
     const order = orderStore.createOrder({
       customer: { name: name.slice(0, 100), phone, address: address.slice(0, 300), note: String(customer?.note || '').slice(0, 500) },
       items: orderItems,
-      total_amount
+      total_amount,
+      live_verified: live.ok
     });
     console.log(`[Order] Đã tiếp nhận đơn hàng #${order.id} trị giá ${order.total_amount.toLocaleString('vi-VN')} đ`);
 
@@ -292,7 +315,7 @@ app.get('/api/admin/config', requireAdmin, (req, res) => {
 });
 
 // Chỉ cho sửa các trường cấu hình an toàn; không ghi đè phiên đăng nhập DropBuy
-app.post('/api/admin/config', requireAdmin, (req, res) => {
+app.post('/api/admin/config', requireAdmin, async (req, res) => {
   try {
     const b = req.body || {};
     const cfg = readConfig();
@@ -302,7 +325,7 @@ app.post('/api/admin/config', requireAdmin, (req, res) => {
     if (b.pricing) {
       const m = Number(b.pricing.markupPercent);
       if (!Number.isFinite(m) || m < 0 || m > 300) return res.status(400).json({ success: false, error: 'Markup phải từ 0 đến 300%' });
-      cfg.pricing = { ...(cfg.pricing || {}), markupPercent: m };
+      cfg.pricing = pricing.normalizeRules({ ...(cfg.pricing || {}), markupPercent: m });
     }
     if (b.bank) {
       const { bankId, bankName, accountNo, accountName } = b.bank;
@@ -313,26 +336,18 @@ app.post('/api/admin/config', requireAdmin, (req, res) => {
     }
     if (b.store) cfg.store = { ...(cfg.store || {}), ...b.store };
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
-    res.json({ success: true, message: 'Đã lưu cấu hình thành công! Giá mới áp dụng từ lần đồng bộ kế tiếp.' });
+    const changed = b.pricing ? await realtimeSync.repriceNow() : 0;
+    res.json({ success: true, message: b.pricing ? `Đã lưu cấu hình và cập nhật giá ${changed} sản phẩm.` : 'Đã lưu cấu hình thành công!' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-let catalogSyncRunning = false;
-function runCatalogSync(opts, wholesale) {
-  if (catalogSyncRunning) return false;
-  catalogSyncRunning = true;
-  scraper.syncCatalog(opts)
-    .then(products => io.emit('CATALOG_SYNC_COMPLETED', { total: products.length, wholesale }))
-    .catch(err => console.error('[Sync Error]:', err.message))
-    .finally(() => { catalogSyncRunning = false; });
-  return true;
-}
-
 app.post('/api/admin/sync', requireAdmin, (req, res) => {
-  const started = runCatalogSync({ maxPages: Number(req.body?.maxPages) || 20, pageSize: 100 }, false);
-  res.json({ success: true, message: started ? 'Tiến trình đồng bộ kho hàng DropBuy đã bắt đầu!' : 'Đồng bộ đang chạy, vui lòng chờ.' });
+  realtimeSync.runFullSync5Min(io)
+    .then(() => io.emit('CATALOG_SYNC_COMPLETED', { total: scraper.getProducts().length }))
+    .catch(err => console.error('[Manual sync]:', err.message));
+  res.json({ success: true, message: 'Đã bắt đầu quét lại toàn bộ kho DropBuy (giá + tồn kho).' });
 });
 
 let imageJobRunning = false;
@@ -366,7 +381,7 @@ app.post('/api/dropbuy/login', requireAdmin, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Vui lòng nhập tài khoản và mật khẩu DropBuy' });
     }
     const result = await dropbuyAuth.loginDropbuy(username, password);
-    runCatalogSync({}, true);
+    realtimeSync.runFullSync5Min(io).catch(err => console.error('[Sync after login]:', err.message));
     io.emit('DROPBUY_AUTH_CHANGED', { authenticated: true });
     res.json({ success: true, message: 'Đăng nhập DropBuy thành công! Đang đồng bộ lại giá sỉ.', data: { username: result.username, method: result.method } });
   } catch (err) {
@@ -377,7 +392,7 @@ app.post('/api/dropbuy/login', requireAdmin, async (req, res) => {
 app.post('/api/dropbuy/set-cookie', requireAdmin, async (req, res) => {
   try {
     const result = await dropbuyAuth.setManualCookie(req.body?.cookie);
-    runCatalogSync({}, true);
+    realtimeSync.runFullSync5Min(io).catch(err => console.error('[Sync after set-cookie]:', err.message));
     io.emit('DROPBUY_AUTH_CHANGED', { authenticated: true });
     res.json({ success: true, message: result.message });
   } catch (err) {
@@ -397,6 +412,105 @@ app.post('/api/dropbuy/logout', requireAdmin, (req, res) => {
   const result = dropbuyAuth.logout();
   io.emit('DROPBUY_AUTH_CHANGED', { authenticated: false });
   res.json(result);
+});
+
+// --- Thiết lập giá bán (giá gốc DropBuy + % lãi) ---
+
+function pricingStats(products) {
+  const sellable = products.filter(p => p.in_stock !== false);
+  const profits = sellable.map(p => p.price - (p.dropbuy_cost || 0));
+  const belowPublic = products.filter(p => p.public_price && p.price <= p.public_price).length;
+  return {
+    total: products.length,
+    wholesaleCount: products.filter(p => p.wholesale_price > 0).length,
+    sellable: sellable.length,
+    avgProfit: profits.length ? Math.round(profits.reduce((a, b) => a + b, 0) / profits.length) : 0,
+    negativeProfit: products.filter(p => p.price < (p.dropbuy_cost || 0)).length,
+    belowOrEqualPublic: belowPublic,
+    abovePublic: products.length - belowPublic
+  };
+}
+
+app.get('/api/admin/pricing', requireAdmin, async (req, res) => {
+  const cfg = readConfig();
+  const rules = pricing.normalizeRules(cfg.pricing || {});
+  const products = scraper.getProducts();
+  const rootMap = pricing.rootCategoryMap(scraper.getCategories());
+  const roots = scraper.getCategories().filter(c => !c.parent_id).map(c => ({
+    id: c.id,
+    name: c.name,
+    product_count: products.filter(p => (rootMap.get(p.category_id) ?? p.category_id) === c.id).length,
+    markupPercent: rules.categoryMarkups[String(c.id)] ?? null
+  })).filter(c => c.product_count > 0).sort((a, b) => b.product_count - a.product_count);
+  const auth = await dropbuyAuth.getAuthStatus().catch(() => ({ authenticated: false }));
+  res.json({ success: true, data: { rules, categories: roots, stats: pricingStats(products), dropbuy: { authenticated: !!auth.authenticated, username: auth.username || null, message: auth.message } } });
+});
+
+app.post('/api/admin/pricing', requireAdmin, async (req, res) => {
+  try {
+    const cfg = readConfig();
+    const current = pricing.normalizeRules(cfg.pricing || {});
+    const b = req.body || {};
+    cfg.pricing = pricing.normalizeRules({
+      ...current,
+      ...b,
+      // Ghi đè từng SP không bị xoá khi lưu form chung
+      productOverrides: b.productOverrides ?? current.productOverrides
+    });
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
+    const changed = await realtimeSync.repriceNow();
+    res.json({ success: true, message: `Đã lưu thiết lập giá. ${changed} sản phẩm được cập nhật giá ngay.`, data: { rules: cfg.pricing, stats: pricingStats(scraper.getProducts()) } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/admin/pricing/products', requireAdmin, (req, res) => {
+  const { search = '', page = 1, limit = 20, filter = '' } = req.query;
+  const rules = pricing.normalizeRules(readConfig().pricing || {});
+  const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+  let list = scraper.getProducts();
+  if (search) list = list.filter(p => norm(p.name).includes(norm(search)) || norm(p.sku).includes(norm(search)) || String(p.id) === String(search));
+  if (filter === 'override') list = list.filter(p => rules.productOverrides[String(p.id)]);
+  if (filter === 'low') list = list.filter(p => p.price - (p.dropbuy_cost || 0) < Math.max(rules.minProfit, 1));
+  if (filter === 'abovePublic') list = list.filter(p => p.public_price && p.price > p.public_price);
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const lim = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+  const rows = list.slice((pageNum - 1) * lim, pageNum * lim).map(p => ({
+    id: p.id, sku: p.sku, name: p.name, image: p.image, category_name: p.category_name, in_stock: p.in_stock !== false,
+    public_price: p.public_price, wholesale_price: p.wholesale_price || null, cost: p.dropbuy_cost, price: p.price,
+    profit: p.price - (p.dropbuy_cost || 0), rule: p.pricing_rule, override: rules.productOverrides[String(p.id)] || null, dropbuy_url: p.dropbuy_url
+  }));
+  res.json({ success: true, total: list.length, page: pageNum, totalPages: Math.ceil(list.length / lim) || 1, data: rows });
+});
+
+// Đặt giá riêng 1 SP: { product_id, type: 'percent'|'fixed', value } – value null/'' = xoá giá riêng
+app.post('/api/admin/pricing/override', requireAdmin, async (req, res) => {
+  const { product_id, type, value } = req.body || {};
+  const id = Number(product_id);
+  if (!scraper.getProducts().some(p => p.id === id)) return res.status(404).json({ success: false, error: 'Không tìm thấy sản phẩm' });
+  const cfg = readConfig();
+  const rules = pricing.normalizeRules(cfg.pricing || {});
+  if (value === null || value === '' || value === undefined) delete rules.productOverrides[String(id)];
+  else {
+    const v = Number(value);
+    if (!Number.isFinite(v) || v < 0) return res.status(400).json({ success: false, error: 'Giá trị không hợp lệ' });
+    rules.productOverrides[String(id)] = { type: type === 'fixed' ? 'fixed' : 'percent', value: v };
+  }
+  cfg.pricing = rules;
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
+  await realtimeSync.repriceNow();
+  const p = scraper.getProducts().find(x => x.id === id);
+  res.json({ success: true, data: { id, price: p.price, cost: p.dropbuy_cost, profit: p.price - p.dropbuy_cost, rule: p.pricing_rule, override: rules.productOverrides[String(id)] || null } });
+});
+
+// Kiểm tra kết nối các API DropBuy
+app.get('/api/admin/dropbuy-health', requireAdmin, async (req, res) => {
+  try {
+    res.json({ success: true, data: await checkDropbuy() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.get('/api/realtime/status', (req, res) => {
@@ -423,5 +537,5 @@ server.listen(PORT, () => {
   console.log(`🔗 Storefront: http://localhost:${PORT}`);
   console.log(`🔗 Admin Console: http://localhost:${PORT}/admin.html`);
   console.log(`================================================================`);
-  realtimeSync.startRealtimeSync(io, 5 * 60 * 1000);
+  realtimeSync.startRealtimeSync(io);
 });

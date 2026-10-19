@@ -62,10 +62,10 @@
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
           <h3 style="margin: 0;">Đồng Bộ Kho DropBuy.vn</h3>
           <span class="auth-badge badge-connected" id="daemonStatusBadge" style="font-size: 11px;">
-            <i class="fa-solid fa-bolt"></i> Tự Động Nạp Giá & Tồn Kho: 5 Phút / 1 Lần
+            <i class="fa-solid fa-bolt"></i> <span id="daemonBadgeText">Realtime: tồn kho 30 giây · giá 2 phút</span>
           </span>
         </div>
-        <p style="margin: 0;" id="daemonStatusText">Hệ thống daemon đang tự động quét 100% kho DropBuy mỗi 5 phút.</p>
+        <p style="margin: 0;" id="daemonStatusText">Đang tải trạng thái đồng bộ...</p>
       </div>
       <div style="display: flex; gap: 10px;">
         <button class="btn-sync-now" id="downloadAllImagesBtn" style="background: #0f172a;">
@@ -134,11 +134,7 @@
 
           <hr class="divider">
 
-          <div class="form-group">
-            <label>Biên Lợi Nhuận (% Markup giá bán trên hoangminh.com)</label>
-            <input type="number" id="cfgMarkup" min="0" max="300" step="0.5" value="15">
-            <p class="help-text">Ví dụ: Giá sỉ DropBuy là 100,000 đ + 15% = 115,000 đ giá niêm yết trên hoangminh.com.</p>
-          </div>
+          <p class="help-text"><i class="fa-solid fa-tags"></i> % lãi và giá bán được thiết lập ở mục <a href="#pricingSection" style="color:#c9a84c;">Thiết Lập Giá Bán</a> bên dưới.</p>
 
           <hr class="divider">
 
@@ -193,6 +189,100 @@
           </table>
         </div>
       </div>
+    </div>
+
+    <!-- ===================== THIẾT LẬP GIÁ BÁN (như CTV) ===================== -->
+    <div class="admin-card" id="pricingSection" style="margin-top: 24px;">
+      <div class="flex-between" style="flex-wrap: wrap; gap: 10px;">
+        <h3 style="margin:0;"><i class="fa-solid fa-tags" style="color:#c9a84c;"></i> Thiết Lập Giá Bán (Giá gốc DropBuy + % lãi)</h3>
+        <span id="pricingAuthBadge" class="auth-badge badge-disconnected">...</span>
+      </div>
+      <p class="help-text" id="pricingAuthNote" style="margin-top:8px;"></p>
+
+      <div class="pricing-stats" id="pricingStats"></div>
+
+      <form id="pricingForm" class="pricing-grid">
+        <div class="form-group">
+          <label>Giá gốc để tính lãi</label>
+          <select id="prBase">
+            <option value="wholesale">Giá CTV/F1 của tài khoản DropBuy (cần đăng nhập)</option>
+            <option value="public">Giá niêm yết công khai trên DropBuy</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>% lãi mặc định</label>
+          <input type="number" id="prMarkup" min="0" max="300" step="0.5">
+        </div>
+        <div class="form-group">
+          <label>Lãi tối thiểu mỗi sản phẩm (đ)</label>
+          <input type="number" id="prMinProfit" min="0" step="1000">
+        </div>
+        <div class="form-group">
+          <label>Làm tròn giá bán lên</label>
+          <select id="prRoundTo">
+            <option value="1">Không làm tròn</option>
+            <option value="100">100 đ</option>
+            <option value="500">500 đ</option>
+            <option value="1000">1.000 đ</option>
+            <option value="5000">5.000 đ</option>
+            <option value="10000">10.000 đ</option>
+          </select>
+        </div>
+        <div class="form-group checkbox-group" style="grid-column: 1 / -1;">
+          <label><input type="checkbox" id="prCapAtPublic"> <strong>Không bán cao hơn giá niêm yết DropBuy</strong> (nếu vẫn còn lãi)</label>
+          <p class="help-text">Ví dụ: giá CTV 639.000 đ, niêm yết 2.650.000 đ, lãi 15% → bán 735.000 đ. Nếu chưa đăng nhập DropBuy, giá gốc = giá niêm yết nên +15% sẽ cao hơn giá DropBuy đang bán.</p>
+        </div>
+
+        <div style="grid-column: 1 / -1;">
+          <h4 style="margin: 6px 0;"><i class="fa-solid fa-layer-group"></i> % lãi riêng theo danh mục <small style="color:#64748b;">(để trống = dùng % mặc định)</small></h4>
+          <div id="prCategoryList" class="pricing-cat-list"></div>
+        </div>
+
+        <div style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center;">
+          <button type="submit" class="btn-submit" style="width:auto;"><i class="fa-solid fa-floppy-disk"></i> Lưu & Áp Dụng Giá Ngay</button>
+          <span id="pricingSaveMsg" class="help-text"></span>
+        </div>
+      </form>
+
+      <hr class="divider">
+
+      <div class="flex-between" style="flex-wrap: wrap; gap: 8px;">
+        <h4 style="margin:0;"><i class="fa-solid fa-table-list"></i> Bảng giá từng sản phẩm</h4>
+        <div style="display:flex; gap:8px; flex-wrap: wrap;">
+          <input type="text" id="prSearch" placeholder="Tìm tên / SKU / mã SP" style="min-width:220px;">
+          <select id="prFilter">
+            <option value="">Tất cả</option>
+            <option value="override">Đang đặt giá riêng</option>
+            <option value="low">Lãi thấp / lỗ</option>
+            <option value="abovePublic">Bán cao hơn giá niêm yết DropBuy</option>
+          </select>
+        </div>
+      </div>
+      <div class="orders-table-wrapper" style="margin-top:10px;">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>Sản phẩm</th>
+              <th>Niêm yết DropBuy</th>
+              <th>Giá CTV của bạn</th>
+              <th>Giá bán</th>
+              <th>Lãi</th>
+              <th>Giá riêng</th>
+            </tr>
+          </thead>
+          <tbody id="pricingTableBody"></tbody>
+        </table>
+      </div>
+      <div id="pricingPagination" class="pricing-pagination"></div>
+    </div>
+
+    <!-- ===================== KIỂM TRA KẾT NỐI DROPBUY ===================== -->
+    <div class="admin-card" style="margin-top: 24px;">
+      <div class="flex-between">
+        <h3 style="margin:0;"><i class="fa-solid fa-stethoscope"></i> Kiểm Tra Kết Nối API DropBuy</h3>
+        <button type="button" class="btn-sync-now" id="healthCheckBtn"><i class="fa-solid fa-plug-circle-check"></i> Kiểm tra ngay</button>
+      </div>
+      <div id="healthResult" class="help-text" style="margin-top:10px;">Bấm "Kiểm tra ngay" để thử toàn bộ các API DropBuy đang dùng.</div>
     </div>
 
   </div>
