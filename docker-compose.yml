@@ -1,0 +1,11 @@
+services:
+  store:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TRUST_PROXY: "1"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data

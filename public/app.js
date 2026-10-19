@@ -335,6 +335,7 @@ async function openProductDetail(productId) {
     const prod = json.data;
     rememberProducts([{ ...prod, variants: undefined }]);
     state.activeDetailProduct = prod;
+    setProductHash(prod);
     state.selectedGalleryIndex = 0;
     // Chọn sẵn phân loại mặc định còn hàng (nếu chỉ có 1 phân loại thì chọn luôn)
     const vs = prod.variants || [];
@@ -444,8 +445,11 @@ function renderDetailModal(prod) {
       </div>
 
       <div class="detail-info">
-        <div class="detail-brand-badge">
-          <i class="fa-solid fa-certificate"></i> Phân phối từ kho DropBuy.vn${prod.is_mall ? ' · DropBuy Mall' : ''}
+        <div class="flex-between" style="gap:8px; flex-wrap:wrap;">
+          <div class="detail-brand-badge">
+            <i class="fa-solid fa-certificate"></i> Phân phối từ kho DropBuy.vn${prod.is_mall ? ' · DropBuy Mall' : ''}
+          </div>
+          <button type="button" class="variant-chip" onclick="copyProductLink()"><i class="fa-solid fa-link"></i> Sao chép link</button>
         </div>
         <h2 class="detail-title">${esc(prod.name)}</h2>
 
@@ -535,6 +539,7 @@ function addFromModalToCart() {
   addLineToCart(line);
   showToast(`Đã thêm <strong>${modalQty}</strong> sản phẩm vào giỏ hàng!`);
   productDetailModal.classList.remove('open');
+  clearProductHash();
   modalQty = 1;
   openCartDrawer();
 }
@@ -545,13 +550,36 @@ function buyFromModalNow() {
   state.cart = [line];
   updateCartUI();
   productDetailModal.classList.remove('open');
+  clearProductHash();
   modalQty = 1;
   openCheckoutModal();
 }
 
 closeDetailModalBtn.addEventListener('click', () => {
   productDetailModal.classList.remove('open');
+  clearProductHash();
 });
+
+// --- Link chia sẻ sản phẩm: /#/sp/<id>-<slug> ---
+const BASE_TITLE = document.title;
+function setProductHash(prod) {
+  const hash = `#/sp/${prod.id}-${String(prod.slug || '').slice(0, 80)}`;
+  if (location.hash !== hash) history.replaceState(null, '', hash);
+  document.title = `${prod.name} | ${BASE_TITLE.split(' - ')[0]}`;
+}
+function clearProductHash() {
+  if (location.hash.startsWith('#/sp/')) history.replaceState(null, '', location.pathname + location.search);
+  document.title = BASE_TITLE;
+}
+function openFromHash() {
+  const m = location.hash.match(/^#\/sp\/(\d+)/);
+  if (m && state.activeDetailProduct?.id !== Number(m[1])) openProductDetail(Number(m[1]));
+}
+window.addEventListener('hashchange', openFromHash);
+function copyProductLink() {
+  const url = location.href;
+  navigator.clipboard.writeText(url).then(() => showToast('Đã sao chép link sản phẩm')).catch(() => prompt('Sao chép link:', url));
+}
 
 // --- Cart Operations (mỗi dòng = sản phẩm + phân loại) ---
 const lineKey = (id, variationId) => `${id}:${variationId || ''}`;
@@ -1111,6 +1139,7 @@ updateCartUI();
 fetchCategories();
 fetchProducts();
 refreshCartPrices();
+openFromHash();
 
 
 // ============================ TRA CỨU ĐƠN HÀNG ============================

@@ -10,10 +10,10 @@
     "applyToPublicPrice": true
   },
   "bank": {
-    "bankId": "970422",
-    "bankName": "MBBank",
-    "accountNo": "0386888999",
-    "accountName": "HOANG MINH STORE"
+    "bankId": "",
+    "bankName": "",
+    "accountNo": "",
+    "accountName": ""
   },
   "store": {
     "name": "Hoàng Minh Store",

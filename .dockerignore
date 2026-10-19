@@ -1,0 +1,15 @@
+node_modules
+dropbuy-api
+scratch
+.git
+.env
+*.log
+data/orders.json
+data/config.json
+data/payments.json
+data/admin-secret.json
+data/products_detail
+public/images/products
+test_*.js
+cookies.txt
+sample_product_rsc.txt

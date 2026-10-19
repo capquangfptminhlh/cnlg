@@ -14,7 +14,7 @@ function getConfig() {
   } catch (e) {}
   return {
     dropbuy: { simulationMode: true },
-    bank: { bankId: '970422', bankName: 'MBBank', accountNo: '0386888999', accountName: 'HOANG MINH STORE' }
+    bank: null
   };
 }
 
@@ -30,6 +30,15 @@ async function findButtonByText(page, texts, fallbackSelector) {
 }
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+/** Tài khoản nhận tiền của shop. Không có mặc định: thiếu cấu hình thì không sinh QR (tránh khách chuyển nhầm tài khoản). */
+function requireBank(config) {
+  const b = config.bank || {};
+  if (!/^\d{6}$/.test(String(b.bankId || '')) || !/^\d{4,20}$/.test(String(b.accountNo || '')) || !b.accountName) {
+    throw new Error('Cửa hàng chưa cấu hình tài khoản ngân hàng nhận tiền (Admin → Cấu hình VietQR).');
+  }
+  return { bankId: String(b.bankId), bankName: b.bankName || '', accountNo: String(b.accountNo), accountName: String(b.accountName) };
+}
 
 function getBrowserExecutable() {
   const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
@@ -69,10 +78,7 @@ async function processOrderFulfillment(order, io) {
     await new Promise(r => setTimeout(r, 1200)); // Delay tạo hiệu ứng realtime relay
 
     const qrData = vietqrHelper.generateVietQR({
-      bankId: config.bank?.bankId || '970422',
-      bankName: config.bank?.bankName || 'MBBank',
-      accountNo: config.bank?.accountNo || '0386888999',
-      accountName: config.bank?.accountName || 'HOANG MINH STORE',
+      ...requireBank(config),
       amount: order.total_amount,
       orderCode: orderId,
       description: `HOANGMINH ${orderId}`
@@ -229,10 +235,7 @@ async function processOrderFulfillment(order, io) {
     // Fallback: Tự động chuyển sang VietQR của shop để khách không bị gián đoạn đơn hàng
     console.log(`[Relay] Chuyển fallback sang VietQR cửa hàng cho #${orderId}`);
     const qrData = vietqrHelper.generateVietQR({
-      bankId: config.bank?.bankId || '970422',
-      bankName: config.bank?.bankName || 'MBBank',
-      accountNo: config.bank?.accountNo || '0386888999',
-      accountName: config.bank?.accountName || 'HOANG MINH STORE',
+      ...requireBank(config),
       amount: order.total_amount,
       orderCode: orderId,
       description: `HOANGMINH ${orderId}`

@@ -68,8 +68,11 @@ async function loadData() {
       }
       cfgSimulationMode.checked = cfg.dropbuy?.simulationMode !== false;
       cfgBankId.value = cfg.bank?.bankId || '970422';
-      cfgAccountNo.value = cfg.bank?.accountNo || '0386888999';
-      cfgAccountName.value = cfg.bank?.accountName || 'HOANG MINH STORE';
+      cfgAccountNo.value = cfg.bank?.accountNo || '';
+      cfgAccountName.value = cfg.bank?.accountName || '';
+      // Cảnh báo nếu vẫn là số tài khoản mẫu có sẵn trong mã nguồn ban đầu
+      const warn = document.getElementById('bankWarning');
+      if (warn) warn.style.display = !cfg.bank?.accountNo || cfg.bank.accountNo === '0386888999' ? 'block' : 'none';
     }
 
     // Fill Stats
@@ -95,6 +98,7 @@ async function loadData() {
 }
 
 function renderOrders(orders) {
+  lastOrders = orders;
   if (orders.length === 0) {
     ordersTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #9ca3af; padding: 20px;">Chưa có đơn hàng nào</td></tr>`;
     return;
@@ -113,7 +117,10 @@ function renderOrders(orders) {
       actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="confirmOrder('${esc(o.id)}')">Xác Nhận Đã Nhận Tiền</button>
         <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="setOrderStatus('${esc(o.id)}', 'CANCELLED')">Huỷ đơn</button>`;
     } else if (o.status === 'PAID') {
-      actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="setOrderStatus('${esc(o.id)}', 'PROCESSING')">Đã đặt bên DropBuy</button>`;
+      actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="pushToDropbuyCart('${esc(o.id)}')"><i class="fa-solid fa-cart-arrow-down"></i> Đưa vào giỏ DropBuy</button>
+        <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="copyReceiver('${esc(o.id)}')"><i class="fa-regular fa-copy"></i> Sao chép người nhận</button>
+        <button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="setOrderStatus('${esc(o.id)}', 'PROCESSING')">Đã đặt bên DropBuy</button>
+        ${o.dropbuy_sync?.status === 'IN_DROPBUY_CART' ? '<br><small style="color:#10b981;">✓ Đã nằm trong giỏ DropBuy</small>' : ''}`;
     } else if (o.status === 'PROCESSING') {
       actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="setOrderStatus('${esc(o.id)}', 'COMPLETED')">Đã giao xong</button>`;
     } else {
@@ -135,6 +142,28 @@ function renderOrders(orders) {
       <td>${actions}</td>
     </tr>`;
   }).join('');
+}
+
+let lastOrders = [];
+async function pushToDropbuyCart(orderId) {
+  if (!confirm(`Đưa các sản phẩm của đơn #${orderId} vào giỏ hàng DropBuy của bạn?`)) return;
+  try {
+    const json = await (await adminFetch(`/api/admin/orders/${orderId}/push-dropbuy-cart`, { method: 'POST', body: '{}' })).json();
+    if (!json.success) throw new Error(json.error);
+    const lines = json.data.pushed.map(p => `• ${p.name}${p.variant_name ? ` [${p.variant_name}]` : ''} × ${p.quantity}${p.in_cart ? '' : ' (KHÔNG thấy trong giỏ!)'}`).join('\n');
+    copyReceiver(orderId, true);
+    if (confirm(`${json.message}\n\n${lines}\n\nThông tin người nhận đã được sao chép. Mở giỏ DropBuy ngay?`)) window.open(json.data.cart_url, '_blank', 'noopener');
+    loadData();
+  } catch (e) {
+    alert('Lỗi: ' + e.message);
+  }
+}
+
+function copyReceiver(orderId, silent = false) {
+  const o = lastOrders.find(x => x.id === orderId);
+  if (!o) return;
+  const text = `${o.customer?.name}\n${o.customer?.phone}\n${o.customer?.address}${o.customer?.province ? `, ${o.customer.province}` : ''}${o.customer?.note ? `\nGhi chú: ${o.customer.note}` : ''}`;
+  navigator.clipboard.writeText(text).then(() => { if (!silent) alert('Đã sao chép:\n\n' + text); }).catch(() => prompt('Sao chép:', text));
 }
 
 async function setOrderStatus(orderId, status) {

@@ -5,10 +5,10 @@
 
 function generateVietQR(options) {
   const {
-    bankId = '970422', // MBBank (Mã BIN Napas)
+    bankId, // Mã BIN Napas của ngân hàng
     bankName = 'MBBank',
-    accountNo = '0386888999',
-    accountName = 'HOANG MINH STORE',
+    accountNo,
+    accountName,
     amount = 0,
     orderCode = 'HM0001',
     description = ''

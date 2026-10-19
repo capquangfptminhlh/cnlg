@@ -12,7 +12,7 @@ const orderStore = require('./services/orderStore');
 const relay = require('./services/dropbuyRelay');
 const dropbuyAuth = require('./services/dropbuyAuth');
 const realtimeSync = require('./services/realtimeSync');
-const { requireAdmin, getAdminPassword, sanitizeHtml, maskPhone } = require('./services/security');
+const { requireAdmin, rateLimit, securityHeaders, getAdminPassword, sanitizeHtml, maskPhone } = require('./services/security');
 const pricing = require('./services/pricing');
 const { checkDropbuy } = require('./services/dropbuyHealth');
 const variants = require('./services/variants');
@@ -20,6 +20,7 @@ const shipping = require('./services/shipping');
 const orderExpiry = require('./services/orderExpiry');
 const payments = require('./services/payments');
 const { notify } = require('./services/notify');
+const dropbuyCart = require('./services/dropbuyCart');
 
 const app = express();
 const server = http.createServer(app);
@@ -32,6 +33,10 @@ const DATA_DIR = path.join(__dirname, 'data');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const MAX_QTY_PER_ITEM = 50;
 
+// Sau reverse proxy (nginx / Cloudflare) đặt TRUST_PROXY=1 để lấy đúng IP khách cho giới hạn tần suất
+if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
+app.disable('x-powered-by');
+app.use(securityHeaders);
 app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
 app.use(express.json({ limit: '100kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -228,7 +233,7 @@ async function priceCartLines(items) {
   return lines;
 }
 
-app.post('/api/shipping/quote', async (req, res) => {
+app.post('/api/shipping/quote', rateLimit('quote', 10 * 60e3, 200), async (req, res) => {
   try {
     const { province, items } = req.body || {};
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ success: false, error: 'Giỏ hàng trống' });
@@ -242,7 +247,7 @@ app.post('/api/shipping/quote', async (req, res) => {
 });
 
 // Tạo đơn: giá, tên, phân loại lấy từ DropBuy/catalog phía server – không tin dữ liệu giá client gửi lên
-app.post('/api/orders/checkout', async (req, res) => {
+app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req, res) => {
   try {
     const { customer, items } = req.body || {};
     const name = String(customer?.name || '').trim();
@@ -312,7 +317,9 @@ app.post('/api/orders/checkout', async (req, res) => {
 
     setImmediate(() => {
       relay.processOrderFulfillment(order, io).catch(err => {
-        console.error(`[Relay Error] Lỗi xử lý đơn #${order.id}:`, err);
+        console.error(`[Relay Error] Lỗi xử lý đơn #${order.id}:`, err.message);
+        io.to(order.id).emit('ORDER_STATUS_UPDATE', { orderId: order.id, status: 'ERROR', message: `Không tạo được mã thanh toán: ${err.message} Vui lòng liên hệ cửa hàng.` });
+        notify.paymentIssue(`Đơn ${order.id}: không tạo được mã QR – ${err.message}`);
       });
     });
 
@@ -333,14 +340,14 @@ app.post('/api/orders/checkout', async (req, res) => {
   }
 });
 
-app.get('/api/orders/:id', (req, res) => {
+app.get('/api/orders/:id', rateLimit('order', 10 * 60e3, 300), (req, res) => {
   const order = orderStore.getOrderById(req.params.id);
   if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
   res.json({ success: true, data: publicOrder(order) });
 });
 
 // Khách báo đã chuyển khoản → chờ admin đối soát (KHÔNG tự đánh dấu đã thanh toán)
-app.post('/api/orders/:id/report-paid', (req, res) => {
+app.post('/api/orders/:id/report-paid', rateLimit('report', 10 * 60e3, 20), (req, res) => {
   const order = orderStore.getOrderById(req.params.id);
   if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
   if (order.status !== 'PENDING_PAYMENT') {
@@ -354,7 +361,7 @@ app.post('/api/orders/:id/report-paid', (req, res) => {
 
 // Khách tra cứu đơn: cần đúng mã đơn + số điện thoại đặt hàng
 const normPhone = v => String(v || '').replace(/\D/g, '').replace(/^84/, '0');
-app.get('/api/orders/:id/track', (req, res) => {
+app.get('/api/orders/:id/track', rateLimit('track', 10 * 60e3, 30), (req, res) => {
   const order = orderStore.getOrderById(String(req.params.id || '').toUpperCase());
   if (!order || !req.query.phone || normPhone(order.customer?.phone) !== normPhone(req.query.phone)) {
     return res.status(404).json({ success: false, error: 'Không tìm thấy đơn với mã và số điện thoại này.' });
@@ -435,6 +442,20 @@ app.post('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
 
 app.get('/api/admin/payments', requireAdmin, (req, res) => {
   res.json({ success: true, data: payments.recentPayments(50), configured: { sepay: !!process.env.SEPAY_WEBHOOK_KEY, casso: !!process.env.CASSO_SECURE_TOKEN, telegram: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) } });
+});
+
+// Đưa đơn đã thanh toán vào giỏ DropBuy của shop (không tự đặt đơn)
+app.post('/api/admin/orders/:id/push-dropbuy-cart', requireAdmin, async (req, res) => {
+  const order = orderStore.getOrderById(req.params.id);
+  if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
+  if (!['PAID', 'PROCESSING'].includes(order.status)) return res.status(400).json({ success: false, error: 'Chỉ đưa vào giỏ DropBuy khi đơn đã thanh toán.' });
+  try {
+    const r = await dropbuyCart.pushOrderToCart(order);
+    orderStore.updateOrder(order.id, { dropbuy_sync: { ...(order.dropbuy_sync || {}), status: 'IN_DROPBUY_CART', pushed_at: new Date().toISOString() } });
+    res.json({ success: true, message: 'Đã đưa vào giỏ DropBuy. Mở dropbuy.vn/gio-hang để đặt giao tới khách.', data: r });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
 });
 
 app.get('/api/admin/orders', requireAdmin, (req, res) => {
@@ -658,6 +679,8 @@ app.get('/api/admin/dropbuy-health', requireAdmin, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+app.get('/healthz', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()), products: scraper.getProducts().length }));
 
 app.get('/api/realtime/status', (req, res) => {
   res.json({ success: true, data: realtimeSync.getSyncStatus() });
