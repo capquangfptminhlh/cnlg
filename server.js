@@ -18,6 +18,8 @@ const { checkDropbuy } = require('./services/dropbuyHealth');
 const variants = require('./services/variants');
 const shipping = require('./services/shipping');
 const orderExpiry = require('./services/orderExpiry');
+const payments = require('./services/payments');
+const { notify } = require('./services/notify');
 
 const app = express();
 const server = http.createServer(app);
@@ -306,6 +308,7 @@ app.post('/api/orders/checkout', async (req, res) => {
     order.subtotal = subtotal;
     order.shipping_fee = ship.fee;
     console.log(`[Order] Đã tiếp nhận đơn hàng #${order.id}: ${subtotal.toLocaleString('vi-VN')} đ + ship ${ship.fee.toLocaleString('vi-VN')} đ`);
+    notify.newOrder({ ...order, items: orderItems });
 
     setImmediate(() => {
       relay.processOrderFulfillment(order, io).catch(err => {
@@ -345,7 +348,65 @@ app.post('/api/orders/:id/report-paid', (req, res) => {
   }
   const updated = orderStore.updateOrder(order.id, { status: 'PAYMENT_REPORTED', payment_reported_at: new Date().toISOString() });
   io.emit('ADMIN_PAYMENT_REPORTED', { orderId: order.id, total_amount: order.total_amount });
+  notify.paymentReported(updated);
   res.json({ success: true, data: publicOrder(updated), message: 'Đã ghi nhận. Cửa hàng sẽ xác nhận ngay khi nhận được tiền.' });
+});
+
+// Khách tra cứu đơn: cần đúng mã đơn + số điện thoại đặt hàng
+const normPhone = v => String(v || '').replace(/\D/g, '').replace(/^84/, '0');
+app.get('/api/orders/:id/track', (req, res) => {
+  const order = orderStore.getOrderById(String(req.params.id || '').toUpperCase());
+  if (!order || !req.query.phone || normPhone(order.customer?.phone) !== normPhone(req.query.phone)) {
+    return res.status(404).json({ success: false, error: 'Không tìm thấy đơn với mã và số điện thoại này.' });
+  }
+  const timeline = [
+    { status: 'CREATED', at: order.created_at, label: 'Đặt hàng' },
+    order.payment_reported_at && { status: 'PAYMENT_REPORTED', at: order.payment_reported_at, label: 'Đã báo chuyển khoản' },
+    order.paid_at && { status: 'PAID', at: order.paid_at, label: 'Cửa hàng đã nhận tiền' },
+    order.processing_at && { status: 'PROCESSING', at: order.processing_at, label: 'Đã đặt hàng tại kho' },
+    order.completed_at && { status: 'COMPLETED', at: order.completed_at, label: 'Giao hàng thành công' },
+    order.cancelled_at && { status: 'CANCELLED', at: order.cancelled_at, label: order.cancel_reason || 'Đã huỷ' }
+  ].filter(Boolean);
+  res.json({ success: true, data: { ...publicOrder(order), address: order.customer?.address, timeline } });
+});
+
+/** Xác nhận đã nhận tiền (admin bấm tay hoặc webhook ngân hàng) – dùng chung để ghi nguồn & báo Telegram */
+function confirmOrderPayment(orderId, meta = {}) {
+  const order = relay.confirmPayment(orderId, io);
+  if (!order) return null;
+  const updated = orderStore.updateOrder(orderId, { payment_via: meta.via || 'admin', payment_tx: meta.tx_id || null, paid_amount: meta.amount ?? order.total_amount });
+  io.emit('ADMIN_ORDER_CHANGED', { orderId, status: 'PAID' });
+  notify.paymentConfirmed(updated, meta.via === 'admin' ? 'admin xác nhận' : `tự động qua ${meta.via}`);
+  return updated;
+}
+
+function processBankTransactions(txs) {
+  return txs.map(tx => payments.handleTransaction(tx, {
+    confirm: (orderId, meta) => confirmOrderPayment(orderId, meta),
+    onIssue: entry => {
+      io.emit('ADMIN_ORDER_CHANGED', { orderId: entry.order_id });
+      if (entry.result !== 'ALREADY_PAID') notify.paymentIssue(`${entry.result}: ${entry.amount.toLocaleString('vi-VN')} đ – "${entry.content}"${entry.note ? ` (${entry.note})` : ''}`);
+    }
+  }));
+}
+
+// Webhook SePay: cấu hình URL https://<domain>/api/webhooks/sepay, kiểu xác thực "API Key" = SEPAY_WEBHOOK_KEY
+app.post('/api/webhooks/sepay', (req, res) => {
+  const key = process.env.SEPAY_WEBHOOK_KEY;
+  if (!key) return res.status(503).json({ success: false, error: 'Chưa cấu hình SEPAY_WEBHOOK_KEY' });
+  const auth = String(req.get('authorization') || '').replace(/^Apikey\s+/i, '');
+  if (!payments.safeEqual(auth, key)) return res.status(401).json({ success: false, error: 'Sai API key' });
+  const results = processBankTransactions(payments.fromSepay(req.body));
+  res.status(200).json({ success: true, results });
+});
+
+// Webhook Casso: header "secure-token" = CASSO_SECURE_TOKEN
+app.post('/api/webhooks/casso', (req, res) => {
+  const token = process.env.CASSO_SECURE_TOKEN;
+  if (!token) return res.status(503).json({ error: 1, message: 'Chưa cấu hình CASSO_SECURE_TOKEN' });
+  if (!payments.safeEqual(req.get('secure-token'), token)) return res.status(401).json({ error: 1, message: 'Sai secure-token' });
+  const results = processBankTransactions(payments.fromCasso(req.body));
+  res.json({ error: 0, message: 'ok', results });
 });
 
 // --- ADMIN API (cần header x-admin-key) ---
@@ -354,7 +415,7 @@ app.get('/api/admin/session', requireAdmin, (req, res) => res.json({ success: tr
 
 app.post('/api/orders/:id/confirm-payment', requireAdmin, (req, res) => {
   try {
-    const order = relay.confirmPayment(req.params.id, io);
+    const order = confirmOrderPayment(req.params.id, { via: 'admin' });
     if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
     res.json({ success: true, message: 'Đã xác nhận thanh toán thành công!', order });
   } catch (err) {
@@ -365,10 +426,15 @@ app.post('/api/orders/:id/confirm-payment', requireAdmin, (req, res) => {
 app.post('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
   const { status, note } = req.body || {};
   if (!orderStore.STATUSES.includes(status)) return res.status(400).json({ success: false, error: 'Trạng thái không hợp lệ' });
-  const order = orderStore.updateOrder(req.params.id, { status, admin_note: note || undefined });
+  const stamp = { PROCESSING: 'processing_at', COMPLETED: 'completed_at', CANCELLED: 'cancelled_at' }[status];
+  const order = orderStore.updateOrder(req.params.id, { status, admin_note: note || undefined, ...(stamp ? { [stamp]: new Date().toISOString() } : {}), ...(status === 'CANCELLED' && !note ? { cancel_reason: 'Cửa hàng huỷ đơn' } : {}) });
   if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
   io.to(order.id).emit('ORDER_STATUS_UPDATE', { orderId: order.id, status, message: `Đơn hàng chuyển sang trạng thái ${status}` });
   res.json({ success: true, data: order });
+});
+
+app.get('/api/admin/payments', requireAdmin, (req, res) => {
+  res.json({ success: true, data: payments.recentPayments(50), configured: { sepay: !!process.env.SEPAY_WEBHOOK_KEY, casso: !!process.env.CASSO_SECURE_TOKEN, telegram: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) } });
 });
 
 app.get('/api/admin/orders', requireAdmin, (req, res) => {

@@ -30435,7 +30435,7 @@
   {
     "id": 111779,
     "dropbuy_id": 111779,
-    "sku": "S10205-111779-110036",
+    "sku": "S10205-111779-110051",
     "name": " (9-22 kg) (2-7y) Set bộ cotton cộc tay dài tay từ vải dư cho bé gái C6269 C6029",
     "slug": "9-22-kg-2-7y-set-bo-cotton-coc-tay-dai-tay-tu-vai-du-cho-be-gai-c6269-c6029",
     "dropbuy_url": "https://dropbuy.vn/9-22-kg-2-7y-set-bo-cotton-coc-tay-dai-tay-tu-vai-du-cho-be-gai-c6269-c6029_p111779",
@@ -30453,7 +30453,7 @@
     "warranty": "1 tháng",
     "is_mall": true,
     "updated_at": "2026-10-19T09:26:11.474Z",
-    "variation_id": "21aa22cb-9d2e-4ad1-9a67-e38c4f8922a3",
+    "variation_id": "7518d27e-b76a-4331-a2fc-0ed3e9c1054b",
     "shop_name": null,
     "is_flash_sale": true,
     "wholesale_price": null,
@@ -36864,13 +36864,14 @@
     "in_stock": true,
     "warranty": "12 tháng",
     "is_mall": false,
-    "updated_at": "2026-10-19T09:26:11.471Z",
+    "updated_at": "2026-10-19T11:38:22.198Z",
     "variation_id": "231095ea-65c0-46d4-8e92-df567d8ac417",
     "shop_name": null,
     "is_flash_sale": true,
     "wholesale_price": null,
     "pricing_rule": "% mặc định",
-    "variant_count": 2
+    "variant_count": 2,
+    "removed_from_dropbuy": true
   },
   {
     "id": 141072,
@@ -36892,13 +36893,14 @@
     "in_stock": true,
     "warranty": "6 tháng",
     "is_mall": false,
-    "updated_at": "2026-10-19T09:26:11.471Z",
+    "updated_at": "2026-10-19T11:36:14.232Z",
     "variation_id": "cc1f6d1e-1746-4eee-b42c-7692040e42db",
     "shop_name": null,
     "is_flash_sale": true,
     "wholesale_price": null,
     "pricing_rule": "% mặc định",
-    "variant_count": 1
+    "variant_count": 1,
+    "removed_from_dropbuy": true
   },
   {
     "id": 141068,
@@ -36920,13 +36922,14 @@
     "in_stock": true,
     "warranty": "12 tháng",
     "is_mall": false,
-    "updated_at": "2026-10-19T09:26:11.471Z",
+    "updated_at": "2026-10-19T11:36:14.232Z",
     "variation_id": "6b9e3b6a-7c1a-493d-ad6e-4f8c46d992f8",
     "shop_name": null,
     "is_flash_sale": true,
     "wholesale_price": null,
     "pricing_rule": "% mặc định",
-    "variant_count": 1
+    "variant_count": 1,
+    "removed_from_dropbuy": true
   },
   {
     "id": 140987,
@@ -36948,13 +36951,14 @@
     "in_stock": true,
     "warranty": "6 tháng",
     "is_mall": false,
-    "updated_at": "2026-10-19T09:26:11.471Z",
+    "updated_at": "2026-10-19T10:31:08.657Z",
     "variation_id": "e01ee635-8d63-4fac-9b94-1068289db4bb",
     "shop_name": null,
     "is_flash_sale": true,
     "wholesale_price": null,
     "pricing_rule": "% mặc định",
-    "variant_count": 2
+    "variant_count": 2,
+    "removed_from_dropbuy": true
   },
   {
     "id": 140854,
@@ -36976,12 +36980,13 @@
     "in_stock": true,
     "warranty": "6 tháng",
     "is_mall": false,
-    "updated_at": "2026-10-19T09:26:11.471Z",
+    "updated_at": "2026-10-19T10:31:08.657Z",
     "variation_id": "47ec148c-7da7-4d5d-9007-bb1199331656",
     "shop_name": null,
     "is_flash_sale": true,
     "wholesale_price": null,
     "pricing_rule": "% mặc định",
-    "variant_count": 1
+    "variant_count": 1,
+    "removed_from_dropbuy": true
   }
 ]

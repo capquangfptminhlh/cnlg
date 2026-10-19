@@ -106,3 +106,13 @@ Server chạy mặc định tại cổng `3000` (URL: `http://localhost:3000`).
 - Giá bán = `services/pricing.js` (`computePrice`): giá gốc (CTV/F1 nếu đã đăng nhập, ngược lại giá niêm yết) + % lãi (mặc định / theo danh mục gốc / riêng từng SP hoặc giá cố định), lãi tối thiểu, làm tròn lên, tuỳ chọn không vượt giá niêm yết. Lưu ở `config.pricing`; đổi quy tắc → `repriceNow()` tính lại toàn bộ ngay, không cần gọi DropBuy.
 - SP lưu cả `public_price` và `wholesale_price`; mất phiên tạm thời thì giữ `wholesale_price` cũ.
 - Admin: mục "Thiết Lập Giá Bán" (`/api/admin/pricing*`) và "Kiểm Tra Kết Nối API DropBuy" (`/api/admin/dropbuy-health`). Dòng lệnh: `npm run test:dropbuy`.
+
+## 🧾 8. BIẾN THỂ, PHÍ SHIP, THANH TOÁN TỰ ĐỘNG (cập nhật 19/10/2026)
+
+- **Biến thể**: `services/variants.js` + `dropbuyDetailScraper` (cache 6h). Dòng giỏ/đơn = SP + `variation_id`; checkout tra trực tiếp SKU biến thể. SP nhiều phân loại (`variant_count !== 1`) luôn mở popup chọn.
+- **Phí ship**: `services/shipping.js` (34 tỉnh, phí theo miền + phụ phí kg vượt mức, miễn phí từ ngưỡng). `config.shipping`; API `/api/shipping/provinces`, `/api/shipping/quote`. Tổng đơn & QR đã gồm phí ship.
+- **Tự huỷ đơn**: `services/orderExpiry.js` quét mỗi phút, huỷ `PENDING_PAYMENT` quá `config.orders.paymentTimeoutMinutes` (mặc định 30); `PAYMENT_REPORTED` chỉ gắn `needs_attention`.
+- **Thanh toán tự động**: `services/payments.js` + webhook `/api/webhooks/sepay` (header `Authorization: Apikey $SEPAY_WEBHOOK_KEY`) và `/api/webhooks/casso` (`secure-token`). Khớp mã đơn `HM[0-9A-F]{8}` trong nội dung CK; đủ tiền → PAID; thiếu/huỷ/không khớp → ghi `data/payments.json` + gắn cờ. Idempotent theo mã giao dịch.
+- **Thông báo**: `services/notify.js` (Telegram, tuỳ chọn).
+- **Tra cứu đơn**: `GET /api/orders/:id/track?phone=` (bắt buộc đúng SĐT).
+- **Test**: `npm test` (node:test, dùng file tạm qua `HM_ORDERS_FILE` / `HM_PAYMENTS_FILE`, không đụng dữ liệu thật). Không chạy `test_relay.js` cũ – nó ghi đơn test vào `data/orders.json` thật.

@@ -12,3 +12,7 @@ data/config.json
 data/orders.json
 data/admin-secret.json
 data/*.tmp
+
+# Nhật ký giao dịch ngân hàng & cache chi tiết sản phẩm
+data/payments.json
+data/products_detail/

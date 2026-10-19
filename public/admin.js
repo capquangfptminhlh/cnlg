@@ -130,7 +130,7 @@ function renderOrders(orders) {
         ${o.customer?.note ? `<br><small style="color:#f59e0b;">Ghi chú: ${esc(o.customer.note)}</small>` : ''}
       </td>
       <td class="order-items-cell">${items}${o.shipping_fee != null ? `<br>Ship: ${o.shipping_fee ? formatPrice(o.shipping_fee) : 'miễn phí'}${o.customer?.province ? ` (${esc(o.customer.province)})` : ''}` : ''}${cost ? `<br><strong>Lãi gộp hàng: ${formatPrice((o.subtotal ?? o.total_amount) - cost)}</strong>` : ''}</td>
-      <td><strong style="color: #e11d48;">${formatPrice(o.total_amount)}</strong></td>
+      <td><strong style="color: #e11d48;">${formatPrice(o.total_amount)}</strong>${o.payment_via ? `<br><small style="color:#10b981;">${o.payment_via === 'admin' ? 'xác nhận tay' : `tự động: ${esc(o.payment_via)}`}</small>` : ''}${o.late_payment ? `<br><small style="color:#ef4444;">Tiền về sau khi huỷ: ${formatPrice(o.late_payment.amount)}</small>` : ''}</td>
       <td><span class="status-pill ${cls}">${label}</span>${o.needs_attention && o.status === 'PAYMENT_REPORTED' ? '<br><small style="color:#ef4444;">⚠ Khách báo CK đã lâu – cần đối soát</small>' : ''}${o.cancel_reason ? `<br><small style="color:#94a3b8;">${esc(o.cancel_reason)}</small>` : ''}</td>
       <td>${actions}</td>
     </tr>`;
@@ -672,3 +672,44 @@ document.getElementById('shippingForm').addEventListener('submit', async e => {
 });
 
 loadShippingSettings();
+
+
+// ============================ THANH TOÁN TỰ ĐỘNG ============================
+const PAY_RESULT = {
+  CONFIRMED: ['#10b981', 'Đã tự xác nhận'],
+  CONFIRMED_MULTI: ['#10b981', 'Đủ tiền sau nhiều lần CK'],
+  UNDERPAID: ['#f59e0b', 'Thiếu tiền'],
+  ALREADY_PAID: ['#f59e0b', 'Đơn đã thanh toán trước đó'],
+  ORDER_CANCELLED: ['#ef4444', 'Đơn đã huỷ – cần xử lý'],
+  UNMATCHED: ['#ef4444', 'Không khớp đơn']
+};
+
+async function loadPayments() {
+  document.getElementById('sepayUrl').innerText = `${location.origin}/api/webhooks/sepay`;
+  document.getElementById('cassoUrl').innerText = `${location.origin}/api/webhooks/casso`;
+  try {
+    const json = await (await adminFetch('/api/admin/payments')).json();
+    if (!json.success) throw new Error(json.error);
+    const c = json.configured;
+    const pill = (on, name) => `<span class="auth-badge ${on ? 'badge-connected' : 'badge-disconnected'}" style="margin-left:6px;">${on ? '✓' : '✗'} ${name}</span>`;
+    document.getElementById('paymentsConfigured').innerHTML = pill(c.sepay, 'SePay') + pill(c.casso, 'Casso') + pill(c.telegram, 'Telegram');
+    const tbody = document.getElementById('paymentsTableBody');
+    if (!json.data.length) return;
+    tbody.innerHTML = json.data.map(t => {
+      const [color, label] = PAY_RESULT[t.result] || ['#94a3b8', t.result];
+      return `<tr>
+        <td><small>${new Date(t.received_at).toLocaleString('vi-VN')}</small></td>
+        <td>${esc(t.provider)}${t.bank ? `<br><small>${esc(t.bank)}</small>` : ''}</td>
+        <td><strong>${formatPrice(t.amount)}</strong></td>
+        <td style="max-width:260px;"><small>${esc(t.content)}</small></td>
+        <td>${t.order_id ? `<code>${esc(t.order_id)}</code>` : '—'}</td>
+        <td><span style="color:${color}; font-weight:700;">${label}</span>${t.note ? `<br><small style="color:#94a3b8;">${esc(t.note)}</small>` : ''}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('paymentsConfigured').innerText = 'Lỗi: ' + e.message;
+  }
+}
+
+socket.on('ADMIN_ORDER_CHANGED', () => loadPayments());
+loadPayments();

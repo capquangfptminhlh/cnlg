@@ -815,6 +815,7 @@ checkoutForm.addEventListener('submit', async e => {
     }
 
     checkoutModal.classList.remove('open');
+    rememberOrder(json.orderId, customer.phone);
     openRealtimeQrModal();
     state.activeOrder = json.orderId;
     socket.emit('join-order', json.orderId);
@@ -1110,3 +1111,88 @@ updateCartUI();
 fetchCategories();
 fetchProducts();
 refreshCartPrices();
+
+
+// ============================ TRA CỨU ĐƠN HÀNG ============================
+const ORDERS_KEY = 'hm_my_orders';
+const trackModal = document.getElementById('trackModal');
+const trackResult = document.getElementById('trackResult');
+
+function myOrders() {
+  try { return JSON.parse(localStorage.getItem(ORDERS_KEY) || '[]'); } catch (e) { return []; }
+}
+function rememberOrder(id, phone) {
+  try {
+    const list = [{ id, phone, at: new Date().toISOString() }, ...myOrders().filter(o => o.id !== id)].slice(0, 10);
+    localStorage.setItem(ORDERS_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+
+const STATUS_VI = {
+  PENDING_PAYMENT: ['Chờ thanh toán', '#f59e0b'],
+  PAYMENT_REPORTED: ['Đã báo chuyển khoản – chờ cửa hàng xác nhận', '#f59e0b'],
+  PAID: ['Đã thanh toán – chờ xuất kho', '#10b981'],
+  PROCESSING: ['Đang xử lý tại kho', '#38bdf8'],
+  COMPLETED: ['Hoàn tất', '#10b981'],
+  CANCELLED: ['Đã huỷ', '#ef4444']
+};
+
+function openTrackModal(prefill) {
+  const recent = myOrders();
+  document.getElementById('trackRecent').innerHTML = recent.length
+    ? `<div style="font-size:12px; color:#94a3b8; margin-bottom:6px;">Đơn bạn đã đặt trên máy này:</div>${recent.map(o => `<button type="button" class="variant-chip" onclick="trackOrder('${esc(o.id)}', '${esc(o.phone)}')">${esc(o.id)}</button>`).join(' ')}`
+    : '';
+  trackResult.innerHTML = '';
+  if (prefill) {
+    document.getElementById('trackOrderId').value = prefill.id;
+    document.getElementById('trackPhone').value = prefill.phone;
+  }
+  trackModal.classList.add('open');
+}
+
+async function trackOrder(id, phone) {
+  document.getElementById('trackOrderId').value = id;
+  document.getElementById('trackPhone').value = phone;
+  trackResult.innerHTML = '<p style="text-align:center; color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin"></i> Đang tra cứu...</p>';
+  try {
+    const json = await (await fetch(`/api/orders/${encodeURIComponent(id.trim().toUpperCase())}/track?phone=${encodeURIComponent(phone)}`)).json();
+    if (!json.success) throw new Error(json.error);
+    const o = json.data;
+    const [label, color] = STATUS_VI[o.status] || [o.status, '#94a3b8'];
+    trackResult.innerHTML = `
+      <div class="track-card">
+        <div class="flex-between"><strong>Đơn #${esc(o.id)}</strong><span style="color:${color}; font-weight:700;">${esc(label)}</span></div>
+        <div class="track-timeline">${o.timeline.map(t => `<div><span>${new Date(t.at).toLocaleString('vi-VN')}</span> ${esc(t.label)}</div>`).join('')}</div>
+        <div class="track-items">${o.items.map(i => `<div class="flex-between"><span>${esc(i.name)}${i.variant_name ? ` <em>[${esc(i.variant_name)}]</em>` : ''} × ${i.quantity}</span><span>${formatPrice(i.price * i.quantity)}</span></div>`).join('')}</div>
+        <div class="flex-between"><span>Tạm tính</span><span>${formatPrice(o.subtotal)}</span></div>
+        <div class="flex-between"><span>Phí vận chuyển</span><span>${o.shipping_fee ? formatPrice(o.shipping_fee) : 'Miễn phí'}</span></div>
+        <div class="flex-between" style="font-size:16px;"><strong>Tổng</strong><strong class="price-highlight">${formatPrice(o.total_amount)}</strong></div>
+        <div style="font-size:12px; color:#94a3b8; margin-top:6px;">Giao tới: ${esc(o.address || '')}${o.customer?.province ? `, ${esc(o.customer.province)}` : ''}</div>
+        ${o.status === 'PENDING_PAYMENT' && o.payment ? `<button type="button" class="btn-primary-block" style="margin-top:12px;" onclick="resumePayment('${esc(o.id)}')"><i class="fa-solid fa-qrcode"></i> Mở Mã QR Để Thanh Toán</button>` : ''}
+      </div>`;
+    state.trackedOrder = o;
+  } catch (e) {
+    trackResult.innerHTML = `<p style="text-align:center; color:#ef4444;">${esc(e.message)}</p>`;
+  }
+}
+
+function resumePayment(orderId) {
+  const o = state.trackedOrder;
+  if (!o || o.id !== orderId) return;
+  trackModal.classList.remove('open');
+  openRealtimeQrModal();
+  state.activeOrder = orderId;
+  socket.emit('join-order', orderId);
+  const remaining = Math.max(60, Math.round((new Date(o.created_at).getTime() + (o.payment.expires_in_seconds || 1800) * 1000 - Date.now()) / 1000));
+  showQr({ orderId, qr: { ...o.payment, expires_in_seconds: remaining } });
+}
+
+document.getElementById('openTrackBtn').addEventListener('click', e => {
+  e.preventDefault();
+  openTrackModal();
+});
+document.getElementById('closeTrackBtn').addEventListener('click', () => trackModal.classList.remove('open'));
+document.getElementById('trackForm').addEventListener('submit', e => {
+  e.preventDefault();
+  trackOrder(document.getElementById('trackOrderId').value, document.getElementById('trackPhone').value);
+});

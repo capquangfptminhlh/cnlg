@@ -191,6 +191,31 @@
       </div>
     </div>
 
+    <!-- ===================== THANH TOÁN TỰ ĐỘNG (WEBHOOK NGÂN HÀNG) ===================== -->
+    <div class="admin-card" id="paymentsSection" style="margin-top: 24px;">
+      <div class="flex-between" style="flex-wrap: wrap; gap: 8px;">
+        <h3 style="margin:0;"><i class="fa-solid fa-building-columns" style="color:#c9a84c;"></i> Thanh Toán Tự Động & Thông Báo</h3>
+        <div id="paymentsConfigured"></div>
+      </div>
+      <details style="margin: 10px 0; font-size: 13px; color: #94a3b8;">
+        <summary style="cursor:pointer; color:#cbd5e1;"><i class="fa-solid fa-circle-info"></i> Cách bật tự xác nhận tiền về (không cần bấm tay)</summary>
+        <ol style="margin: 8px 0 0 18px; line-height: 1.7;">
+          <li>Đăng ký <strong>SePay</strong> (sepay.vn) hoặc <strong>Casso</strong> (casso.vn), liên kết đúng tài khoản ngân hàng nhận tiền ở mục cấu hình VietQR.</li>
+          <li>SePay → Webhook: URL <code id="sepayUrl"></code>, xác thực <strong>API Key</strong>, đặt cùng giá trị vào <code>SEPAY_WEBHOOK_KEY</code> trong file <code>.env</code>.</li>
+          <li>Casso → Webhook: URL <code id="cassoUrl"></code>, <strong>secure-token</strong> = <code>CASSO_SECURE_TOKEN</code> trong <code>.env</code>.</li>
+          <li>Tuỳ chọn báo Telegram: tạo bot với @BotFather, đặt <code>TELEGRAM_BOT_TOKEN</code> và <code>TELEGRAM_CHAT_ID</code>.</li>
+          <li>Khởi động lại server. Server phải truy cập được từ Internet (domain thật hoặc tunnel) để ngân hàng gọi webhook.</li>
+        </ol>
+        <p style="margin-top:6px;">Nội dung chuyển khoản trong mã QR đã chứa mã đơn (HMxxxxxxxx). Tiền về đủ → đơn tự chuyển "Đã thanh toán"; thiếu tiền / đơn đã huỷ / không rõ đơn → hiện ở bảng dưới để bạn xử lý.</p>
+      </details>
+      <div class="orders-table-wrapper">
+        <table class="orders-table">
+          <thead><tr><th>Thời gian</th><th>Nguồn</th><th>Số tiền</th><th>Nội dung CK</th><th>Đơn</th><th>Kết quả</th></tr></thead>
+          <tbody id="paymentsTableBody"><tr><td colspan="6" style="text-align:center; color:#9ca3af;">Chưa có giao dịch</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- ===================== PHÍ VẬN CHUYỂN & HẠN THANH TOÁN ===================== -->
     <div class="admin-card" id="shippingSection" style="margin-top: 24px;">
       <h3 style="margin:0 0 10px;"><i class="fa-solid fa-truck-fast" style="color:#c9a84c;"></i> Phí Vận Chuyển & Hạn Thanh Toán</h3>

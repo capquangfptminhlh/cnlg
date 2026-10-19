@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const ORDERS_FILE = path.join(__dirname, '..', 'data', 'orders.json');
+const ORDERS_FILE = process.env.HM_ORDERS_FILE || path.join(__dirname, '..', 'data', 'orders.json');
 
 // Trạng thái: PENDING_PAYMENT → PAYMENT_REPORTED (khách báo đã CK) → PAID (admin xác nhận) → COMPLETED / CANCELLED
 const STATUSES = ['PENDING_PAYMENT', 'PAYMENT_REPORTED', 'PAID', 'PROCESSING', 'COMPLETED', 'CANCELLED'];
