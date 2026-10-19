@@ -24,6 +24,7 @@ const dropbuyCart = require('./services/dropbuyCart');
 const seo = require('./services/seo');
 const backup = require('./services/backup');
 const reports = require('./services/reports');
+const dropbuyOrderFulfillment = require('./services/dropbuyOrderFulfillment');
 
 const app = express();
 const server = http.createServer(app);
@@ -411,6 +412,14 @@ function confirmOrderPayment(orderId, meta = {}) {
   const updated = orderStore.updateOrder(orderId, { payment_via: meta.via || 'admin', payment_tx: meta.tx_id || null, paid_amount: meta.amount ?? order.total_amount });
   io.emit('ADMIN_ORDER_CHANGED', { orderId, status: 'PAID' });
   notify.paymentConfirmed(updated, meta.via === 'admin' ? 'admin xác nhận' : `tự động qua ${meta.via}`);
+
+  // TỰ ĐỘNG GỌI API DROPBUY ĐỂ ĐẨY ĐƠN HÀNG XUẤT KHO NGAY LẬP TỨC
+  setImmediate(() => {
+    dropbuyOrderFulfillment.fulfillOrderOnDropbuy(updated, io).catch(err => {
+      console.error(`[DropBuy Auto Order Failed] Không đẩy được đơn #${orderId} sang DropBuy:`, err.message);
+    });
+  });
+
   return updated;
 }
 
@@ -489,17 +498,25 @@ app.get('/api/admin/payments', requireAdmin, (req, res) => {
   res.json({ success: true, data: payments.recentPayments(50), configured: { sepay: !!process.env.SEPAY_WEBHOOK_KEY, casso: !!process.env.CASSO_SECURE_TOKEN, telegram: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) } });
 });
 
-// Đưa đơn đã thanh toán vào giỏ DropBuy của shop (không tự đặt đơn)
-app.post('/api/admin/orders/:id/push-dropbuy-cart', requireAdmin, async (req, res) => {
+// Đẩy đơn tự động qua API DropBuy (đặt đơn + thanh toán ví + chuyển trạng thái)
+app.post('/api/admin/orders/:id/fulfill-dropbuy', requireAdmin, async (req, res) => {
   const order = orderStore.getOrderById(req.params.id);
   if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
-  if (!['PAID', 'PROCESSING'].includes(order.status)) return res.status(400).json({ success: false, error: 'Chỉ đưa vào giỏ DropBuy khi đơn đã thanh toán.' });
   try {
-    const r = await dropbuyCart.pushOrderToCart(order);
-    orderStore.updateOrder(order.id, { dropbuy_sync: { ...(order.dropbuy_sync || {}), status: 'IN_DROPBUY_CART', pushed_at: new Date().toISOString() } });
-    res.json({ success: true, message: 'Đã đưa vào giỏ DropBuy. Mở dropbuy.vn/gio-hang để đặt giao tới khách.', data: r });
+    const result = await dropbuyOrderFulfillment.fulfillOrderOnDropbuy(order, io);
+    res.json({ success: true, message: 'Đã kích hoạt tạo đơn tự động trên DropBuy thành công!', data: result });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Đồng bộ trạng thái các đơn đang xử lý từ DropBuy
+app.post('/api/admin/orders/sync-dropbuy-status', requireAdmin, async (req, res) => {
+  try {
+    await dropbuyOrderFulfillment.syncDropbuyOrdersStatus(io);
+    res.json({ success: true, message: 'Đã đồng bộ trạng thái đơn hàng từ DropBuy thành công!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -754,4 +771,11 @@ server.listen(PORT, () => {
   realtimeSync.startRealtimeSync(io);
   orderExpiry.startOrderExpiry(io, readConfig);
   backup.startBackups();
+
+  // Định kỳ mỗi 2 phút đồng bộ trạng thái đơn hàng từ DropBuy đến khi hoàn tất
+  setInterval(() => {
+    dropbuyOrderFulfillment.syncDropbuyOrdersStatus(io).catch(err => {
+      console.warn('[DropBuy Sync Interval Error]:', err.message);
+    });
+  }, 2 * 60 * 1000).unref();
 });
