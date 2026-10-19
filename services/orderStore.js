@@ -1,7 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const ORDERS_FILE = path.join(__dirname, '..', 'data', 'orders.json');
+
+// Trạng thái: PENDING_PAYMENT → PAYMENT_REPORTED (khách báo đã CK) → PAID (admin xác nhận) → COMPLETED / CANCELLED
+const STATUSES = ['PENDING_PAYMENT', 'PAYMENT_REPORTED', 'PAID', 'PROCESSING', 'COMPLETED', 'CANCELLED'];
 
 function getOrders() {
   try {
@@ -13,17 +17,29 @@ function getOrders() {
 }
 
 function saveOrders(orders) {
-  fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
+  // Ghi qua file tạm rồi đổi tên để không hỏng orders.json nếu tiến trình dừng giữa chừng
+  const tmp = `${ORDERS_FILE}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(orders, null, 2), 'utf8');
+  fs.renameSync(tmp, ORDERS_FILE);
+}
+
+/** Mã đơn khó đoán: HM + 8 ký tự ngẫu nhiên (trước đây là 6 số cuối timestamp, dễ dò để xem thông tin khách). */
+function newOrderId(existing) {
+  let id;
+  do {
+    id = `HM${crypto.randomBytes(5).toString('hex').toUpperCase().slice(0, 8)}`;
+  } while (existing.some(o => o.id === id));
+  return id;
 }
 
 function createOrder(orderData) {
   const orders = getOrders();
-  const orderId = `HM${Date.now().toString().slice(-6)}`;
-  
+  const orderId = newOrderId(orders);
+
   const newOrder = {
     id: orderId,
     created_at: new Date().toISOString(),
-    status: 'PENDING_PAYMENT', // PENDING_PAYMENT -> PAID -> PROCESSING -> COMPLETED / CANCELLED
+    status: 'PENDING_PAYMENT',
     customer: {
       name: orderData.customer.name || '',
       phone: orderData.customer.phone || '',
@@ -33,7 +49,7 @@ function createOrder(orderData) {
     items: orderData.items || [],
     total_amount: orderData.total_amount || 0,
     dropbuy_sync: {
-      status: 'INITIATING', // INITIATING -> SUCCESS -> FAILED
+      status: 'INITIATING',
       order_id: null,
       relay_mode: 'AUTO',
       last_checked_at: new Date().toISOString()
@@ -67,6 +83,7 @@ function getOrderById(orderId) {
 }
 
 module.exports = {
+  STATUSES,
   getOrders,
   createOrder,
   updateOrder,

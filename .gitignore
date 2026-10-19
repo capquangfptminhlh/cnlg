@@ -6,3 +6,9 @@ sample_product_rsc.txt
 .DS_Store
 .env
 .env.local
+
+# Dữ liệu vận hành – có thể chứa cookie DropBuy, thông tin khách hàng, mật khẩu admin
+data/config.json
+data/orders.json
+data/admin-secret.json
+data/*.tmp

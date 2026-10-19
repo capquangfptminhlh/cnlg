@@ -65,7 +65,7 @@
             <i class="fa-solid fa-bolt"></i> Tự Động Nạp Giá & Tồn Kho: 5 Phút / 1 Lần
           </span>
         </div>
-        <p style="margin: 0;" id="daemonStatusText">Hệ thống daemon đang tự động quét 100% kho DropBuy (1.321 SP) mỗi 5 phút.</p>
+        <p style="margin: 0;" id="daemonStatusText">Hệ thống daemon đang tự động quét 100% kho DropBuy mỗi 5 phút.</p>
       </div>
       <div style="display: flex; gap: 10px;">
         <button class="btn-sync-now" id="downloadAllImagesBtn" style="background: #0f172a;">
@@ -136,7 +136,7 @@
 
           <div class="form-group">
             <label>Biên Lợi Nhuận (% Markup giá bán trên hoangminh.com)</label>
-            <input type="number" id="cfgMarkup" min="0" max="100" value="15">
+            <input type="number" id="cfgMarkup" min="0" max="300" step="0.5" value="15">
             <p class="help-text">Ví dụ: Giá sỉ DropBuy là 100,000 đ + 15% = 115,000 đ giá niêm yết trên hoangminh.com.</p>
           </div>
 
@@ -181,6 +181,7 @@
                 <th>Mã Đơn HM</th>
                 <th>Mã DropBuy</th>
                 <th>Khách Hàng</th>
+                <th>Sản Phẩm (giá vốn)</th>
                 <th>Tổng Tiền</th>
                 <th>Trạng Thái</th>
                 <th>Thao Tác</th>

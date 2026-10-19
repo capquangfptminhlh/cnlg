@@ -18,12 +18,46 @@ function formatPrice(number) {
   return (number || 0).toLocaleString('vi-VN') + ' đ';
 }
 
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+// API quản trị cần mật khẩu (header x-admin-key). Mật khẩu: biến ADMIN_PASSWORD trong .env,
+// hoặc mật khẩu server tự sinh ở data/admin-secret.json (in ra console khi khởi động).
+const ADMIN_KEY_STORE = 'hm_admin_key';
+async function adminFetch(url, opts = {}, retry = true) {
+  const key = sessionStorage.getItem(ADMIN_KEY_STORE) || '';
+  const headers = { ...(opts.headers || {}), 'x-admin-key': key };
+  if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+  const res = await fetch(url, { ...opts, headers });
+  if (res.status === 401 && retry) {
+    const entered = prompt('Nhập mật khẩu quản trị (ADMIN_PASSWORD hoặc trong data/admin-secret.json):');
+    if (!entered) throw new Error('Chưa đăng nhập quản trị');
+    sessionStorage.setItem(ADMIN_KEY_STORE, entered.trim());
+    return adminFetch(url, opts, false);
+  }
+  if (res.status === 401) {
+    sessionStorage.removeItem(ADMIN_KEY_STORE);
+    throw new Error('Sai mật khẩu quản trị');
+  }
+  return res;
+}
+
+const STATUS_LABEL = {
+  PENDING_PAYMENT: ['pending', 'CHỜ THANH TOÁN'],
+  PAYMENT_REPORTED: ['reported', 'KHÁCH BÁO ĐÃ CK'],
+  PAID: ['paid', 'ĐÃ THANH TOÁN'],
+  PROCESSING: ['paid', 'ĐANG XỬ LÝ'],
+  COMPLETED: ['paid', 'HOÀN TẤT'],
+  CANCELLED: ['cancelled', 'ĐÃ HUỶ']
+};
+
 async function loadData() {
   // Load stats & config
   try {
     const [cfgRes, ordRes, prodRes] = await Promise.all([
-      fetch('/api/admin/config').then(r => r.json()),
-      fetch('/api/admin/orders').then(r => r.json()),
+      adminFetch('/api/admin/config').then(r => r.json()),
+      adminFetch('/api/admin/orders').then(r => r.json()),
       fetch('/api/products?limit=1').then(r => r.json())
     ]);
 
@@ -34,7 +68,7 @@ async function loadData() {
         document.getElementById('dropbuyLoginUser').value = cfg.dropbuy?.username || '';
       }
       cfgSimulationMode.checked = cfg.dropbuy?.simulationMode !== false;
-      cfgMarkup.value = cfg.pricing?.markupPercent || 15;
+      cfgMarkup.value = cfg.pricing?.markupPercent ?? 15;
       cfgBankId.value = cfg.bank?.bankId || '970422';
       cfgAccountNo.value = cfg.bank?.accountNo || '0386888999';
       cfgAccountName.value = cfg.bank?.accountName || 'HOANG MINH STORE';
@@ -50,7 +84,7 @@ async function loadData() {
       statOrders.innerText = orders.length;
 
       const revenue = orders
-        .filter(o => o.status === 'PAID')
+        .filter(o => ['PAID', 'PROCESSING', 'COMPLETED'].includes(o.status))
         .reduce((sum, o) => sum + (o.total_amount || 0), 0);
       statRevenue.innerText = formatPrice(revenue);
 
@@ -64,40 +98,62 @@ async function loadData() {
 
 function renderOrders(orders) {
   if (orders.length === 0) {
-    ordersTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 20px;">Chưa có đơn hàng nào</td></tr>`;
+    ordersTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #9ca3af; padding: 20px;">Chưa có đơn hàng nào</td></tr>`;
     return;
   }
 
-  ordersTableBody.innerHTML = orders.map(o => `
+  ordersTableBody.innerHTML = orders.map(o => {
+    const [cls, label] = STATUS_LABEL[o.status] || ['pending', o.status];
+    const cost = (o.items || []).reduce((s, i) => s + (i.dropbuy_cost || 0) * i.quantity, 0);
+    const canConfirm = ['PENDING_PAYMENT', 'PAYMENT_REPORTED'].includes(o.status);
+    const items = (o.items || []).map(i => {
+      const name = i.dropbuy_url ? `<a href="${esc(i.dropbuy_url)}" target="_blank" rel="noopener" style="color:#c9a84c;">${esc(i.name)}</a>` : esc(i.name);
+      return `${name} × ${i.quantity}${i.dropbuy_cost ? ` <span title="Giá vốn DropBuy">(${formatPrice(i.dropbuy_cost)})</span>` : ''}`;
+    }).join('<br>');
+    let actions;
+    if (canConfirm) {
+      actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="confirmOrder('${esc(o.id)}')">Xác Nhận Đã Nhận Tiền</button>
+        <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="setOrderStatus('${esc(o.id)}', 'CANCELLED')">Huỷ đơn</button>`;
+    } else if (o.status === 'PAID') {
+      actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="setOrderStatus('${esc(o.id)}', 'PROCESSING')">Đã đặt bên DropBuy</button>`;
+    } else if (o.status === 'PROCESSING') {
+      actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="setOrderStatus('${esc(o.id)}', 'COMPLETED')">Đã giao xong</button>`;
+    } else {
+      actions = `<span style="color: #10b981; font-size: 12px;"><i class="fa-solid fa-check"></i> ${label}</span>`;
+    }
+    return `
     <tr>
-      <td><strong>#${o.id}</strong></td>
-      <td><code>${o.dropbuy_sync?.order_id || 'Chưa sync'}</code></td>
+      <td><strong>#${esc(o.id)}</strong><br><small style="color:#6b7280;">${new Date(o.created_at).toLocaleString('vi-VN')}</small></td>
+      <td><code>${esc(o.dropbuy_sync?.order_id || 'Chưa đặt')}</code><br><small style="color:#6b7280;">${esc(o.dropbuy_sync?.relay_mode || '')}</small></td>
       <td>
-        <strong>${o.customer?.name || ''}</strong><br>
-        <small style="color: #6b7280;">${o.customer?.phone || ''}</small>
+        <strong>${esc(o.customer?.name)}</strong><br>
+        <small style="color: #6b7280;">${esc(o.customer?.phone)}</small><br>
+        <small style="color: #6b7280;">${esc(o.customer?.address)}</small>
+        ${o.customer?.note ? `<br><small style="color:#f59e0b;">Ghi chú: ${esc(o.customer.note)}</small>` : ''}
       </td>
+      <td class="order-items-cell">${items}${cost ? `<br><strong>Lãi gộp: ${formatPrice(o.total_amount - cost)}</strong>` : ''}</td>
       <td><strong style="color: #e11d48;">${formatPrice(o.total_amount)}</strong></td>
-      <td>
-        <span class="status-pill ${o.status === 'PAID' ? 'paid' : 'pending'}">
-          ${o.status === 'PAID' ? 'ĐÃ THANH TOÁN' : 'CHỜ THANH TOÁN'}
-        </span>
-      </td>
-      <td>
-        ${o.status !== 'PAID' ? `
-          <button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="confirmOrder('${o.id}')">
-            Xác Nhận Đã Nhận Tiền
-          </button>
-        ` : `
-          <span style="color: #10b981; font-size: 12px;"><i class="fa-solid fa-check"></i> Hoàn tất</span>
-        `}
-      </td>
-    </tr>
-  `).join('');
+      <td><span class="status-pill ${cls}">${label}</span></td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function setOrderStatus(orderId, status) {
+  if (status === 'CANCELLED' && !confirm(`Huỷ đơn #${orderId}?`)) return;
+  try {
+    const json = await (await adminFetch(`/api/admin/orders/${orderId}/status`, { method: 'POST', body: JSON.stringify({ status }) })).json();
+    if (!json.success) throw new Error(json.error);
+    loadData();
+  } catch (e) {
+    alert('Lỗi: ' + e.message);
+  }
 }
 
 async function confirmOrder(orderId) {
   try {
-    const res = await fetch(`/api/orders/${orderId}/confirm-payment`, { method: 'POST' });
+    if (!confirm(`Xác nhận đã nhận đủ tiền cho đơn #${orderId}? (kiểm tra sao kê ngân hàng trước)`)) return;
+    const res = await adminFetch(`/api/orders/${orderId}/confirm-payment`, { method: 'POST' });
     const json = await res.json();
     if (json.success) {
       alert(`Đã xác nhận thanh toán đơn #${orderId}! Sự kiện realtime đã được bắn tới khách hàng.`);
@@ -123,7 +179,7 @@ configForm.addEventListener('submit', async e => {
       simulationMode: cfgSimulationMode.checked
     },
     pricing: {
-      markupPercent: parseFloat(cfgMarkup.value) || 15
+      markupPercent: Number.isFinite(parseFloat(cfgMarkup.value)) ? parseFloat(cfgMarkup.value) : 15
     },
     bank: {
       bankId: cfgBankId.value,
@@ -134,15 +190,12 @@ configForm.addEventListener('submit', async e => {
   };
 
   try {
-    const res = await fetch('/api/admin/config', {
+    const res = await adminFetch('/api/admin/config', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newConfig)
     });
     const json = await res.json();
-    if (json.success) {
-      alert('Đã lưu cấu hình DropBuy & VietQR thành công!');
-    }
+    alert(json.success ? json.message : 'Lỗi: ' + json.error);
   } catch (err) {
     alert('Lỗi lưu cấu hình: ' + err.message);
   }
@@ -156,7 +209,7 @@ syncNowBtn.addEventListener('click', async () => {
   syncNowBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đồng bộ từ DropBuy...';
 
   try {
-    const res = await fetch('/api/admin/sync', { method: 'POST', body: JSON.stringify({ maxPages: 15 }) });
+    const res = await adminFetch('/api/admin/sync', { method: 'POST', body: JSON.stringify({ maxPages: 20 }) });
     const json = await res.json();
     alert(json.message);
   } catch (err) {
@@ -170,13 +223,13 @@ syncNowBtn.addEventListener('click', async () => {
 const downloadAllImagesBtn = document.getElementById('downloadAllImagesBtn');
 if (downloadAllImagesBtn) {
   downloadAllImagesBtn.addEventListener('click', async () => {
-    if (!confirm('Bạn có muốn kích hoạt cào full chi tiết & tải toàn bộ album ảnh của 1.136 sản phẩm về lưu trữ trên ổ đĩa server không?')) return;
+    if (!confirm('Tải chi tiết & toàn bộ album ảnh của tất cả sản phẩm về ổ đĩa server? (chạy nền, mất nhiều thời gian)')) return;
 
     downloadAllImagesBtn.disabled = true;
     downloadAllImagesBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải album ảnh ngầm...';
 
     try {
-      const res = await fetch('/api/admin/download-all-images', { method: 'POST' });
+      const res = await adminFetch('/api/admin/download-all-images', { method: 'POST' });
       const json = await res.json();
       alert(json.message);
     } catch (err) {
@@ -219,6 +272,10 @@ socket.on('PAYMENT_CONFIRMED', () => {
   loadData();
 });
 
+socket.on('ADMIN_PAYMENT_REPORTED', () => {
+  loadData();
+});
+
 // DropBuy Wholesale Auth UI
 const dropbuyAuthBadge = document.getElementById('dropbuyAuthBadge');
 const dropbuyLoginUser = document.getElementById('dropbuyLoginUser');
@@ -235,10 +292,10 @@ async function updateDaemonStatusUI() {
     const res = await fetch('/api/realtime/status').then(r => r.json());
     if (res.success && res.data) {
       const d = res.data;
-      const lastStr = d.lastSyncTime ? new Date(d.lastSyncTime).toLocaleTimeString('vi-VN') : 'Vừa xong';
+      const lastStr = d.lastSyncTime ? new Date(d.lastSyncTime).toLocaleTimeString('vi-VN') : 'chưa có';
       const nextStr = d.nextSyncTime ? new Date(d.nextSyncTime).toLocaleTimeString('vi-VN') : '5 phút nữa';
       if (daemonStatusText) {
-        daemonStatusText.innerHTML = `Đang đồng bộ liên tục <strong>1.316 SP</strong> (Giá & Tồn kho) mỗi <strong>5 phút</strong>. Quét gần nhất: <strong>${lastStr}</strong> ➔ Lần kế tiếp: <strong>${nextStr}</strong>`;
+        daemonStatusText.innerHTML = `Đang đồng bộ <strong>${(d.totalProducts || 0).toLocaleString('vi-VN')} SP</strong> (giá & tồn kho) mỗi <strong>${d.intervalMinutes} phút</strong>. Quét gần nhất: <strong>${lastStr}</strong> ➔ Lần kế tiếp: <strong>${nextStr}</strong>${d.lastError ? ` · <span style="color:#ef4444;">Lỗi lần trước: ${esc(d.lastError)}</span>` : ''}`;
       }
     }
   } catch (e) {}
@@ -252,12 +309,12 @@ socket.on('REALTIME_HEARTBEAT', data => {
 async function updateAuthStatusUI() {
   updateDaemonStatusUI();
   try {
-    const res = await fetch('/api/dropbuy/auth-status').then(r => r.json());
+    const res = await adminFetch('/api/dropbuy/auth-status').then(r => r.json());
     if (res.success && res.data) {
       const d = res.data;
       if (d.authenticated) {
         dropbuyAuthBadge.className = 'auth-badge badge-connected';
-        dropbuyAuthBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Đã kết nối: ${d.username || 'Đại lý'}`;
+        dropbuyAuthBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Đã kết nối: ${esc(d.username || 'Đại lý')}`;
         btnDropbuyLogin.style.display = 'none';
         btnDropbuyLogout.style.display = 'inline-block';
         dropbuyLoginPass.value = '';
@@ -265,7 +322,7 @@ async function updateAuthStatusUI() {
         dropbuyAuthMsg.style.background = 'rgba(16, 185, 129, 0.15)';
         dropbuyAuthMsg.style.color = '#10b981';
         dropbuyAuthMsg.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-        dropbuyAuthMsg.innerHTML = `<i class="fa-solid fa-bolt"></i> <strong>${d.message}</strong>`;
+        dropbuyAuthMsg.innerHTML = `<i class="fa-solid fa-bolt"></i> <strong>${esc(d.message)}</strong>`;
       } else {
         dropbuyAuthBadge.className = 'auth-badge badge-disconnected';
         dropbuyAuthBadge.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Chưa kết nối`;
@@ -276,7 +333,7 @@ async function updateAuthStatusUI() {
           dropbuyAuthMsg.style.background = 'rgba(239, 68, 68, 0.15)';
           dropbuyAuthMsg.style.color = '#ef4444';
           dropbuyAuthMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-          dropbuyAuthMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${d.message}`;
+          dropbuyAuthMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${esc(d.message)}`;
         } else {
           dropbuyAuthMsg.style.display = 'none';
         }
@@ -305,9 +362,8 @@ if (btnDropbuyLogin) {
     dropbuyAuthMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xác thực tài khoản với DropBuy và kích hoạt giá sỉ...';
 
     try {
-      const res = await fetch('/api/dropbuy/login', {
+      const res = await adminFetch('/api/dropbuy/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
       const data = await res.json();
@@ -323,7 +379,7 @@ if (btnDropbuyLogin) {
       dropbuyAuthMsg.style.background = 'rgba(239, 68, 68, 0.15)';
       dropbuyAuthMsg.style.color = '#ef4444';
       dropbuyAuthMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-      dropbuyAuthMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Lỗi: ${err.message}`;
+      dropbuyAuthMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Lỗi: ${esc(err.message)}`;
     } finally {
       btnDropbuyLogin.disabled = false;
       btnDropbuyLogin.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Đăng Nhập & Kích Hoạt Giá Sỉ';
@@ -335,7 +391,7 @@ if (btnDropbuyLogout) {
   btnDropbuyLogout.addEventListener('click', async () => {
     if (!confirm('Bạn có chắc muốn đăng xuất DropBuy? Hệ thống sẽ quay về giá bán lẻ công khai.')) return;
     try {
-      await fetch('/api/dropbuy/logout', { method: 'POST' });
+      await adminFetch('/api/dropbuy/logout', { method: 'POST' });
       alert('Đã đăng xuất tài khoản DropBuy.');
       updateAuthStatusUI();
     } catch (e) {
@@ -354,9 +410,8 @@ if (btnSaveCookie) {
     btnSaveCookie.disabled = true;
     btnSaveCookie.innerText = 'Đang kiểm tra...';
     try {
-      const res = await fetch('/api/dropbuy/set-cookie', {
+      const res = await adminFetch('/api/dropbuy/set-cookie', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cookie })
       });
       const data = await res.json();

@@ -1522,3 +1522,13 @@ input, textarea, select { font-family: var(--font); }
   background: #4caf6e;
   color: #000;
 }
+
+/* --- Trạng thái hết hàng & nút bị khoá --- */
+.luxury-card.is-sold-out .card-media img { filter: grayscale(0.85); opacity: 0.6; }
+.luxury-card button:disabled,
+.btn-order-now-large:disabled,
+.btn-add-cart-large:disabled,
+.btn-confirm-transfer:disabled { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.6); }
+.status-pill.reported { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); }
+.status-pill.cancelled { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+.order-items-cell { font-size: 12px; color: #94a3b8; line-height: 1.5; max-width: 340px; }

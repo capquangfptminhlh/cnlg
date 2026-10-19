@@ -16,6 +16,10 @@ const state = {
   selectedGalleryIndex: 0
 };
 
+// Mọi sản phẩm đã tải (lưới, tìm kiếm, chi tiết) – để thêm giỏ được cả khi SP không nằm trong trang hiện tại
+const productCache = new Map();
+const CART_KEY = 'hm_cart_v1';
+
 // Initialize Socket.io
 const socket = io();
 
@@ -65,12 +69,17 @@ const qrStageConnecting = document.getElementById('qrStageConnecting');
 const qrStageReady = document.getElementById('qrStageReady');
 const qrStageSuccess = document.getElementById('qrStageSuccess');
 const closeQrModalBtn = document.getElementById('closeQrModalBtn');
-const simulatePaidBtn = document.getElementById('simulatePaidBtn');
+const reportPaidBtn = document.getElementById('simulatePaidBtn');
 const finishOrderBtn = document.getElementById('finishOrderBtn');
 
 // --- Helper Functions ---
 function formatPrice(number) {
   return (number || 0).toLocaleString('vi-VN') + ' đ';
+}
+
+/** Dữ liệu sản phẩm lấy từ DropBuy → luôn escape trước khi chèn vào HTML */
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 
 function showToast(message) {
@@ -85,10 +94,14 @@ function copyText(elementId) {
   if (!el) return;
   const text = el.value !== undefined ? el.value : el.innerText;
   navigator.clipboard.writeText(text).then(() => {
-    showToast(`Đã sao chép: <strong>${text}</strong>`);
+    showToast(`Đã sao chép: <strong>${esc(text)}</strong>`);
   }).catch(() => {
     prompt('Sao chép thủ công:', text);
   });
+}
+
+function rememberProducts(list) {
+  for (const p of list || []) productCache.set(p.id, { ...(productCache.get(p.id) || {}), ...p });
 }
 
 // --- API Calls ---
@@ -124,22 +137,21 @@ async function fetchProducts(append = false) {
     const json = await res.json();
 
     if (json.success) {
-      if (append) {
-        state.products = [...state.products, ...json.data];
-      } else {
-        state.products = json.data;
-      }
+      rememberProducts(json.data);
+      state.products = append ? [...state.products, ...json.data] : json.data;
       renderProducts();
       renderPagination(json.page, json.totalPages);
       catalogCount.innerText = `Đang hiển thị ${state.products.length} / tổng ${json.total.toLocaleString('vi-VN')} SP`;
-      if (heroTotalProd) heroTotalProd.innerText = json.total.toLocaleString('vi-VN') + '+';
+      if (heroTotalProd && state.currentCategory === 'all' && !state.searchQuery && !state.minPrice && !state.maxPrice) {
+        heroTotalProd.innerText = json.total.toLocaleString('vi-VN');
+      }
 
       if (btnLoadMore) {
         if (json.page >= json.totalPages) {
           btnLoadMore.style.display = 'none';
         } else {
           btnLoadMore.style.display = 'inline-flex';
-          btnLoadMore.innerHTML = `<i class="fa-solid fa-angles-down"></i> Tải Thêm Sản Phẩm Nữa (Xem thêm ${json.total - state.products.length} SP)`;
+          btnLoadMore.innerHTML = `<i class="fa-solid fa-angles-down"></i> Tải Thêm Sản Phẩm (còn ${json.total - state.products.length} SP)`;
         }
       }
     }
@@ -151,27 +163,40 @@ async function fetchProducts(append = false) {
 
 if (btnLoadMore) {
   btnLoadMore.addEventListener('click', () => {
-    btnLoadMore.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải thêm sản phẩm từ DropBuy...';
+    btnLoadMore.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải thêm sản phẩm...';
     state.currentPage++;
     fetchProducts(true);
   });
 }
 
 // --- Render Categories ---
+// Icon theo tên danh mục (trước đây gán theo thứ tự nên "Máy tính bảng" ra icon ô tô, "Đồng hồ" ra tay cầm game)
+const CATEGORY_ICONS = [
+  [/điện thoại/i, 'fa-mobile-screen'], [/gia dụng|điện máy/i, 'fa-plug'], [/âm thanh|loa|tai nghe/i, 'fa-headphones'],
+  [/nhà cửa|đời sống/i, 'fa-house'], [/ô tô|xe máy|xe đạp/i, 'fa-car'], [/máy tính|laptop/i, 'fa-laptop'],
+  [/thời trang|quần áo/i, 'fa-shirt'], [/camping|phượt|cắm trại/i, 'fa-campground'], [/người lớn|phòng the/i, 'fa-heart'],
+  [/dịch vụ|phần mềm/i, 'fa-cloud'], [/văn phòng/i, 'fa-pen-ruler'], [/mẹ và bé|mẹ & bé/i, 'fa-baby'],
+  [/phong thuỷ|phong thủy|tâm linh/i, 'fa-yin-yang'], [/mạng/i, 'fa-wifi'], [/đồng hồ/i, 'fa-clock'],
+  [/sức khỏe|sức khoẻ|làm đẹp/i, 'fa-heart-pulse'], [/đồ chơi/i, 'fa-puzzle-piece'], [/thú cưng/i, 'fa-paw']
+];
+function categoryIcon(name) {
+  const hit = CATEGORY_ICONS.find(([re]) => re.test(name));
+  return hit ? hit[1] : 'fa-tag';
+}
+
 function renderCategories() {
   let html = `<button class="cat-btn ${state.currentCategory === 'all' ? 'active' : ''}" data-id="all">
     <i class="fa-solid fa-border-all"></i> Tất Cả Sản Phẩm
   </button>`;
 
-  const icons = [
-    'fa-mobile-screen', 'fa-plug', 'fa-headphones', 'fa-house-laptop', 'fa-laptop',
-    'fa-car', 'fa-gamepad', 'fa-heart-pulse', 'fa-shirt', 'fa-shoe-prints'
-  ];
+  // Chỉ hiện danh mục gốc còn sản phẩm (lọc danh mục cha đã bao gồm danh mục con ở server)
+  const roots = state.categories
+    .filter(c => !c.parent_id && (c.product_count ?? 1) > 0)
+    .sort((a, b) => (b.product_count || 0) - (a.product_count || 0));
 
-  state.categories.slice(0, 14).forEach((cat, idx) => {
-    const icon = icons[idx % icons.length];
-    html += `<button class="cat-btn ${state.currentCategory == cat.id ? 'active' : ''}" data-id="${cat.id}">
-      <i class="fa-solid ${icon}"></i> ${cat.name}
+  roots.forEach(cat => {
+    html += `<button class="cat-btn ${state.currentCategory == cat.id ? 'active' : ''}" data-id="${cat.id}" title="${esc(cat.name)} (${cat.product_count || 0} SP)">
+      <i class="fa-solid ${categoryIcon(cat.name)}"></i> ${esc(cat.name)}
     </button>`;
   });
 
@@ -183,7 +208,7 @@ function renderCategories() {
       btn.classList.add('active');
       state.currentCategory = btn.getAttribute('data-id');
       state.currentPage = 1;
-      
+
       const catObj = state.categories.find(c => c.id == state.currentCategory);
       catalogTitle.innerText = catObj ? catObj.name : 'Tất Cả Sản Phẩm';
       fetchProducts();
@@ -192,24 +217,33 @@ function renderCategories() {
 }
 
 // --- Render Products ---
+function productBadges(p) {
+  let html = '';
+  if (p.is_mall) html += `<span class="badge-official"><i class="fa-solid fa-circle-check" style="color: #38bdf8;"></i> DropBuy Mall</span>`;
+  if (p.in_stock === false) html += `<span class="badge-discount">HẾT HÀNG</span>`;
+  else if (p.discount_percent > 0) html += `<span class="badge-discount">-${p.discount_percent}%</span>`;
+  return html;
+}
+
 function renderProducts() {
   if (state.products.length === 0) {
     productGrid.innerHTML = `
       <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #64748b;">
         <i class="fa-solid fa-box-open" style="font-size: 54px; color: #cbd5e1; margin-bottom: 14px;"></i>
-        <h3 style="color: #1e293b; margin-bottom: 6px;">Không tìm thấy sản phẩm nào</h3>
+        <h3 style="color: #e2e8f0; margin-bottom: 6px;">Không tìm thấy sản phẩm nào</h3>
         <p>Vui lòng thử tìm kiếm với từ khóa khác hoặc bỏ chọn bộ lọc giá.</p>
       </div>`;
     return;
   }
 
-  productGrid.innerHTML = state.products.map(p => `
-    <div class="luxury-card" data-id="${p.id}">
+  productGrid.innerHTML = state.products.map(p => {
+    const soldOut = p.in_stock === false;
+    return `
+    <div class="luxury-card${soldOut ? ' is-sold-out' : ''}" data-id="${p.id}">
       <div class="card-media">
-        <span class="badge-official"><i class="fa-solid fa-circle-check" style="color: #38bdf8;"></i> DropBuy Mall</span>
-        <span class="badge-discount">-20% GIÁ SỈ</span>
-        <img src="${p.image}" alt="${p.name}" loading="lazy" onerror="this.src='https://dropbuy.vn/d/logo.png'">
-        
+        ${productBadges(p)}
+        <img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" onerror="this.src='https://dropbuy.vn/d/logo.png'">
+
         <div class="card-quick-overlay">
           <button class="btn-quick-view" onclick="openProductDetail(${p.id})">
             <i class="fa-solid fa-eye"></i> Xem Chi Tiết
@@ -218,31 +252,29 @@ function renderProducts() {
       </div>
 
       <div class="card-details">
-        <div class="card-category">${p.category_name || 'Phụ kiện DropBuy'}</div>
-        <h3 class="card-title" title="${p.name}" onclick="openProductDetail(${p.id})">${p.name}</h3>
+        <div class="card-category">${esc(p.category_name || 'DropBuy')}</div>
+        <h3 class="card-title" title="${esc(p.name)}" onclick="openProductDetail(${p.id})">${esc(p.name)}</h3>
 
         <div class="card-meta">
-          <span class="stars"><i class="fa-solid fa-star"></i> 5.0</span>
-          <span>•</span>
-          <span>Đã bán ${80 + (p.id % 200)}+</span>
+          <span><i class="fa-solid fa-shield-halved"></i> ${esc(p.warranty || 'Bảo hành chính hãng')}</span>
         </div>
 
         <div class="card-pricing">
           <span class="price-highlight">${formatPrice(p.price)}</span>
-          <span class="price-strike">${formatPrice(p.original_price)}</span>
+          ${p.original_price ? `<span class="price-strike">${formatPrice(p.original_price)}</span>` : ''}
         </div>
 
         <div class="card-actions-row">
-          <button class="btn-buy-instant" onclick="buyNowInstant(${p.id})">
-            <i class="fa-solid fa-bolt"></i> Mua Ngay
+          <button class="btn-buy-instant" onclick="buyNowInstant(${p.id})" ${soldOut ? 'disabled' : ''}>
+            <i class="fa-solid fa-bolt"></i> ${soldOut ? 'Hết Hàng' : 'Mua Ngay'}
           </button>
-          <button class="btn-add-mini" title="Thêm vào giỏ" onclick="addToCart(${p.id})">
+          <button class="btn-add-mini" title="Thêm vào giỏ" onclick="addToCart(${p.id})" ${soldOut ? 'disabled' : ''}>
             <i class="fa-solid fa-cart-plus"></i>
           </button>
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 // --- Pagination ---
@@ -283,35 +315,37 @@ function changePage(page) {
 
 // --- FULL PRODUCT DETAIL MODAL (Gallery + Video + Specs) ---
 async function openProductDetail(productId) {
-  // Open modal with loading state
+  searchDropdown.classList.add('hidden');
   productDetailModal.classList.add('open');
+  modalQty = 1;
   detailModalBody.innerHTML = `
     <div style="text-align: center; padding: 60px;">
-      <i class="fa-solid fa-spinner fa-spin" style="font-size: 40px; color: var(--primary);"></i>
-      <p style="margin-top: 14px; font-weight: 700; color: #475569;">Đang tải toàn bộ thông số kỹ thuật & album ảnh từ DropBuy...</p>
+      <i class="fa-solid fa-spinner fa-spin" style="font-size: 40px; color: var(--gold);"></i>
+      <p style="margin-top: 14px; font-weight: 700; color: #94a3b8;">Đang tải thông số kỹ thuật & album ảnh...</p>
     </div>`;
 
   try {
     const res = await fetch(`/api/products/${productId}`);
     const json = await res.json();
     if (!json.success || !json.data) {
-      detailModalBody.innerHTML = `<p style="text-align: center; color: red;">Không thể tải chi tiết sản phẩm.</p>`;
+      detailModalBody.innerHTML = `<p style="text-align: center; color: #ef4444;">Không thể tải chi tiết sản phẩm.</p>`;
       return;
     }
 
     const prod = json.data;
+    rememberProducts([prod]);
     state.activeDetailProduct = prod;
     state.selectedGalleryIndex = 0;
     renderDetailModal(prod);
-
   } catch (err) {
-    detailModalBody.innerHTML = `<p style="text-align: center; color: red;">Lỗi kết nối máy chủ.</p>`;
+    detailModalBody.innerHTML = `<p style="text-align: center; color: #ef4444;">Lỗi kết nối máy chủ.</p>`;
   }
 }
 
 function renderDetailModal(prod) {
-  const gallery = prod.gallery && prod.gallery.length > 0 ? prod.gallery : [{ url: prod.image, thumb: prod.image }];
+  const gallery = prod.gallery && prod.gallery.length > 0 ? prod.gallery : [{ url: prod.image_hd || prod.image, thumb: prod.image }];
   const activeMedia = gallery[state.selectedGalleryIndex] || gallery[0];
+  const soldOut = prod.in_stock === false;
 
   detailModalBody.innerHTML = `
     <div class="product-detail-grid">
@@ -319,16 +353,16 @@ function renderDetailModal(prod) {
       <div class="detail-gallery">
         <div class="main-preview-box" id="mainMediaBox">
           ${activeMedia.is_video ? `
-            <video src="${activeMedia.url}" controls autoplay muted loop playsinline></video>
+            <video src="${esc(activeMedia.url)}" controls autoplay muted loop playsinline></video>
           ` : `
-            <img src="${activeMedia.url}" alt="${prod.name}" id="mainPreviewImg">
+            <img src="${esc(activeMedia.url)}" alt="${esc(prod.name)}" id="mainPreviewImg">
           `}
         </div>
 
         <div class="thumbs-strip">
           ${gallery.map((item, idx) => `
             <div class="thumb-item ${idx === state.selectedGalleryIndex ? 'active' : ''}" onclick="switchDetailMedia(${idx})">
-              <img src="${item.thumb || item.url}" alt="Thumb ${idx + 1}">
+              <img src="${esc(item.thumb || item.url)}" alt="Ảnh ${idx + 1}">
               ${item.is_video ? `<div class="thumb-video-badge"><i class="fa-solid fa-play"></i></div>` : ''}
             </div>
           `).join('')}
@@ -338,44 +372,44 @@ function renderDetailModal(prod) {
       <!-- Right: Detailed Information -->
       <div class="detail-info">
         <div class="detail-brand-badge">
-          <i class="fa-solid fa-certificate"></i> Phân Phối Chính Hãng Từ Kho DropBuy.vn
+          <i class="fa-solid fa-certificate"></i> Phân phối từ kho DropBuy.vn${prod.is_mall ? ' · DropBuy Mall' : ''}
         </div>
-        <h2 class="detail-title">${prod.name}</h2>
+        <h2 class="detail-title">${esc(prod.name)}</h2>
 
         <div class="detail-meta-row">
-          <span class="stars"><i class="fa-solid fa-star"></i> 5.0 (100% Đánh giá 5 sao)</span>
+          <span>Mã SKU: <strong>${esc(prod.sku)}</strong></span>
           <span>•</span>
-          <span>Mã SKU: <strong>${prod.sku}</strong></span>
-          <span>•</span>
-          <span class="stock-status-pill"><i class="fa-solid fa-check"></i> Sẵn sàng xuất kho</span>
+          ${soldOut
+            ? `<span class="stock-status-pill" style="background: rgba(239,68,68,.15); color: #ef4444;"><i class="fa-solid fa-xmark"></i> Tạm hết hàng</span>`
+            : `<span class="stock-status-pill"><i class="fa-solid fa-check"></i> Còn hàng</span>`}
         </div>
 
         <div class="detail-pricing-box">
           <span class="detail-price-main">${formatPrice(prod.price)}</span>
-          <span class="detail-price-sub">${formatPrice(prod.original_price)}</span>
-          <span class="saving-tag">Tiết kiệm 20%</span>
+          ${prod.original_price ? `<span class="detail-price-sub">${formatPrice(prod.original_price)}</span>` : ''}
+          ${prod.discount_percent > 0 ? `<span class="saving-tag">Tiết kiệm ${prod.discount_percent}%</span>` : ''}
         </div>
 
         <div class="detail-features-list">
-          <div><i class="fa-solid fa-circle-check"></i> Cam kết 100% hàng thật – Hoàn tiền 200% nếu phát hiện giả</div>
-          <div><i class="fa-solid fa-shield-check"></i> Bảo hành: ${prod.warranty || '6 tháng chính hãng'}</div>
-          <div><i class="fa-solid fa-truck-fast"></i> Miễn phí đóng gói bọc xốp chống sốc theo chuẩn DropBuy</div>
+          <div><i class="fa-solid fa-shield-halved"></i> Bảo hành: ${esc(prod.warranty || 'Bảo hành chính hãng')}</div>
+          <div><i class="fa-solid fa-truck-fast"></i> Giao hàng toàn quốc, được đồng kiểm khi nhận</div>
+          <div><i class="fa-solid fa-qrcode"></i> Thanh toán chuyển khoản VietQR</div>
         </div>
 
         <div class="detail-qty-row">
-          <span style="font-weight: 700; color: #334155;">Số lượng mua:</span>
+          <span style="font-weight: 700; color: #cbd5e1;">Số lượng mua:</span>
           <div class="qty-stepper">
             <button onclick="changeModalQty(-1)">-</button>
-            <span id="modalQtyDisplay">1</span>
+            <span id="modalQtyDisplay">${modalQty}</span>
             <button onclick="changeModalQty(1)">+</button>
           </div>
         </div>
 
         <div class="detail-actions-row">
-          <button class="btn-order-now-large" onclick="buyFromModalNow()">
-            <i class="fa-solid fa-bolt"></i> Đặt Hàng & Nhận VietQR Ngay
+          <button class="btn-order-now-large" onclick="buyFromModalNow()" ${soldOut ? 'disabled' : ''}>
+            <i class="fa-solid fa-bolt"></i> ${soldOut ? 'Tạm Hết Hàng' : 'Đặt Hàng & Nhận VietQR Ngay'}
           </button>
-          <button class="btn-add-cart-large" onclick="addFromModalToCart()">
+          <button class="btn-add-cart-large" onclick="addFromModalToCart()" ${soldOut ? 'disabled' : ''}>
             <i class="fa-solid fa-cart-plus"></i> Thêm Vào Giỏ
           </button>
         </div>
@@ -401,17 +435,15 @@ function switchDetailMedia(index) {
 
 let modalQty = 1;
 function changeModalQty(delta) {
-  modalQty = Math.max(1, modalQty + delta);
+  modalQty = Math.min(50, Math.max(1, modalQty + delta));
   const el = document.getElementById('modalQtyDisplay');
   if (el) el.innerText = modalQty;
 }
 
 function addFromModalToCart() {
-  if (!state.activeDetailProduct) return;
   const p = state.activeDetailProduct;
-  for (let i = 0; i < modalQty; i++) {
-    addToCart(p.id, false);
-  }
+  if (!p || p.in_stock === false) return;
+  addToCart(p.id, false, modalQty);
   showToast(`Đã thêm <strong>${modalQty}</strong> sản phẩm vào giỏ hàng!`);
   productDetailModal.classList.remove('open');
   modalQty = 1;
@@ -419,16 +451,9 @@ function addFromModalToCart() {
 }
 
 function buyFromModalNow() {
-  if (!state.activeDetailProduct) return;
   const p = state.activeDetailProduct;
-  state.cart = [{
-    id: p.id,
-    name: p.name,
-    price: p.price,
-    image: p.gallery && p.gallery.length > 0 ? p.gallery[0].thumb || p.gallery[0].url : p.image,
-    dropbuy_url: p.dropbuy_url,
-    quantity: modalQty
-  }];
+  if (!p || p.in_stock === false) return;
+  state.cart = [cartLine(p, modalQty)];
   updateCartUI();
   productDetailModal.classList.remove('open');
   modalQty = 1;
@@ -439,44 +464,68 @@ closeDetailModalBtn.addEventListener('click', () => {
   productDetailModal.classList.remove('open');
 });
 
-// --- Instant Buy from Product Card ---
+// --- Cart Operations ---
+function cartLine(p, quantity) {
+  return { id: p.id, name: p.name, price: p.price, image: p.image, quantity };
+}
+
+function saveCart() {
+  try { localStorage.setItem(CART_KEY, JSON.stringify(state.cart)); } catch (e) {}
+}
+
+function loadCart() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+    state.cart = Array.isArray(raw) ? raw.filter(i => i && Number.isInteger(i.id) && i.quantity > 0) : [];
+  } catch (e) {
+    state.cart = [];
+  }
+}
+
+/** Cập nhật giá/tồn kho trong giỏ theo dữ liệu hiện tại của cửa hàng (giá có thể đổi sau mỗi lần đồng bộ). */
+async function refreshCartPrices() {
+  if (state.cart.length === 0) return;
+  const removed = [];
+  await Promise.all(state.cart.map(async item => {
+    try {
+      const res = await fetch(`/api/products/${item.id}`);
+      if (res.status === 404) { item.quantity = 0; removed.push(item.name); return; }
+      const json = await res.json();
+      if (!json.success) return;
+      rememberProducts([json.data]);
+      item.price = json.data.price;
+      item.name = json.data.name;
+      if (json.data.in_stock === false) { item.quantity = 0; removed.push(item.name); }
+    } catch (e) {}
+  }));
+  state.cart = state.cart.filter(i => i.quantity > 0);
+  updateCartUI();
+  if (removed.length) showToast(`Đã bỏ khỏi giỏ sản phẩm hết hàng: ${esc(removed.join(', ').slice(0, 80))}`);
+}
+
 function buyNowInstant(productId) {
-  const product = state.products.find(p => p.id === productId);
-  if (!product) return;
-  state.cart = [{
-    id: product.id,
-    name: product.name,
-    price: product.price,
-    image: product.image,
-    dropbuy_url: product.dropbuy_url,
-    quantity: 1
-  }];
+  const product = productCache.get(productId);
+  if (!product || product.in_stock === false) return;
+  state.cart = [cartLine(product, 1)];
   updateCartUI();
   openCheckoutModal();
 }
 
-// --- Cart Operations ---
-function addToCart(productId, notify = true) {
-  const product = state.products.find(p => p.id === productId);
-  if (!product) return;
+function addToCart(productId, notify = true, qty = 1) {
+  const product = productCache.get(productId);
+  if (!product || product.in_stock === false) return;
 
   const existing = state.cart.find(item => item.id === productId);
   if (existing) {
-    existing.quantity += 1;
+    existing.quantity = Math.min(50, existing.quantity + qty);
+    existing.price = product.price;
   } else {
-    state.cart.push({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: product.image,
-      dropbuy_url: product.dropbuy_url,
-      quantity: 1
-    });
+    state.cart.push(cartLine(product, qty));
   }
 
   updateCartUI();
   if (notify) {
-    showToast(`Đã thêm <strong>${product.name.slice(0, 30)}...</strong> vào giỏ!`);
+    showToast(`Đã thêm <strong>${esc(product.name.slice(0, 30))}...</strong> vào giỏ!`);
     openCartDrawer();
   }
 }
@@ -485,7 +534,7 @@ function updateCartQty(productId, delta) {
   const item = state.cart.find(i => i.id === productId);
   if (!item) return;
 
-  item.quantity += delta;
+  item.quantity = Math.min(50, item.quantity + delta);
   if (item.quantity <= 0) {
     state.cart = state.cart.filter(i => i.id !== productId);
   }
@@ -496,6 +545,7 @@ function updateCartQty(productId, delta) {
 function updateCartUI() {
   const totalCount = state.cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = state.cart.reduce((sum, item) => sum + item.quantity * item.price, 0);
+  saveCart();
 
   cartCount.innerText = totalCount;
   drawerCount.innerText = totalCount;
@@ -506,18 +556,18 @@ function updateCartUI() {
   if (state.cart.length === 0) {
     cartItemsContainer.innerHTML = `
       <div style="text-align: center; padding: 60px 20px; color: #94a3b8;">
-        <i class="fa-solid fa-basket-shopping" style="font-size: 48px; color: #e2e8f0; margin-bottom: 12px;"></i>
-        <h4 style="color: #334155; margin-bottom: 4px;">Giỏ hàng của bạn đang trống</h4>
-        <p style="font-size: 13px;">Hãy khám phá các sản phẩm giá sỉ từ DropBuy nhé!</p>
+        <i class="fa-solid fa-basket-shopping" style="font-size: 48px; color: #475569; margin-bottom: 12px;"></i>
+        <h4 style="color: #e2e8f0; margin-bottom: 4px;">Giỏ hàng của bạn đang trống</h4>
+        <p style="font-size: 13px;">Hãy khám phá các sản phẩm từ kho DropBuy nhé!</p>
       </div>`;
     return;
   }
 
   cartItemsContainer.innerHTML = state.cart.map(item => `
     <div class="cart-drawer-item">
-      <img src="${item.image}" alt="${item.name}">
+      <img src="${esc(item.image)}" alt="${esc(item.name)}">
       <div class="cart-drawer-item-info">
-        <div class="drawer-item-title">${item.name}</div>
+        <div class="drawer-item-title">${esc(item.name)}</div>
         <div class="drawer-item-price">${formatPrice(item.price)}</div>
         <div class="qty-stepper" style="display: inline-flex; height: 30px;">
           <button style="width: 28px; height: 28px;" onclick="updateCartQty(${item.id}, -1)">-</button>
@@ -563,45 +613,52 @@ checkoutForm.addEventListener('submit', async e => {
     address: document.getElementById('custAddress').value.trim(),
     note: document.getElementById('custNote').value.trim()
   };
-
-  const totalAmount = state.cart.reduce((sum, item) => sum + item.quantity * item.price, 0);
-
-  checkoutModal.classList.remove('open');
-  openRealtimeQrModal();
+  const submitBtn = checkoutForm.querySelector('[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
 
   try {
+    // Chỉ gửi mã SP + số lượng – giá do server tính
     const res = await fetch('/api/orders/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customer,
-        items: state.cart,
-        total_amount: totalAmount
-      })
+      body: JSON.stringify({ customer, items: state.cart.map(i => ({ id: i.id, quantity: i.quantity })) })
     });
-
     const json = await res.json();
     if (!json.success) {
-      alert('Lỗi tạo đơn: ' + json.error);
-      closeRealtimeQrModal();
+      alert('Không tạo được đơn: ' + json.error);
+      if (/hết hàng|không còn/.test(json.error || '')) refreshCartPrices();
       return;
     }
 
+    checkoutModal.classList.remove('open');
+    openRealtimeQrModal();
     state.activeOrder = json.orderId;
-    console.log(`[Socket] Đã tạo đơn #${json.orderId}, lắng nghe phòng WebSocket...`);
     socket.emit('join-order', json.orderId);
-
+    // Đề phòng QR được tạo trước khi socket kịp vào phòng: hỏi lại trạng thái đơn
+    setTimeout(() => pollOrderOnce(json.orderId), 2500);
   } catch (err) {
     alert('Không thể kết nối máy chủ: ' + err.message);
-    closeRealtimeQrModal();
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 });
+
+async function pollOrderOnce(orderId) {
+  if (state.activeOrder !== orderId || !qrStageConnecting || qrStageConnecting.classList.contains('hidden')) return;
+  try {
+    const json = await (await fetch(`/api/orders/${orderId}`)).json();
+    if (json.success && json.data.payment) showQr({ orderId, qr: json.data.payment });
+    else setTimeout(() => pollOrderOnce(orderId), 2000);
+  } catch (e) {}
+}
 
 // --- VietQR Realtime Modal ---
 function openRealtimeQrModal() {
   qrStageConnecting.classList.remove('hidden');
   qrStageReady.classList.add('hidden');
   qrStageSuccess.classList.add('hidden');
+  reportPaidBtn.disabled = false;
+  reportPaidBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Tôi Đã Chuyển Khoản';
   qrModal.classList.add('open');
 }
 
@@ -630,37 +687,41 @@ function startCountdown(durationSeconds = 900) {
   }, 1000);
 }
 
-// --- Socket.IO Listeners ---
-socket.on('ORDER_STATUS_UPDATE', data => {
-  const statusEl = document.getElementById('connectingStatusText');
-  if (statusEl) statusEl.innerText = data.message;
-});
-
-socket.on('ORDER_QR_READY', data => {
+function showQr(data) {
+  if (!data.qr || data.orderId !== state.activeOrder) return;
   qrStageConnecting.classList.add('hidden');
   qrStageReady.classList.remove('hidden');
 
   document.getElementById('qrHmCode').innerText = data.orderId;
-  document.getElementById('qrDbCode').innerText = data.dropbuyOrderId || 'DB-PENDING';
+  document.getElementById('qrDbCode').innerText = data.dropbuyOrderId || '—';
 
   const qr = data.qr;
   document.getElementById('qrImage').src = qr.qr_image_url;
-  document.getElementById('qrBankName').innerText = qr.bank_name || 'MBBank';
-  document.getElementById('qrAccountNo').innerText = qr.account_number;
-  document.getElementById('qrAccountName').innerText = qr.account_name;
+  document.getElementById('qrBankName').innerText = qr.bank_name || '';
+  document.getElementById('qrAccountNo').innerText = qr.account_number || '';
+  document.getElementById('qrAccountName').innerText = qr.account_name || '';
   document.getElementById('qrAmount').innerText = formatPrice(qr.amount);
   document.getElementById('qrRawAmount').value = qr.amount;
   document.getElementById('qrMemo').innerText = qr.transfer_content;
 
   startCountdown(qr.expires_in_seconds || 900);
+}
+
+// --- Socket.IO Listeners ---
+socket.on('ORDER_STATUS_UPDATE', data => {
+  const statusEl = document.getElementById('connectingStatusText');
+  if (statusEl && data.message) statusEl.innerText = data.message;
 });
 
+socket.on('ORDER_QR_READY', showQr);
+
 socket.on('PAYMENT_CONFIRMED', data => {
+  if (data.orderId !== state.activeOrder) return;
   qrStageReady.classList.add('hidden');
   qrStageSuccess.classList.remove('hidden');
+  if (state.countdownInterval) clearInterval(state.countdownInterval);
 
   document.getElementById('successOrderId').innerText = data.orderId;
-  document.getElementById('successDropbuyId').innerText = 'DB-CONFIRMED-' + data.orderId;
   document.getElementById('successDesc').innerText = data.message;
 
   state.cart = [];
@@ -668,28 +729,30 @@ socket.on('PAYMENT_CONFIRMED', data => {
 });
 
 socket.on('REALTIME_CATALOG_SYNC', data => {
-  console.log('[Realtime] Nhận tín hiệu đồng bộ kho DropBuy:', data);
-  showToast(data.message || '⚡ Kho DropBuy vừa cập nhật dữ liệu realtime!');
+  showToast(esc(data.message || 'Kho DropBuy vừa cập nhật dữ liệu!'));
   fetchProducts();
+  refreshCartPrices();
 });
 
-simulatePaidBtn.addEventListener('click', async () => {
+// Khách chỉ BÁO đã chuyển khoản; cửa hàng đối soát rồi mới xác nhận (trước đây nút này tự đánh dấu "đã thanh toán")
+reportPaidBtn.addEventListener('click', async () => {
   if (!state.activeOrder) return;
-  simulatePaidBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xác thực...';
-  simulatePaidBtn.disabled = true;
+  reportPaidBtn.disabled = true;
+  reportPaidBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
 
   try {
-    const res = await fetch(`/api/orders/${state.activeOrder}/confirm-payment`, { method: 'POST' });
+    const res = await fetch(`/api/orders/${state.activeOrder}/report-paid`, { method: 'POST' });
     const json = await res.json();
-    if (!json.success) {
-      alert('Lỗi: ' + json.error);
-      simulatePaidBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Tôi Đã Chuyển Khoản Thành Công';
-      simulatePaidBtn.disabled = false;
-    }
+    if (!json.success) throw new Error(json.error);
+    reportPaidBtn.innerHTML = '<i class="fa-solid fa-hourglass-half"></i> Đang chờ cửa hàng xác nhận';
+    const alertText = document.getElementById('qrAlertText');
+    if (alertText) alertText.innerHTML = `Đã ghi nhận thông báo chuyển khoản cho đơn <strong>${esc(state.activeOrder)}</strong>. Màn hình sẽ tự cập nhật khi cửa hàng xác nhận đã nhận tiền – bạn có thể đóng cửa sổ, đơn hàng vẫn được giữ.`;
+    state.cart = [];
+    updateCartUI();
   } catch (e) {
     alert('Lỗi: ' + e.message);
-    simulatePaidBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Tôi Đã Chuyển Khoản Thành Công';
-    simulatePaidBtn.disabled = false;
+    reportPaidBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Tôi Đã Chuyển Khoản';
+    reportPaidBtn.disabled = false;
   }
 });
 
@@ -715,12 +778,13 @@ searchInput.addEventListener('input', e => {
       const res = await fetch(`/api/products?search=${encodeURIComponent(q)}&limit=6`);
       const json = await res.json();
       if (json.success && json.data.length > 0) {
+        rememberProducts(json.data);
         searchDropdown.innerHTML = json.data.map(item => `
           <div class="search-item-preview" onclick="openProductDetail(${item.id})">
-            <img src="${item.image}" alt="${item.name}">
+            <img src="${esc(item.image)}" alt="${esc(item.name)}">
             <div class="search-item-info">
-              <div class="search-item-title">${item.name}</div>
-              <div class="search-item-price">${formatPrice(item.price)}</div>
+              <div class="search-item-title">${esc(item.name)}</div>
+              <div class="search-item-price">${formatPrice(item.price)}${item.in_stock === false ? ' · Hết hàng' : ''}</div>
             </div>
           </div>
         `).join('');
@@ -748,20 +812,17 @@ document.addEventListener('click', e => {
   }
 });
 
-searchBtn.addEventListener('click', () => {
+function runSearch() {
   searchDropdown.classList.add('hidden');
   state.searchQuery = searchInput.value.trim();
   state.currentPage = 1;
+  catalogTitle.innerText = state.searchQuery ? `Kết quả cho "${state.searchQuery}"` : 'Tất Cả Sản Phẩm';
   fetchProducts();
-});
+}
 
+searchBtn.addEventListener('click', runSearch);
 searchInput.addEventListener('keyup', e => {
-  if (e.key === 'Enter') {
-    searchDropdown.classList.add('hidden');
-    state.searchQuery = searchInput.value.trim();
-    state.currentPage = 1;
-    fetchProducts();
-  }
+  if (e.key === 'Enter') runSearch();
 });
 
 // --- Filter & Sorting Handlers ---
@@ -789,5 +850,8 @@ cartBackdrop.addEventListener('click', closeCartDrawer);
 checkoutBtn.addEventListener('click', openCheckoutModal);
 
 // Init
+loadCart();
+updateCartUI();
 fetchCategories();
 fetchProducts();
+refreshCartPrices();

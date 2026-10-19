@@ -18,6 +18,19 @@ function getConfig() {
   };
 }
 
+/** Tìm nút theo chữ hiển thị (thay cho selector `:has-text()` của Playwright mà Puppeteer không hiểu). */
+async function findButtonByText(page, texts, fallbackSelector) {
+  const handle = await page.evaluateHandle((texts) => {
+    const btns = Array.from(document.querySelectorAll('button, a[role="button"]'));
+    return btns.find(b => texts.some(t => (b.innerText || '').trim().includes(t))) || null;
+  }, texts);
+  const el = handle.asElement();
+  if (el) return el;
+  return fallbackSelector ? page.$(fallbackSelector) : null;
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 function getBrowserExecutable() {
   const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
   const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
@@ -34,7 +47,11 @@ function getBrowserExecutable() {
 async function processOrderFulfillment(order, io) {
   const config = getConfig();
   const orderId = order.id;
-  const isSimulation = config.dropbuy?.simulationMode !== false || !config.dropbuy?.username;
+  // Bot tự đặt hàng trên DropBuy chỉ chạy khi bật rõ ràng RELAY_LIVE_BOT=true:
+  // form của DropBuy cần chọn Tỉnh/Huyện/Xã mà form của hoangminh chỉ có địa chỉ dạng chữ,
+  // và bot đặt hàng thật bằng tiền thật – chưa được kiểm thử đầu-cuối. Mặc định: khách trả tiền
+  // vào tài khoản của shop (VietQR), admin đặt đơn tương ứng trên DropBuy sau khi xác nhận đã nhận tiền.
+  const isSimulation = process.env.RELAY_LIVE_BOT !== 'true' || config.dropbuy?.simulationMode !== false || !config.dropbuy?.cookieHeader;
 
   console.log(`[Relay] Bắt đầu xử lý đơn #${orderId} (Chế độ: ${isSimulation ? 'SIMULATION / SANDBOX' : 'DROPBUY LIVE BOT'})...`);
 
@@ -129,17 +146,16 @@ async function processOrderFulfillment(order, io) {
       // Chọn số lượng
       if (item.quantity > 1) {
         for (let q = 1; q < item.quantity; q++) {
-          const plusBtn = await page.$('button:has-text("+"), button.ant-input-number-handler-up');
+          const plusBtn = await findButtonByText(page, ['+'], '.ant-input-number-handler-up');
           if (plusBtn) await plusBtn.click();
         }
       }
 
       // Bấm "Mua ngay" hoặc "Thêm vào giỏ"
-      const buyBtn = await page.$('button:has-text("Mua ngay"), button.btn-buy-now');
-      if (buyBtn) {
-        await buyBtn.click();
-        await page.waitForTimeout(1000);
-      }
+      const buyBtn = await findButtonByText(page, ['Thêm vào giỏ', 'Mua ngay'], 'button.btn-buy-now');
+      if (!buyBtn) throw new Error(`Không tìm thấy nút thêm vào giỏ cho ${item.name}`);
+      await buyBtn.click();
+      await sleep(1000);
     }
 
     // 3. Tiến hành Checkout trên Dropbuy
@@ -153,7 +169,7 @@ async function processOrderFulfillment(order, io) {
     await page.type('input[name="address"], input[placeholder*="chỉ"], input[name="receiver_address"]', order.customer.address);
 
     // 4. Bấm "Xác nhận đặt hàng" để Dropbuy sinh mã QR
-    const confirmBtn = await page.$('button:has-text("Đặt hàng"), button:has-text("Thanh toán"), button.btn-checkout');
+    const confirmBtn = await findButtonByText(page, ['Đặt hàng', 'Thanh toán'], 'button.btn-checkout');
     if (confirmBtn) {
       await confirmBtn.click();
       await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
@@ -249,6 +265,11 @@ async function processOrderFulfillment(order, io) {
  * Giả lập hoặc kích hoạt xác nhận thanh toán thành công
  */
 function confirmPayment(orderId, io) {
+  const current = orderStore.getOrderById(orderId);
+  if (!current) return null;
+  if (!['PENDING_PAYMENT', 'PAYMENT_REPORTED'].includes(current.status)) {
+    throw new Error(`Đơn đang ở trạng thái ${current.status}, không thể xác nhận thanh toán.`);
+  }
   const order = orderStore.updateOrder(orderId, {
     status: 'PAID',
     paid_at: new Date().toISOString()

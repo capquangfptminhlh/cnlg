@@ -367,12 +367,12 @@
 
         <div class="qr-alert-box">
           <i class="fa-solid fa-circle-info"></i>
-          <span>Vui lòng chuyển <strong>chính xác từng đồng và nội dung chuyển khoản</strong> để hệ thống DropBuy tự động kích hoạt vận chuyển đơn hàng.</span>
+          <span id="qrAlertText">Vui lòng chuyển <strong>chính xác số tiền và nội dung chuyển khoản</strong>. Đơn hàng được xuất kho ngay khi cửa hàng xác nhận đã nhận tiền.</span>
         </div>
 
         <div class="qr-actions flex-between">
           <button class="btn-confirm-transfer" id="simulatePaidBtn">
-            <i class="fa-solid fa-circle-check"></i> Tôi Đã Chuyển Khoản Thành Công
+            <i class="fa-solid fa-paper-plane"></i> Tôi Đã Chuyển Khoản
           </button>
           <button class="btn-ghost" id="closeQrModalBtn">Đóng cửa sổ</button>
         </div>
@@ -384,7 +384,7 @@
           <div class="check-circle-icon"><i class="fa-solid fa-check"></i></div>
         </div>
         <h2 class="success-title">Thanh Toán Thành Công!</h2>
-        <p class="success-subtitle" id="successDesc">Hệ thống DropBuy đã ghi nhận thanh toán. Đơn hàng đang được bộ phận kho đóng gói và xuất giao.</p>
+        <p class="success-subtitle" id="successDesc">Cửa hàng đã xác nhận thanh toán. Đơn hàng đang được đóng gói và xuất giao.</p>
         
         <div class="order-receipt-card">
           <div class="flex-between">
@@ -392,12 +392,8 @@
             <strong id="successOrderId">...</strong>
           </div>
           <div class="flex-between">
-            <span>Mã vận đơn DropBuy:</span>
-            <strong id="successDropbuyId">...</strong>
-          </div>
-          <div class="flex-between">
             <span>Trạng thái:</span>
-            <span class="badge-success"><i class="fa-solid fa-box-open"></i> Đang Đóng Gói Tại Kho</span>
+            <span class="badge-success"><i class="fa-solid fa-box-open"></i> Đã thanh toán – chờ xuất kho</span>
           </div>
         </div>
 
