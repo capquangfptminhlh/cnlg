@@ -1,0 +1,116 @@
+{
+  "id": 117959,
+  "name": "Đồng Hồ Định Vị, Đồng Hồ Thông Minh Trẻ Em XO H140 (4G)",
+  "slug": "dong-ho-dinh-vi-dong-ho-thong-minh-tre-em-xo-h140-4g",
+  "sku": "S11-117959-077619",
+  "price": 3438000,
+  "original_price": 4126000,
+  "dropbuy_cost": 2990000,
+  "dropbuy_url": "https://dropbuy.vn/dong-ho-dinh-vi-dong-ho-thong-minh-tre-em-xo-h140-4g_p117959",
+  "category_id": 7,
+  "category_name": "Đồng hồ",
+  "warranty": "3 tháng",
+  "in_stock": false,
+  "description": "Đồng Hồ Thông Minh Trẻ Em H140 Kids Smart 4G Watch\n\nAn Toàn - Tiện Lợi - Thông Minh Mỗi Ngày\n\n\n✅ Tính Năng Nổi Bật\n\nKết nối 4G + 2G mạnh mẽ: Hỗ trợ các băng tần tại Châu Á / Châu Âu / Châu Phi, mang l",
+  "gallery": [
+    {
+      "id": "9b7818c9-3116-4e06-95d5-3354ef2d0bcf",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079586-3.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079586-3_128x128.jpg"
+    },
+    {
+      "id": "664e24e6-bd45-4c3c-9720-093445c4c819",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079724-4.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079724-4_128x128.jpg"
+    },
+    {
+      "id": "d452b853-f988-42e1-9287-f078ff0dc32c",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079751-5.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079751-5_128x128.jpg"
+    },
+    {
+      "id": "26217422-72a4-494b-a23a-35e0419431e7",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079718-6.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079718-6_128x128.jpg"
+    },
+    {
+      "id": "730d09a0-80c0-44f8-bbdb-8867b8b0bb7d",
+      "is_video": true,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826084932-h140_720p.mp4",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826084932-h140_thumb.jpg"
+    },
+    {
+      "id": "0df5df0b-d867-41b5-97bd-12578d0e1d85",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079706-l.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079706-l_128x128.jpg"
+    },
+    {
+      "id": "a1c3d7bd-f2e9-49b5-beef-8015a5a9adfa",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079710-l2.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826079710-l2_128x128.jpg"
+    }
+  ],
+  "video_url": "https://r6i.pen.dropbuy.vn/md/s-11/p-117959/1759826084932-h140_720p.mp4",
+  "variations": [
+    {
+      "id": "10e2ed6f-6ed7-45c3-a551-3b322fba34d4",
+      "sku": "S11-117959-077619",
+      "name": "Xanh",
+      "in_stock": false,
+      "specs": {
+        "variation_weight": 500,
+        "variation_weight_vtp": 500,
+        "variation_weight_spx": 500,
+        "weight_type": "g",
+        "variation_length": 15,
+        "variation_width": 6,
+        "variation_height": 6,
+        "dimension_type": "cm",
+        "variation_cube": 540
+      }
+    },
+    {
+      "id": "0c7669a2-98f5-41b4-b81e-52480e4b5349",
+      "sku": "S11-117959-077618",
+      "name": "Hồng",
+      "in_stock": false,
+      "specs": {
+        "variation_weight": 500,
+        "variation_weight_vtp": 500,
+        "variation_weight_spx": 500,
+        "weight_type": "g",
+        "variation_length": 15,
+        "variation_width": 6,
+        "variation_height": 6,
+        "dimension_type": "cm",
+        "variation_cube": 540
+      }
+    },
+    {
+      "id": "53e0f2d6-65c6-4ad9-90e6-5bf36e799d4b",
+      "sku": "S11-117959-077617",
+      "name": "Đen",
+      "in_stock": false,
+      "specs": {
+        "variation_weight": 500,
+        "variation_weight_vtp": 500,
+        "variation_weight_spx": 500,
+        "weight_type": "g",
+        "variation_length": 15,
+        "variation_width": 6,
+        "variation_height": 6,
+        "dimension_type": "cm",
+        "variation_cube": 540
+      }
+    }
+  ],
+  "rating": 5,
+  "sold_count": 148,
+  "cached_at": "2026-10-19T08:19:51.250Z"
+}

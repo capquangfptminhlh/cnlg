@@ -1,0 +1,576 @@
+[
+  {
+    "id": 1,
+    "name": "Điện thoại & phụ kiện",
+    "slug": "dien-thoai-phu-kien_c1",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 2,
+    "name": "Thiết bị điện gia dụng",
+    "slug": "thiet-bi-dien-gia-dung_c2",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 3,
+    "name": "Thiết bị âm thanh",
+    "slug": "thiet-bi-am-thanh_c3",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 4,
+    "name": "Nhà cửa & đời sống",
+    "slug": "nha-cua-doi-song_c4",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 5,
+    "name": "Điện thoại",
+    "slug": "dien-thoai_c5",
+    "parent_id": 1,
+    "icon": null
+  },
+  {
+    "id": 6,
+    "name": "Máy tính bảng",
+    "slug": "may-tinh-bang_c6",
+    "parent_id": 1,
+    "icon": null
+  },
+  {
+    "id": 7,
+    "name": "Đồng hồ",
+    "slug": "dong-ho_c7",
+    "parent_id": 1,
+    "icon": null
+  },
+  {
+    "id": 8,
+    "name": "Tivi ; máy chiếu",
+    "slug": "tivi-may-chieu_c8",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 9,
+    "name": "Tủ lạnh",
+    "slug": "tu-lanh_c9",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 10,
+    "name": "Củ cáp sạc",
+    "slug": "cu-cap-sac_c10",
+    "parent_id": 1,
+    "icon": null
+  },
+  {
+    "id": 11,
+    "name": "Vỏ ốp lưng & miếng dán",
+    "slug": "vo-op-lung-mieng-dan_c11",
+    "parent_id": 1,
+    "icon": null
+  },
+  {
+    "id": 12,
+    "name": "Pin,Sạc dự phòng , ắc quy",
+    "slug": "pinsac-du-phong-ac-quy_c12",
+    "parent_id": 1,
+    "icon": null
+  },
+  {
+    "id": 13,
+    "name": "Thẻ sim số",
+    "slug": "the-sim-so_c13",
+    "parent_id": 1,
+    "icon": null
+  },
+  {
+    "id": 14,
+    "name": "Loa",
+    "slug": "loa_c14",
+    "parent_id": 3,
+    "icon": null
+  },
+  {
+    "id": 15,
+    "name": "Máy giặt",
+    "slug": "may-giat_c15",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 16,
+    "name": "Tai nghe - Micro",
+    "slug": "tai-nghe-micro_c16",
+    "parent_id": 3,
+    "icon": null
+  },
+  {
+    "id": 17,
+    "name": "Bình nước nóng",
+    "slug": "binh-nuoc-nong_c17",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 18,
+    "name": "Phụ kiện khác",
+    "slug": "phu-kien-khac_c18",
+    "parent_id": 1,
+    "icon": null
+  },
+  {
+    "id": 19,
+    "name": "Điều hòa - Quạt",
+    "slug": "dieu-hoa-quat_c19",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 20,
+    "name": "Máy xay - Máy ép",
+    "slug": "may-xay-may-ep_c20",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 21,
+    "name": "Phòng ngủ",
+    "slug": "phong-ngu_c21",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 22,
+    "name": "Đồ dùng nhà tắm",
+    "slug": "do-dung-nha-tam_c22",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 23,
+    "name": "Chăm sóc nhà cửa",
+    "slug": "cham-soc-nha-cua_c23",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 24,
+    "name": "Trang trí nhà cửa",
+    "slug": "trang-tri-nha-cua_c24",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 25,
+    "name": "Nội thất",
+    "slug": "noi-that_c25",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 26,
+    "name": "Dụng cụ nhà bếp",
+    "slug": "dung-cu-nha-bep_c26",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 27,
+    "name": "Đèn & ánh sáng",
+    "slug": "den-anh-sang_c27",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 28,
+    "name": "Sức khỏe & làm đẹp",
+    "slug": "suc-khoe-lam-dep_c28",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 29,
+    "name": "Đồ dùng khác",
+    "slug": "do-dung-khac_c29",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 30,
+    "name": "Ô tô - Xe máy - Xe đạp",
+    "slug": "o-to-xe-may_c30",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 31,
+    "name": "Phụ tùng",
+    "slug": "phu-tung_c31",
+    "parent_id": 30,
+    "icon": null
+  },
+  {
+    "id": 32,
+    "name": "Đồ chơi - Phụ kiện",
+    "slug": "do-choi-phu-kien_c32",
+    "parent_id": 30,
+    "icon": null
+  },
+  {
+    "id": 33,
+    "name": "Đồ chơi",
+    "slug": "do-choi_c33",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 34,
+    "name": "Máy tính & Laptop",
+    "slug": "may-tinh-laptop_c34",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 35,
+    "name": "Máy tính bàn",
+    "slug": "may-tinh-ban_c35",
+    "parent_id": 34,
+    "icon": null
+  },
+  {
+    "id": 36,
+    "name": "Laptop",
+    "slug": "laptop_c36",
+    "parent_id": 34,
+    "icon": null
+  },
+  {
+    "id": 37,
+    "name": "Máy in - Máy scan",
+    "slug": "may-in-may-scan_c37",
+    "parent_id": 34,
+    "icon": null
+  },
+  {
+    "id": 38,
+    "name": "Thiết bị - Phụ kiện",
+    "slug": "thiet-bi-phu-kien_c38",
+    "parent_id": 34,
+    "icon": null
+  },
+  {
+    "id": 39,
+    "name": "Thời trang",
+    "slug": "thoi-trang_c39",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 40,
+    "name": "Quần áo",
+    "slug": "quan-ao_c40",
+    "parent_id": 39,
+    "icon": null
+  },
+  {
+    "id": 41,
+    "name": "Giày dép",
+    "slug": "giay-dep_c41",
+    "parent_id": 39,
+    "icon": null
+  },
+  {
+    "id": 42,
+    "name": "Mũ nón",
+    "slug": "mu-non_c42",
+    "parent_id": 39,
+    "icon": null
+  },
+  {
+    "id": 43,
+    "name": "Balo - Túi xách - Vali",
+    "slug": "balo-tui-xach-vali_c43",
+    "parent_id": 39,
+    "icon": null
+  },
+  {
+    "id": 44,
+    "name": "Máy ảnh & Camera",
+    "slug": "may-anh-camera_c44",
+    "parent_id": 1,
+    "icon": null
+  },
+  {
+    "id": 45,
+    "name": "Thiết bị khác",
+    "slug": "thiet-bi-khac_c45",
+    "parent_id": 3,
+    "icon": null
+  },
+  {
+    "id": 46,
+    "name": "Thiết bị khác",
+    "slug": "thiet-bi-khac_c46",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 47,
+    "name": "Máy chơi game",
+    "slug": "may-choi-game_c47",
+    "parent_id": 34,
+    "icon": null
+  },
+  {
+    "id": 48,
+    "name": "Thực phẩm & Đồ ăn",
+    "slug": "thuc-pham-do-an_c48",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 49,
+    "name": "Thú cưng",
+    "slug": "thu-cung_c49",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 52,
+    "name": "Trang sức",
+    "slug": "trang-suc_c52",
+    "parent_id": 39,
+    "icon": null
+  },
+  {
+    "id": 53,
+    "name": "Máy Massage",
+    "slug": "may-massage_c53",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 54,
+    "name": "Robot & Máy hút bụi , lau nhà",
+    "slug": "robot-may-hut-bui-lau-nha_c54",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 55,
+    "name": "Bàn phím & Chuột",
+    "slug": "ban-phim-chuot_c55",
+    "parent_id": 34,
+    "icon": null
+  },
+  {
+    "id": 56,
+    "name": "Bàn chải & Tăm nước",
+    "slug": "ban-chai-tam-nuoc_c56",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 57,
+    "name": "Máy lọc không khí",
+    "slug": "may-loc-khong-khi_c57",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 58,
+    "name": "Kính mắt",
+    "slug": "kinh-mat_c58",
+    "parent_id": 39,
+    "icon": null
+  },
+  {
+    "id": 59,
+    "name": "Ly, cốc, bình giữ nhiệt",
+    "slug": "ly-coc-binh-giu-nhiet_c59",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 60,
+    "name": "Bàn , ghế",
+    "slug": "ban-ghe_c60",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 61,
+    "name": "Đồ Camping , phượt , cắm trại",
+    "slug": "do-camping-phuot-cam-trai_c61",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 62,
+    "name": "Máy chiếu",
+    "slug": "may-chieu_c62",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 63,
+    "name": "Vợt muỗi , đèn bắt muỗi",
+    "slug": "vot-muoi-den-bat-muoi_c63",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 64,
+    "name": "Máy hút ẩm, tạo ẩm, máy sưởi",
+    "slug": "may-hut-am-tao-am-may-suoi_c64",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 66,
+    "name": "Đồ chơi người lớn , phòng the",
+    "slug": "do-choi-nguoi-lon-phong-the_c66",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 67,
+    "name": "Dụng cụ thể thao",
+    "slug": "dung-cu-the-thao_c67",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 68,
+    "name": "Dụng cụ cầm tay , máy khoan , cắt…",
+    "slug": "dung-cu-cam-tay-may-khoan-cat_c68",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 69,
+    "name": "Dịch vụ , phần mềm online…",
+    "slug": "dich-vu-phan-mem-online_c69",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 70,
+    "name": "Văn phòng phẩm",
+    "slug": "van-phong-pham_c70",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 71,
+    "name": "Mẹ và Bé",
+    "slug": "me-va-be_c71",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 72,
+    "name": "Đồ phong thuỷ , tâm linh",
+    "slug": "do-phong-thuy-tam-linh_c72",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 73,
+    "name": "Danh mục khác",
+    "slug": "danh-muc-khac_c72",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 76,
+    "name": "Android box , tivi box",
+    "slug": "android-box-tivi-box_c76",
+    "parent_id": 75,
+    "icon": null
+  },
+  {
+    "id": 78,
+    "name": "Dây , giắc kết nối",
+    "slug": "day-giac-ket-noi_c78",
+    "parent_id": 75,
+    "icon": null
+  },
+  {
+    "id": 79,
+    "name": "Bộ chuyển đổi tín hiệu",
+    "slug": "bo-chuyen-doi-tin-hieu_c79",
+    "parent_id": 75,
+    "icon": null
+  },
+  {
+    "id": 80,
+    "name": "Amply , Equalize , Sub",
+    "slug": "amply-equalize-sub_c80",
+    "parent_id": 3,
+    "icon": null
+  },
+  {
+    "id": 81,
+    "name": "Thiết bị mạng",
+    "slug": "thiet-bi-mang_c81",
+    "parent_id": null,
+    "icon": null
+  },
+  {
+    "id": 82,
+    "name": "Modem , router",
+    "slug": "modem-router_c82",
+    "parent_id": 81,
+    "icon": null
+  },
+  {
+    "id": 84,
+    "name": "Kích sóng wifi , bộ phát 4G",
+    "slug": "kich-song-wifi-bo-phat-4g_c84",
+    "parent_id": 81,
+    "icon": null
+  },
+  {
+    "id": 85,
+    "name": "Văn phòng phẩm",
+    "slug": "van-phong-pham_c85",
+    "parent_id": 4,
+    "icon": null
+  },
+  {
+    "id": 86,
+    "name": "Bếp từ , bếp điện",
+    "slug": "bep-tu-bep-dien_c86",
+    "parent_id": 2,
+    "icon": null
+  },
+  {
+    "id": 87,
+    "name": "Thùng các tông",
+    "slug": "thung-cac-tong_c87",
+    "parent_id": 73,
+    "icon": null
+  },
+  {
+    "id": 89,
+    "name": "Băng dính đóng hàng",
+    "slug": "bang-dinh-dong-hang_c89",
+    "parent_id": 73,
+    "icon": null
+  },
+  {
+    "id": 92,
+    "name": "Xốp , bọt , cột khí",
+    "slug": "xop-bot-cot-khi_c92",
+    "parent_id": 73,
+    "icon": null
+  }
+]

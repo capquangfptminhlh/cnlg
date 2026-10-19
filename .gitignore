@@ -1,0 +1,8 @@
+node_modules/
+scratch/
+cookies.txt
+sample_product_rsc.txt
+*.log
+.DS_Store
+.env
+.env.local

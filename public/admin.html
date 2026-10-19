@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BẢNG ĐIỀU KHIỂN - HoangMinh x DropBuy Relay</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="admin-body">
+
+  <header class="admin-header">
+    <div class="container flex-between">
+      <div class="brand">
+        <a href="/" class="brand-logo"><span class="logo-bold">HOANGMINH</span><span class="logo-accent">.COM</span></a>
+        <span class="admin-tag"><i class="fa-solid fa-server"></i> Relay Control Panel</span>
+      </div>
+      <div>
+        <a href="/" class="btn-back-store"><i class="fa-solid fa-store"></i> Xem Cửa Hàng</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="container admin-main">
+    
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+        <div class="stat-info">
+          <div class="stat-label">Tổng SP Đồng Bộ Từ DropBuy</div>
+          <div class="stat-val" id="statProducts">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-receipt"></i></div>
+        <div class="stat-info">
+          <div class="stat-label">Tổng Đơn Hàng</div>
+          <div class="stat-val" id="statOrders">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-money-bill-transfer"></i></div>
+        <div class="stat-info">
+          <div class="stat-label">Doanh Thu Đã Thanh Toán</div>
+          <div class="stat-val price" id="statRevenue">0 đ</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-bolt"></i></div>
+        <div class="stat-info">
+          <div class="stat-label">Trạng Thái Relay DropBuy</div>
+          <div class="stat-val status-online" id="statStatus">Sẵn sàng</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions Bar -->
+    <div class="admin-action-bar flex-between" style="gap: 16px; flex-wrap: wrap;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+          <h3 style="margin: 0;">Đồng Bộ Kho DropBuy.vn</h3>
+          <span class="auth-badge badge-connected" id="daemonStatusBadge" style="font-size: 11px;">
+            <i class="fa-solid fa-bolt"></i> Tự Động Nạp Giá & Tồn Kho: 5 Phút / 1 Lần
+          </span>
+        </div>
+        <p style="margin: 0;" id="daemonStatusText">Hệ thống daemon đang tự động quét 100% kho DropBuy (1.321 SP) mỗi 5 phút.</p>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-sync-now" id="downloadAllImagesBtn" style="background: #0f172a;">
+          <i class="fa-solid fa-cloud-arrow-down"></i> Tải Full Album Ảnh Về Ổ Đĩa Server
+        </button>
+        <button class="btn-sync-now" id="syncNowBtn">
+          <i class="fa-solid fa-rotate"></i> Đồng Bộ Lại Toàn Bộ Kho DropBuy
+        </button>
+      </div>
+    </div>
+
+    <div class="admin-two-cols">
+      <!-- Left: Settings -->
+      <div>
+        <!-- Wholesale Login Card -->
+        <div class="admin-card" style="border: 1px solid rgba(245, 158, 11, 0.4); background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(15, 23, 42, 0.95)); margin-bottom: 24px;">
+          <div class="flex-between" style="margin-bottom: 12px;">
+            <h3><i class="fa-solid fa-key" style="color: #f59e0b;"></i> Đăng Nhập DropBuy (Kích Hoạt Giá Sỉ)</h3>
+            <span id="dropbuyAuthBadge" class="auth-badge badge-disconnected">Chưa kết nối</span>
+          </div>
+          <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">
+            Đăng nhập tài khoản DropBuy để hệ thống tự động đồng bộ theo <strong>giá sỉ đại lý (F1)</strong> thay vì giá bán lẻ thị trường.
+          </p>
+
+          <div id="dropbuyLoginForm">
+            <div class="form-group">
+              <label>Số điện thoại / Email / Tên truy cập DropBuy</label>
+              <input type="text" id="dropbuyLoginUser" placeholder="Tài khoản đăng nhập DropBuy của bạn">
+            </div>
+            <div class="form-group">
+              <label>Mật khẩu DropBuy</label>
+              <input type="password" id="dropbuyLoginPass" placeholder="••••••••">
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 14px;">
+              <button type="button" class="btn-sync-now" id="btnDropbuyLogin" style="flex: 1; background: #f59e0b; color: #000; font-weight: 700;">
+                <i class="fa-solid fa-arrow-right-to-bracket"></i> Đăng Nhập & Kích Hoạt Giá Sỉ
+              </button>
+              <button type="button" class="btn-sync-now" id="btnDropbuyLogout" style="display: none; background: #ef4444; color: #fff;">
+                <i class="fa-solid fa-power-off"></i> Đăng Xuất
+              </button>
+            </div>
+          </div>
+
+          <div id="dropbuyAuthMsg" style="display: none; margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 13px;"></div>
+
+          <details style="margin-top: 14px; font-size: 12px; color: #64748b;">
+            <summary style="cursor: pointer; color: #94a3b8;"><i class="fa-solid fa-cookie"></i> Hoặc dán Session Cookie DropBuy thủ công (Dành cho tài khoản có OTP)</summary>
+            <div style="margin-top: 8px;">
+              <textarea id="dropbuyManualCookie" rows="2" style="width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-family: monospace; font-size: 11px; padding: 6px;" placeholder="Dán next-auth.session-token=..."></textarea>
+              <button type="button" id="btnSaveCookie" style="margin-top: 6px; padding: 6px 12px; font-size: 12px; background: #334155; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Lưu Cookie</button>
+            </div>
+          </details>
+        </div>
+
+        <!-- General Config Card -->
+        <div class="admin-card">
+          <h3><i class="fa-solid fa-sliders"></i> Cấu Hình Giá Bán & Cổng Thanh Toán</h3>
+          <form id="configForm">
+            <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" id="cfgSimulationMode">
+              <strong>Bật Chế Độ Mô Phỏng / Sandbox (Khuyên dùng khi chưa có tài khoản thật)</strong>
+            </label>
+            <p class="help-text">Ở chế độ Sandbox, hệ thống sẽ tự sinh mã VietQR chuẩn Napas 24/7 để bạn test luồng đặt hàng và thanh toán mà không bị trừ tiền thật trên DropBuy.</p>
+          </div>
+
+          <hr class="divider">
+
+          <div class="form-group">
+            <label>Biên Lợi Nhuận (% Markup giá bán trên hoangminh.com)</label>
+            <input type="number" id="cfgMarkup" min="0" max="100" value="15">
+            <p class="help-text">Ví dụ: Giá sỉ DropBuy là 100,000 đ + 15% = 115,000 đ giá niêm yết trên hoangminh.com.</p>
+          </div>
+
+          <hr class="divider">
+
+          <h4><i class="fa-solid fa-building-columns"></i> Thông Tin Ngân Hàng Thụ Hưởng (VietQR)</h4>
+          <div class="form-group">
+            <label>Ngân hàng</label>
+            <select id="cfgBankId">
+              <option value="970422">MBBank (Ngân hàng Quân Đội)</option>
+              <option value="970436">Vietcombank</option>
+              <option value="970407">Techcombank</option>
+              <option value="970418">BIDV</option>
+              <option value="970415">VietinBank</option>
+              <option value="970423">TPBank</option>
+              <option value="970432">VPBank</option>
+              <option value="970441">VIB</option>
+              <option value="970405">Agribank</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Số tài khoản</label>
+            <input type="text" id="cfgAccountNo" placeholder="Ví dụ: 0386888999">
+          </div>
+          <div class="form-group">
+            <label>Tên chủ tài khoản</label>
+            <input type="text" id="cfgAccountName" placeholder="Ví dụ: HOANG MINH STORE">
+          </div>
+
+          <button type="submit" class="btn-submit"><i class="fa-solid fa-floppy-disk"></i> Lưu Cấu Hình</button>
+        </form>
+      </div>
+      </div>
+
+      <!-- Right: Orders Management -->
+      <div class="admin-card">
+        <h3><i class="fa-solid fa-list-check"></i> Đơn Hàng Mới Nhất & Trạng Thái Đồng Bộ DropBuy</h3>
+        <div class="orders-table-wrapper">
+          <table class="orders-table">
+            <thead>
+              <tr>
+                <th>Mã Đơn HM</th>
+                <th>Mã DropBuy</th>
+                <th>Khách Hàng</th>
+                <th>Tổng Tiền</th>
+                <th>Trạng Thái</th>
+                <th>Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

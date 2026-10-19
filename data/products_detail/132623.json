@@ -1,0 +1,82 @@
+{
+  "id": 132623,
+  "name": "Camera xoay an ninh thông minh DCSXJ-108OPW, sạc pin, có quay video offline",
+  "slug": "camera-xoay-an-ninh-thong-minh-dcsxj-108opw-sac-pin-co-quay-video-offline",
+  "sku": "S1-132623-116117",
+  "price": 1150000,
+  "original_price": 1380000,
+  "dropbuy_cost": 1000000,
+  "dropbuy_url": "https://dropbuy.vn/camera-xoay-an-ninh-thong-minh-dcsxj-108opw-sac-pin-co-quay-video-offline_p132623",
+  "category_id": 44,
+  "category_name": "Máy ảnh & Camera",
+  "warranty": "12 tháng",
+  "in_stock": true,
+  "description": "CAMERA AN NINH KHÔNG DÂY VB-101 - WIRE-FREE, SẮC NÉT FULL HD 🏠📸\nBạn đang tìm kiếm giải pháp giám sát an ninh đơn giản, tiện lợi mà không cần đi dây rườm rà? Camera an ninh VB-101 chính là lựa chọn h",
+  "gallery": [
+    {
+      "id": "666a8deb-e5c7-48dd-ac33-51cb21c6537d",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641817-z79534338381436418d1aa2f1c48c0cee76476153ddf1f.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641817-z79534338381436418d1aa2f1c48c0cee76476153ddf1f_128x128.jpg"
+    },
+    {
+      "id": "d2011bbc-2328-4dd1-bcf7-af6c4c0a1f32",
+      "is_video": true,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781879944953-img4346_720p.mov",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781879944953-img4346_thumb.jpg"
+    },
+    {
+      "id": "0f0ef3cb-1cb5-42d7-adb9-0a8b43b18690",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641786-z7953361567561fef937299f69ad0fdedbc31285fca0d6.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641786-z7953361567561fef937299f69ad0fdedbc31285fca0d6_128x128.jpg"
+    },
+    {
+      "id": "b336b03e-b6d9-44b6-8deb-7be065fdbc55",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641787-z79533524761516af0494adf61fd182a74f2f7c6f33b5c.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641787-z79533524761516af0494adf61fd182a74f2f7c6f33b5c_128x128.jpg"
+    },
+    {
+      "id": "2d946597-c9e0-4764-94d8-77d3f218af4e",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641782-z7953368689403c38e97bb8aa4adeae987418afd27911f.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641782-z7953368689403c38e97bb8aa4adeae987418afd27911f_128x128.jpg"
+    },
+    {
+      "id": "4dc6d755-cbb1-4afd-9eaa-38902f85d8da",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641818-z7953389088735de779466a08e9921684c8c4d5c397942.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641818-z7953389088735de779466a08e9921684c8c4d5c397942_128x128.jpg"
+    },
+    {
+      "id": "088b571c-dc39-47ec-8304-cd12787fdd52",
+      "is_video": false,
+      "url": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641825-z7953417380539c231aace3189465728c1b6bc8591c0dc.jpg",
+      "thumb": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781854641825-z7953417380539c231aace3189465728c1b6bc8591c0dc_128x128.jpg"
+    }
+  ],
+  "video_url": "https://r6i.pen.dropbuy.vn/md/s-1/p-132623/1781879944953-img4346_720p.mov",
+  "variations": [
+    {
+      "id": "3099ae4f-c251-4c17-bc84-7bc1edad902c",
+      "sku": "S1-132623-116117",
+      "name": "Camera xoay an ninh thông minh DCSXJ-108OPW, sạc pin, có quay video offline",
+      "in_stock": true,
+      "specs": {
+        "variation_weight": 650,
+        "variation_weight_vtp": 770,
+        "variation_weight_spx": 650,
+        "weight_type": "g",
+        "variation_length": 24,
+        "variation_width": 20,
+        "variation_height": 8,
+        "dimension_type": "cm",
+        "variation_cube": 3840
+      }
+    }
+  ],
+  "rating": 5,
+  "sold_count": 112,
+  "cached_at": "2026-10-19T06:42:33.191Z"
+}
