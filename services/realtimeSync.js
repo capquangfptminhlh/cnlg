@@ -42,7 +42,7 @@ function withCatalogLock(fn) {
 /** Thông tin công khai của SP (khớp với publicProduct trong server.js) để gửi qua socket */
 function publicPatch(p) {
   const discount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
-  return { id: p.id, name: p.name, price: p.price, original_price: p.original_price, discount_percent: discount, in_stock: p.in_stock !== false, image: p.image, category_id: p.category_id };
+  return { id: p.id, name: p.name, price: p.price, original_price: p.original_price, discount_percent: discount, in_stock: p.in_stock !== false, image: p.image, category_id: p.category_id, variant_count: p.variant_count };
 }
 
 function emitChanges(changed, meta = {}) {
@@ -101,7 +101,7 @@ async function runPriceSync() {
         continue;
       }
       const priceDiff = cur.price !== fresh.price || cur.original_price !== fresh.original_price || cur.dropbuy_cost !== fresh.dropbuy_cost;
-      const infoDiff = cur.name !== fresh.name || cur.image !== fresh.image;
+      const infoDiff = cur.name !== fresh.name || cur.image !== fresh.image || cur.variant_count !== fresh.variant_count;
       // in_stock do vòng tồn kho quyết định (API in-stock chuẩn hơn cờ trong kết quả tìm kiếm)
       const keepStock = cur.in_stock;
       Object.assign(cur, fresh, { in_stock: keepStock, updated_at: priceDiff || infoDiff ? fresh.updated_at : cur.updated_at });

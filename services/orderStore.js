@@ -43,6 +43,7 @@ function createOrder(orderData) {
     customer: {
       name: orderData.customer.name || '',
       phone: orderData.customer.phone || '',
+      province: orderData.customer.province || '',
       address: orderData.customer.address || '',
       note: orderData.customer.note || ''
     },

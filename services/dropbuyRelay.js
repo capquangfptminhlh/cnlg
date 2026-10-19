@@ -79,6 +79,8 @@ async function processOrderFulfillment(order, io) {
     });
 
     const dropbuyOrderId = `DB${Date.now().toString().slice(-7)}`;
+    const timeoutMin = require('./orderExpiry').normalizeOrderRules(config.orders || {}).paymentTimeoutMinutes;
+    qrData.expires_in_seconds = Math.max(60, timeoutMin * 60 - Math.round((Date.now() - new Date(order.created_at).getTime()) / 1000));
 
     orderStore.updateOrder(orderId, {
       status: 'PENDING_PAYMENT',

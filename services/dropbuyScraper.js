@@ -181,6 +181,7 @@ function mapItem(item, { ctx = getPricingContext(), priceMap, previous, keepWhol
     is_mall: !!item.shop_is_mall,
     shop_name: item.shop_name || null,
     is_flash_sale: !!item.is_flash_sale,
+    variant_count: Number(item.total_variations) || 1,
     updated_at: new Date().toISOString()
   };
   return applyPricing(base, ctx);

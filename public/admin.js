@@ -106,7 +106,7 @@ function renderOrders(orders) {
     const canConfirm = ['PENDING_PAYMENT', 'PAYMENT_REPORTED'].includes(o.status);
     const items = (o.items || []).map(i => {
       const name = i.dropbuy_url ? `<a href="${esc(i.dropbuy_url)}" target="_blank" rel="noopener" style="color:#c9a84c;">${esc(i.name)}</a>` : esc(i.name);
-      return `${name} × ${i.quantity}${i.dropbuy_cost ? ` <span title="Giá vốn DropBuy">(${formatPrice(i.dropbuy_cost)})</span>` : ''}`;
+      return `${name}${i.variant_name ? ` <em style="color:#94a3b8;">[${esc(i.variant_name)}]</em>` : ''} × ${i.quantity}${i.sku ? ` <small style="color:#64748b;">${esc(i.sku)}</small>` : ''}${i.dropbuy_cost ? ` <span title="Giá vốn DropBuy">(${formatPrice(i.dropbuy_cost)})</span>` : ''}`;
     }).join('<br>');
     let actions;
     if (canConfirm) {
@@ -126,12 +126,12 @@ function renderOrders(orders) {
       <td>
         <strong>${esc(o.customer?.name)}</strong><br>
         <small style="color: #6b7280;">${esc(o.customer?.phone)}</small><br>
-        <small style="color: #6b7280;">${esc(o.customer?.address)}</small>
+        <small style="color: #6b7280;">${esc(o.customer?.address)}${o.customer?.province ? `, ${esc(o.customer.province)}` : ''}</small>
         ${o.customer?.note ? `<br><small style="color:#f59e0b;">Ghi chú: ${esc(o.customer.note)}</small>` : ''}
       </td>
-      <td class="order-items-cell">${items}${cost ? `<br><strong>Lãi gộp: ${formatPrice(o.total_amount - cost)}</strong>` : ''}</td>
+      <td class="order-items-cell">${items}${o.shipping_fee != null ? `<br>Ship: ${o.shipping_fee ? formatPrice(o.shipping_fee) : 'miễn phí'}${o.customer?.province ? ` (${esc(o.customer.province)})` : ''}` : ''}${cost ? `<br><strong>Lãi gộp hàng: ${formatPrice((o.subtotal ?? o.total_amount) - cost)}</strong>` : ''}</td>
       <td><strong style="color: #e11d48;">${formatPrice(o.total_amount)}</strong></td>
-      <td><span class="status-pill ${cls}">${label}</span></td>
+      <td><span class="status-pill ${cls}">${label}</span>${o.needs_attention && o.status === 'PAYMENT_REPORTED' ? '<br><small style="color:#ef4444;">⚠ Khách báo CK đã lâu – cần đối soát</small>' : ''}${o.cancel_reason ? `<br><small style="color:#94a3b8;">${esc(o.cancel_reason)}</small>` : ''}</td>
       <td>${actions}</td>
     </tr>`;
   }).join('');
@@ -268,6 +268,10 @@ socket.on('PAYMENT_CONFIRMED', () => {
 });
 
 socket.on('ADMIN_PAYMENT_REPORTED', () => {
+  loadData();
+});
+
+socket.on('ADMIN_ORDER_CHANGED', () => {
   loadData();
 });
 
@@ -623,3 +627,48 @@ socket.on('PRODUCTS_UPDATED', () => {
 
 loadPricing();
 loadPricingTable();
+
+
+// ============================ PHÍ VẬN CHUYỂN & HẠN THANH TOÁN ============================
+const SH_FIELDS = { shNorth: ['fees', 'north'], shCentral: ['fees', 'central'], shSouth: ['fees', 'south'], shIncluded: ['includedWeightGram'], shPerKg: ['perExtraKg'], shFree: ['freeShipThreshold'], shDefaultWeight: ['defaultWeightGram'] };
+
+async function loadShippingSettings() {
+  try {
+    const json = await (await adminFetch('/api/admin/shipping')).json();
+    if (!json.success) throw new Error(json.error);
+    const { shipping, orders } = json.data;
+    document.getElementById('shEnabled').checked = shipping.enabled;
+    for (const [id, path] of Object.entries(SH_FIELDS)) document.getElementById(id).value = path.reduce((o, k) => o[k], shipping);
+    document.getElementById('odTimeout').value = orders.paymentTimeoutMinutes;
+    document.getElementById('odAlert').value = orders.reportedAlertHours;
+  } catch (e) {
+    document.getElementById('shippingSaveMsg').innerText = 'Lỗi tải cấu hình: ' + e.message;
+  }
+}
+
+document.getElementById('shippingForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const val = id => Number(document.getElementById(id).value);
+  const body = {
+    shipping: {
+      enabled: document.getElementById('shEnabled').checked,
+      fees: { north: val('shNorth'), central: val('shCentral'), south: val('shSouth') },
+      includedWeightGram: val('shIncluded'),
+      perExtraKg: val('shPerKg'),
+      freeShipThreshold: val('shFree'),
+      defaultWeightGram: val('shDefaultWeight')
+    },
+    orders: { paymentTimeoutMinutes: val('odTimeout'), reportedAlertHours: val('odAlert') }
+  };
+  const msg = document.getElementById('shippingSaveMsg');
+  try {
+    const json = await (await adminFetch('/api/admin/shipping', { method: 'POST', body: JSON.stringify(body) })).json();
+    if (!json.success) throw new Error(json.error);
+    msg.innerText = json.message;
+    loadShippingSettings();
+  } catch (err) {
+    msg.innerText = 'Lỗi: ' + err.message;
+  }
+});
+
+loadShippingSettings();

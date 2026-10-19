@@ -15,6 +15,9 @@ const realtimeSync = require('./services/realtimeSync');
 const { requireAdmin, getAdminPassword, sanitizeHtml, maskPhone } = require('./services/security');
 const pricing = require('./services/pricing');
 const { checkDropbuy } = require('./services/dropbuyHealth');
+const variants = require('./services/variants');
+const shipping = require('./services/shipping');
+const orderExpiry = require('./services/orderExpiry');
 
 const app = express();
 const server = http.createServer(app);
@@ -79,8 +82,12 @@ function publicOrder(o) {
     status: o.status,
     created_at: o.created_at,
     total_amount: o.total_amount,
-    items: (o.items || []).map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
-    customer: { name: o.customer?.name, phone: maskPhone(o.customer?.phone) },
+    subtotal: o.subtotal ?? o.total_amount,
+    shipping_fee: o.shipping_fee || 0,
+    shipping_detail: o.shipping_detail || null,
+    cancel_reason: o.cancel_reason || null,
+    items: (o.items || []).map(i => ({ id: i.id, name: i.name, variant_name: i.variant_name || null, price: i.price, quantity: i.quantity, image: i.image })),
+    customer: { name: o.customer?.name, phone: maskPhone(o.customer?.phone), province: o.customer?.province || null },
     payment: o.payment,
     paid_at: o.paid_at || null
   };
@@ -185,30 +192,73 @@ app.get('/api/products/:id', async (req, res) => {
     delete merged.dropbuy_cost;
     delete merged.rating;
     delete merged.sold_count;
+    merged.variants = await variants.variantsWithPrices(product, detail).catch(() => []);
+    merged.variation_options = detail.variation_options || [];
+    delete merged.variations;
     res.json({ success: true, data: merged });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Tạo đơn: giá, tên, ảnh lấy từ catalog phía server – không tin dữ liệu giá client gửi lên
+// --- Vận chuyển ---
+app.get('/api/shipping/provinces', (req, res) => {
+  res.json({ success: true, data: shipping.PROVINCES.map(([name, region]) => ({ name, region, region_label: shipping.REGION_LABEL[region] })) });
+});
+
+/** Tính giá & khối lượng từng dòng giỏ theo dữ liệu đã đồng bộ (không gọi trực tiếp DropBuy) */
+async function priceCartLines(items) {
+  const catalog = new Map(scraper.getProducts().map(p => [p.id, p]));
+  const lines = [];
+  for (const it of items) {
+    const p = catalog.get(Number(it.id));
+    if (!p) continue;
+    const qty = Math.max(1, Math.min(MAX_QTY_PER_ITEM, Number(it.quantity) || 1));
+    let price = p.price;
+    let weight = 0;
+    // Chi tiết (cache 6h) cho biết giá theo phân loại và khối lượng thật để tính phí ship
+    const detail = await detailScraper.fetchProductFullDetail(p, false).catch(() => null);
+    const vs = await variants.variantsWithPrices(p, detail).catch(() => []);
+    const v = vs.find(x => x.id === it.variation_id) || vs.find(x => x.id === p.variation_id) || (vs.length === 1 ? vs[0] : null);
+    if (v) { price = v.price; weight = v.weight_gram; }
+    lines.push({ id: p.id, variation_id: it.variation_id || null, quantity: qty, price, weight_gram: weight });
+  }
+  return lines;
+}
+
+app.post('/api/shipping/quote', async (req, res) => {
+  try {
+    const { province, items } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ success: false, error: 'Giỏ hàng trống' });
+    const lines = await priceCartLines(items.slice(0, 30));
+    const subtotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
+    const q = shipping.quote({ province, subtotal, lines }, readConfig().shipping);
+    res.json({ success: true, data: { subtotal, shipping_fee: q.fee, total: subtotal + q.fee, ...q } });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Tạo đơn: giá, tên, phân loại lấy từ DropBuy/catalog phía server – không tin dữ liệu giá client gửi lên
 app.post('/api/orders/checkout', async (req, res) => {
   try {
     const { customer, items } = req.body || {};
     const name = String(customer?.name || '').trim();
     const phone = String(customer?.phone || '').replace(/[\s.-]/g, '');
     const address = String(customer?.address || '').trim();
+    const province = String(customer?.province || '').trim();
     if (!name || !address || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, error: 'Vui lòng cung cấp đầy đủ họ tên, số điện thoại, địa chỉ và sản phẩm.' });
     }
     if (!/^(0|\+84)\d{9,10}$/.test(phone)) {
       return res.status(400).json({ success: false, error: 'Số điện thoại không hợp lệ.' });
     }
+    if (!shipping.regionOf(province)) return res.status(400).json({ success: false, error: 'Vui lòng chọn Tỉnh/Thành phố nhận hàng.' });
     if (items.length > 30) return res.status(400).json({ success: false, error: 'Tối đa 30 mặt hàng mỗi đơn.' });
 
     const known = new Map(scraper.getProducts().map(p => [p.id, p]));
+    // Gộp theo SP + phân loại
     const merged = new Map();
-    const expected = new Map();
     for (const it of items) {
       const id = Number(it?.id);
       const qty = Number(it?.quantity);
@@ -216,36 +266,46 @@ app.post('/api/orders/checkout', async (req, res) => {
         return res.status(400).json({ success: false, error: `Số lượng không hợp lệ (1–${MAX_QTY_PER_ITEM}).` });
       }
       if (!known.has(id)) return res.status(400).json({ success: false, error: `Sản phẩm #${it?.id} không còn tồn tại.` });
-      merged.set(id, (merged.get(id) || 0) + qty);
-      if (Number.isFinite(Number(it?.price))) expected.set(id, Number(it.price));
+      const vid = it?.variation_id ? String(it.variation_id) : null;
+      const key = `${id}:${vid || ''}`;
+      const cur = merged.get(key) || { id, variation_id: vid, quantity: 0, expected: null };
+      cur.quantity = Math.min(MAX_QTY_PER_ITEM, cur.quantity + qty);
+      if (Number.isFinite(Number(it?.price))) cur.expected = Number(it.price);
+      merged.set(key, cur);
     }
 
-    // Kiểm tra trực tiếp trên DropBuy (giá theo SKU + tồn kho) ngay trước khi tạo đơn
-    const live = await realtimeSync.liveCheck([...merged.keys()]);
-    const catalog = live.products;
+    // Cập nhật catalog chung (giá/tồn kho cấp SP) chạy song song
+    realtimeSync.liveCheck([...new Set([...merged.values()].map(l => l.id))]).catch(() => {});
+
+    // Kiểm tra TRỰC TIẾP từng dòng (SKU phân loại) trên DropBuy
+    const checked = await Promise.all([...merged.values()].map(async l => ({ line: l, r: await variants.checkLine(known.get(l.id), l.variation_id) })));
     const problems = [];
-    for (const id of merged.keys()) {
-      const p = catalog.get(id);
-      if (p.in_stock === false) problems.push({ id, name: p.name, reason: 'OUT_OF_STOCK', message: `"${p.name}" vừa hết hàng trên kho DropBuy.` });
-      else if (expected.has(id) && expected.get(id) !== p.price) problems.push({ id, name: p.name, reason: 'PRICE_CHANGED', old_price: expected.get(id), price: p.price, message: `Giá "${p.name}" vừa đổi từ ${expected.get(id).toLocaleString('vi-VN')} đ thành ${p.price.toLocaleString('vi-VN')} đ.` });
+    for (const { line, r } of checked) {
+      const label = `"${r.name || known.get(line.id).name}${r.variant_name ? ` – ${r.variant_name}` : ''}"`;
+      if (!r.ok) problems.push({ id: line.id, variation_id: line.variation_id, reason: r.in_stock === false ? 'OUT_OF_STOCK' : 'INVALID', message: r.message || `${label} hiện không đặt được.` });
+      else if (line.expected != null && line.expected !== r.price) problems.push({ id: line.id, variation_id: line.variation_id, reason: 'PRICE_CHANGED', old_price: line.expected, price: r.price, message: `Giá ${label} vừa đổi từ ${line.expected.toLocaleString('vi-VN')} đ thành ${r.price.toLocaleString('vi-VN')} đ.` });
     }
     if (problems.length) {
-      return res.status(409).json({ success: false, error: problems.map(x => x.message).join(' '), problems, items: [...merged.keys()].map(id => publicProduct(catalog.get(id))) });
+      return res.status(409).json({ success: false, error: problems.map(x => x.message).join(' '), problems, lines: checked.map(({ line, r }) => ({ id: line.id, variation_id: line.variation_id, price: r.price ?? null, in_stock: !!r.ok })) });
     }
 
-    const orderItems = [...merged.entries()].map(([id, quantity]) => {
-      const p = catalog.get(id);
-      return { id, sku: p.sku, variation_id: p.variation_id || null, name: p.name, price: p.price, quantity, image: p.image, dropbuy_url: p.dropbuy_url, dropbuy_cost: p.dropbuy_cost, cost_is_wholesale: !!p.is_wholesale_price };
+    const orderItems = checked.map(({ line, r }) => {
+      const p = known.get(line.id);
+      return { id: line.id, sku: r.sku, variation_id: r.variation_id, variant_name: r.variant_name || null, name: p.name, price: r.price, quantity: line.quantity, image: p.image, weight_gram: r.weight_gram || 0, dropbuy_url: p.dropbuy_url, dropbuy_cost: r.cost, cost_is_wholesale: !!r.cost_is_wholesale, live_verified: r.live };
     });
-    const total_amount = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
+    const subtotal = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
+    const ship = shipping.quote({ province, subtotal, lines: orderItems }, readConfig().shipping);
+    const total_amount = subtotal + ship.fee;
 
     const order = orderStore.createOrder({
-      customer: { name: name.slice(0, 100), phone, address: address.slice(0, 300), note: String(customer?.note || '').slice(0, 500) },
+      customer: { name: name.slice(0, 100), phone, province, address: address.slice(0, 300), note: String(customer?.note || '').slice(0, 500) },
       items: orderItems,
-      total_amount,
-      live_verified: live.ok
+      total_amount
     });
-    console.log(`[Order] Đã tiếp nhận đơn hàng #${order.id} trị giá ${order.total_amount.toLocaleString('vi-VN')} đ`);
+    orderStore.updateOrder(order.id, { subtotal, shipping_fee: ship.fee, shipping_detail: ship.detail, weight_gram: ship.weight_gram, live_verified: orderItems.every(i => i.live_verified) });
+    order.subtotal = subtotal;
+    order.shipping_fee = ship.fee;
+    console.log(`[Order] Đã tiếp nhận đơn hàng #${order.id}: ${subtotal.toLocaleString('vi-VN')} đ + ship ${ship.fee.toLocaleString('vi-VN')} đ`);
 
     setImmediate(() => {
       relay.processOrderFulfillment(order, io).catch(err => {
@@ -253,11 +313,16 @@ app.post('/api/orders/checkout', async (req, res) => {
       });
     });
 
+    const timeout = orderExpiry.normalizeOrderRules(readConfig().orders || {}).paymentTimeoutMinutes;
     res.json({
       success: true,
       orderId: order.id,
+      subtotal,
+      shipping_fee: ship.fee,
+      shipping_detail: ship.detail,
       total_amount,
-      items: orderItems.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+      payment_timeout_minutes: timeout,
+      items: orderItems.map(i => ({ id: i.id, variation_id: i.variation_id, variant_name: i.variant_name, name: i.name, price: i.price, quantity: i.quantity })),
       message: 'Đơn hàng đã được tạo. Đang khởi tạo mã thanh toán...'
     });
   } catch (err) {
@@ -504,6 +569,21 @@ app.post('/api/admin/pricing/override', requireAdmin, async (req, res) => {
   res.json({ success: true, data: { id, price: p.price, cost: p.dropbuy_cost, profit: p.price - p.dropbuy_cost, rule: p.pricing_rule, override: rules.productOverrides[String(id)] || null } });
 });
 
+// --- Phí vận chuyển & hạn thanh toán ---
+app.get('/api/admin/shipping', requireAdmin, (req, res) => {
+  const cfg = readConfig();
+  res.json({ success: true, data: { shipping: shipping.normalizeShipping(cfg.shipping || {}), orders: orderExpiry.normalizeOrderRules(cfg.orders || {}) } });
+});
+
+app.post('/api/admin/shipping', requireAdmin, (req, res) => {
+  const cfg = readConfig();
+  const b = req.body || {};
+  if (b.shipping) cfg.shipping = shipping.normalizeShipping(b.shipping);
+  if (b.orders) cfg.orders = orderExpiry.normalizeOrderRules(b.orders);
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
+  res.json({ success: true, message: 'Đã lưu phí vận chuyển & hạn thanh toán.', data: { shipping: cfg.shipping, orders: cfg.orders } });
+});
+
 // Kiểm tra kết nối các API DropBuy
 app.get('/api/admin/dropbuy-health', requireAdmin, async (req, res) => {
   try {
@@ -538,4 +618,5 @@ server.listen(PORT, () => {
   console.log(`🔗 Admin Console: http://localhost:${PORT}/admin.html`);
   console.log(`================================================================`);
   realtimeSync.startRealtimeSync(io);
+  orderExpiry.startOrderExpiry(io, readConfig);
 });

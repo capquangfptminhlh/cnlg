@@ -230,8 +230,15 @@
         </div>
 
         <div class="form-field">
+          <label>Tỉnh / Thành phố nhận hàng <span class="req">*</span></label>
+          <select id="custProvince" required>
+            <option value="">-- Chọn Tỉnh / Thành phố --</option>
+          </select>
+        </div>
+
+        <div class="form-field">
           <label>Địa chỉ giao hàng chi tiết <span class="req">*</span></label>
-          <textarea id="custAddress" required rows="2" placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố"></textarea>
+          <textarea id="custAddress" required rows="2" placeholder="Số nhà, tên đường, phường/xã"></textarea>
         </div>
 
         <div class="form-field">
@@ -245,9 +252,14 @@
             <span id="summaryCount">0</span>
           </div>
           <div class="summary-line flex-between">
-            <span>Đơn vị thực hiện:</span>
-            <span>Kho Tổng DropBuy.vn</span>
+            <span>Tạm tính:</span>
+            <span id="summarySubtotal">0 đ</span>
           </div>
+          <div class="summary-line flex-between">
+            <span>Phí vận chuyển:</span>
+            <span id="summaryShipping">Chọn tỉnh/thành để tính</span>
+          </div>
+          <div class="summary-line" id="summaryShippingNote" style="font-size:12px; color:#94a3b8;"></div>
           <div class="summary-total-line flex-between">
             <span>Tổng thanh toán:</span>
             <span class="price-highlight" id="summaryTotal">0 đ</span>
@@ -257,7 +269,7 @@
         <div class="checkout-actions flex-between">
           <button type="button" class="btn-ghost" id="cancelCheckoutBtn">Hủy bỏ</button>
           <button type="submit" class="btn-primary" id="submitOrderBtn">
-            <i class="fa-solid fa-qrcode"></i> Xác Nhận & Mở Mã QR DropBuy
+            <i class="fa-solid fa-qrcode"></i> Xác Nhận & Nhận Mã QR Thanh Toán
           </button>
         </div>
       </form>

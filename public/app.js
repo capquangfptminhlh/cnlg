@@ -313,7 +313,7 @@ function changePage(page) {
   window.scrollTo({ top: 380, behavior: 'smooth' });
 }
 
-// --- FULL PRODUCT DETAIL MODAL (Gallery + Video + Specs) ---
+// --- FULL PRODUCT DETAIL MODAL (Gallery + Video + Specs + Phân loại) ---
 async function openProductDetail(productId) {
   searchDropdown.classList.add('hidden');
   productDetailModal.classList.add('open');
@@ -321,7 +321,7 @@ async function openProductDetail(productId) {
   detailModalBody.innerHTML = `
     <div style="text-align: center; padding: 60px;">
       <i class="fa-solid fa-spinner fa-spin" style="font-size: 40px; color: var(--gold);"></i>
-      <p style="margin-top: 14px; font-weight: 700; color: #94a3b8;">Đang tải thông số kỹ thuật & album ảnh...</p>
+      <p style="margin-top: 14px; font-weight: 700; color: #94a3b8;">Đang tải thông số kỹ thuật, phân loại & album ảnh...</p>
     </div>`;
 
   try {
@@ -333,23 +333,97 @@ async function openProductDetail(productId) {
     }
 
     const prod = json.data;
-    rememberProducts([prod]);
+    rememberProducts([{ ...prod, variants: undefined }]);
     state.activeDetailProduct = prod;
     state.selectedGalleryIndex = 0;
+    // Chọn sẵn phân loại mặc định còn hàng (nếu chỉ có 1 phân loại thì chọn luôn)
+    const vs = prod.variants || [];
+    const def = vs.find(v => v.is_default && v.in_stock) || vs.find(v => v.id === prod.variation_id && v.in_stock) || vs.find(v => v.in_stock) || null;
+    state.selectedVariantId = vs.length === 1 ? vs[0].id : vs.length > 1 ? (def ? def.id : null) : null;
     renderDetailModal(prod);
   } catch (err) {
     detailModalBody.innerHTML = `<p style="text-align: center; color: #ef4444;">Lỗi kết nối máy chủ.</p>`;
   }
 }
 
+function selectedVariant(prod = state.activeDetailProduct) {
+  return (prod?.variants || []).find(v => v.id === state.selectedVariantId) || null;
+}
+
+/** Tách tên phân loại "Màu đen, XL" theo nhóm lựa chọn (Màu sắc / Size) nếu khớp */
+function variantGroups(prod) {
+  const groups = prod.variation_options || [];
+  const vs = prod.variants || [];
+  if (groups.length < 2 || vs.length < 2) return null;
+  const parts = vs.map(v => v.name.split(',').map(x => x.trim()));
+  if (!parts.every(p => p.length === groups.length)) return null;
+  return groups.map((g, i) => ({ display: g.display, options: [...new Set(parts.map(p => p[i]))] }));
+}
+
+function renderVariantPicker(prod) {
+  const vs = prod.variants || [];
+  if (vs.length <= 1) return '';
+  const sel = selectedVariant(prod);
+  const groups = variantGroups(prod);
+  if (groups) {
+    const chosen = sel ? sel.name.split(',').map(x => x.trim()) : [];
+    return groups.map((g, gi) => `
+      <div class="variant-group">
+        <div class="variant-group-label">${esc(g.display)}:</div>
+        <div class="variant-chips">
+          ${g.options.map((opt, oi) => {
+            // Có biến thể còn hàng khớp lựa chọn này + các nhóm khác đang chọn?
+            const ok = vs.some(v => {
+              const p = v.name.split(',').map(x => x.trim());
+              return v.in_stock && p[gi] === opt && p.every((x, i) => i === gi || !chosen[i] || x === chosen[i]);
+            });
+            return `<button type="button" class="variant-chip ${chosen[gi] === opt ? 'active' : ''} ${ok ? '' : 'disabled'}" onclick="pickVariantOption(${gi}, ${oi})">${esc(opt)}</button>`;
+          }).join('')}
+        </div>
+      </div>`).join('');
+  }
+  return `
+    <div class="variant-group">
+      <div class="variant-group-label">Phân loại:</div>
+      <div class="variant-chips">
+        ${vs.map(v => `<button type="button" class="variant-chip ${sel?.id === v.id ? 'active' : ''} ${v.in_stock ? '' : 'disabled'}" ${v.in_stock ? `onclick="pickVariant('${v.id}')"` : 'disabled'} title="${v.in_stock ? '' : 'Hết hàng'}">${esc(v.name)}</button>`).join('')}
+      </div>
+    </div>`;
+}
+
+function pickVariant(id) {
+  state.selectedVariantId = id;
+  const v = selectedVariant();
+  if (v?.image) state.selectedGalleryIndex = -1;
+  renderDetailModal(state.activeDetailProduct);
+}
+
+function pickVariantOption(groupIndex, optionIndex) {
+  const prod = state.activeDetailProduct;
+  const option = variantGroups(prod)?.[groupIndex]?.options[optionIndex];
+  if (option == null) return;
+  const sel = selectedVariant(prod);
+  const chosen = sel ? sel.name.split(',').map(x => x.trim()) : [];
+  chosen[groupIndex] = option;
+  const vs = prod.variants || [];
+  const match = vs.find(v => v.name.split(',').map(x => x.trim()).every((x, i) => !chosen[i] || x === chosen[i]) && v.in_stock)
+    || vs.find(v => v.name.split(',').map(x => x.trim())[groupIndex] === option && v.in_stock);
+  if (match) pickVariant(match.id);
+}
+
 function renderDetailModal(prod) {
   const gallery = prod.gallery && prod.gallery.length > 0 ? prod.gallery : [{ url: prod.image_hd || prod.image, thumb: prod.image }];
-  const activeMedia = gallery[state.selectedGalleryIndex] || gallery[0];
-  const soldOut = prod.in_stock === false;
+  const v = selectedVariant(prod);
+  const needsChoice = (prod.variants || []).length > 1;
+  const activeMedia = state.selectedGalleryIndex === -1 && v?.image ? { url: v.image } : gallery[Math.max(0, state.selectedGalleryIndex)] || gallery[0];
+  const price = v ? v.price : prod.price;
+  const original = v ? v.original_price : prod.original_price;
+  const discount = v ? v.discount_percent : prod.discount_percent;
+  const soldOut = prod.in_stock === false || (needsChoice ? (prod.variants || []).every(x => !x.in_stock) : v ? !v.in_stock : false);
+  const canBuy = !soldOut && (!needsChoice || (v && v.in_stock));
 
   detailModalBody.innerHTML = `
     <div class="product-detail-grid">
-      <!-- Left: Interactive Gallery -->
       <div class="detail-gallery">
         <div class="main-preview-box" id="mainMediaBox">
           ${activeMedia.is_video ? `
@@ -369,7 +443,6 @@ function renderDetailModal(prod) {
         </div>
       </div>
 
-      <!-- Right: Detailed Information -->
       <div class="detail-info">
         <div class="detail-brand-badge">
           <i class="fa-solid fa-certificate"></i> Phân phối từ kho DropBuy.vn${prod.is_mall ? ' · DropBuy Mall' : ''}
@@ -377,22 +450,27 @@ function renderDetailModal(prod) {
         <h2 class="detail-title">${esc(prod.name)}</h2>
 
         <div class="detail-meta-row">
-          <span>Mã SKU: <strong>${esc(prod.sku)}</strong></span>
+          <span>Mã SKU: <strong>${esc(v ? v.sku : prod.sku)}</strong></span>
           <span>•</span>
           ${soldOut
             ? `<span class="stock-status-pill" style="background: rgba(239,68,68,.15); color: #ef4444;"><i class="fa-solid fa-xmark"></i> Tạm hết hàng</span>`
-            : `<span class="stock-status-pill"><i class="fa-solid fa-check"></i> Còn hàng</span>`}
+            : needsChoice && v && !v.in_stock
+              ? `<span class="stock-status-pill" style="background: rgba(239,68,68,.15); color: #ef4444;"><i class="fa-solid fa-xmark"></i> Phân loại này hết hàng</span>`
+              : `<span class="stock-status-pill"><i class="fa-solid fa-check"></i> Còn hàng</span>`}
         </div>
 
         <div class="detail-pricing-box">
-          <span class="detail-price-main">${formatPrice(prod.price)}</span>
-          ${prod.original_price ? `<span class="detail-price-sub">${formatPrice(prod.original_price)}</span>` : ''}
-          ${prod.discount_percent > 0 ? `<span class="saving-tag">Tiết kiệm ${prod.discount_percent}%</span>` : ''}
+          <span class="detail-price-main">${formatPrice(price)}</span>
+          ${original ? `<span class="detail-price-sub">${formatPrice(original)}</span>` : ''}
+          ${discount > 0 ? `<span class="saving-tag">Tiết kiệm ${discount}%</span>` : ''}
         </div>
+
+        ${renderVariantPicker(prod)}
+        ${needsChoice && !v ? '<div class="variant-hint"><i class="fa-solid fa-hand-pointer"></i> Vui lòng chọn phân loại</div>' : ''}
 
         <div class="detail-features-list">
           <div><i class="fa-solid fa-shield-halved"></i> Bảo hành: ${esc(prod.warranty || 'Bảo hành chính hãng')}</div>
-          <div><i class="fa-solid fa-truck-fast"></i> Giao hàng toàn quốc, được đồng kiểm khi nhận</div>
+          <div><i class="fa-solid fa-truck-fast"></i> Giao hàng toàn quốc, được đồng kiểm khi nhận${v?.weight_gram ? ` · ${(v.weight_gram / 1000).toLocaleString('vi-VN')} kg` : ''}</div>
           <div><i class="fa-solid fa-qrcode"></i> Thanh toán chuyển khoản VietQR</div>
         </div>
 
@@ -406,17 +484,16 @@ function renderDetailModal(prod) {
         </div>
 
         <div class="detail-actions-row">
-          <button class="btn-order-now-large" onclick="buyFromModalNow()" ${soldOut ? 'disabled' : ''}>
+          <button class="btn-order-now-large" onclick="buyFromModalNow()" ${canBuy ? '' : 'disabled'}>
             <i class="fa-solid fa-bolt"></i> ${soldOut ? 'Tạm Hết Hàng' : 'Đặt Hàng & Nhận VietQR Ngay'}
           </button>
-          <button class="btn-add-cart-large" onclick="addFromModalToCart()" ${soldOut ? 'disabled' : ''}>
+          <button class="btn-add-cart-large" onclick="addFromModalToCart()" ${canBuy ? '' : 'disabled'}>
             <i class="fa-solid fa-cart-plus"></i> Thêm Vào Giỏ
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Description & Specs Tabs -->
     <div class="detail-tabs-section">
       <div class="detail-tabs-header">
         <button class="tab-btn active" id="tabDescBtn">Mô Tả Sản Phẩm & Thông Số Kỹ Thuật</button>
@@ -440,10 +517,22 @@ function changeModalQty(delta) {
   if (el) el.innerText = modalQty;
 }
 
-function addFromModalToCart() {
+function modalLine() {
   const p = state.activeDetailProduct;
-  if (!p || p.in_stock === false) return;
-  addToCart(p.id, false, modalQty);
+  if (!p || p.in_stock === false) return null;
+  const vs = p.variants || [];
+  const v = selectedVariant(p);
+  if (vs.length > 1 && (!v || !v.in_stock)) {
+    showToast('Vui lòng chọn phân loại còn hàng');
+    return null;
+  }
+  return cartLine(p, modalQty, vs.length > 1 ? v : null);
+}
+
+function addFromModalToCart() {
+  const line = modalLine();
+  if (!line) return;
+  addLineToCart(line);
   showToast(`Đã thêm <strong>${modalQty}</strong> sản phẩm vào giỏ hàng!`);
   productDetailModal.classList.remove('open');
   modalQty = 1;
@@ -451,9 +540,9 @@ function addFromModalToCart() {
 }
 
 function buyFromModalNow() {
-  const p = state.activeDetailProduct;
-  if (!p || p.in_stock === false) return;
-  state.cart = [cartLine(p, modalQty)];
+  const line = modalLine();
+  if (!line) return;
+  state.cart = [line];
   updateCartUI();
   productDetailModal.classList.remove('open');
   modalQty = 1;
@@ -464,9 +553,31 @@ closeDetailModalBtn.addEventListener('click', () => {
   productDetailModal.classList.remove('open');
 });
 
-// --- Cart Operations ---
-function cartLine(p, quantity) {
-  return { id: p.id, name: p.name, price: p.price, image: p.image, quantity };
+// --- Cart Operations (mỗi dòng = sản phẩm + phân loại) ---
+const lineKey = (id, variationId) => `${id}:${variationId || ''}`;
+
+function cartLine(p, quantity, variant = null) {
+  return {
+    key: lineKey(p.id, variant?.id),
+    id: p.id,
+    variation_id: variant?.id || null,
+    variant_name: variant?.name || null,
+    name: p.name,
+    price: variant ? variant.price : p.price,
+    image: variant?.image || p.image,
+    quantity
+  };
+}
+
+function addLineToCart(line) {
+  const existing = state.cart.find(i => i.key === line.key);
+  if (existing) {
+    existing.quantity = Math.min(50, existing.quantity + line.quantity);
+    existing.price = line.price;
+  } else {
+    state.cart.push(line);
+  }
+  updateCartUI();
 }
 
 function saveCart() {
@@ -476,26 +587,34 @@ function saveCart() {
 function loadCart() {
   try {
     const raw = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
-    state.cart = Array.isArray(raw) ? raw.filter(i => i && Number.isInteger(i.id) && i.quantity > 0) : [];
+    state.cart = Array.isArray(raw)
+      ? raw.filter(i => i && Number.isInteger(i.id) && i.quantity > 0).map(i => ({ ...i, key: lineKey(i.id, i.variation_id) }))
+      : [];
   } catch (e) {
     state.cart = [];
   }
 }
 
-/** Cập nhật giá/tồn kho trong giỏ theo dữ liệu hiện tại của cửa hàng (giá có thể đổi sau mỗi lần đồng bộ). */
+/** Cập nhật giá/tồn kho trong giỏ theo dữ liệu hiện tại của cửa hàng (kể cả theo phân loại). */
 async function refreshCartPrices() {
   if (state.cart.length === 0) return;
   const removed = [];
-  await Promise.all(state.cart.map(async item => {
+  const ids = [...new Set(state.cart.map(i => i.id))];
+  await Promise.all(ids.map(async id => {
     try {
-      const res = await fetch(`/api/products/${item.id}`);
-      if (res.status === 404) { item.quantity = 0; removed.push(item.name); return; }
+      const res = await fetch(`/api/products/${id}`);
+      const lines = state.cart.filter(i => i.id === id);
+      if (res.status === 404) { lines.forEach(l => { l.quantity = 0; removed.push(l.name); }); return; }
       const json = await res.json();
       if (!json.success) return;
-      rememberProducts([json.data]);
-      item.price = json.data.price;
-      item.name = json.data.name;
-      if (json.data.in_stock === false) { item.quantity = 0; removed.push(item.name); }
+      const p = json.data;
+      rememberProducts([{ ...p, variants: undefined }]);
+      for (const l of lines) {
+        const v = l.variation_id ? (p.variants || []).find(x => x.id === l.variation_id) : null;
+        if (p.in_stock === false || (l.variation_id && (!v || !v.in_stock))) { l.quantity = 0; removed.push(l.name); continue; }
+        l.price = v ? v.price : p.price;
+        l.name = p.name;
+      }
     } catch (e) {}
   }));
   state.cart = state.cart.filter(i => i.quantity > 0);
@@ -506,6 +625,11 @@ async function refreshCartPrices() {
 function buyNowInstant(productId) {
   const product = productCache.get(productId);
   if (!product || product.in_stock === false) return;
+  if (product.variant_count !== 1) {
+    showToast('Vui lòng chọn phân loại (màu/size...) trước khi mua');
+    openProductDetail(productId);
+    return;
+  }
   state.cart = [cartLine(product, 1)];
   updateCartUI();
   openCheckoutModal();
@@ -514,31 +638,23 @@ function buyNowInstant(productId) {
 function addToCart(productId, notify = true, qty = 1) {
   const product = productCache.get(productId);
   if (!product || product.in_stock === false) return;
-
-  const existing = state.cart.find(item => item.id === productId);
-  if (existing) {
-    existing.quantity = Math.min(50, existing.quantity + qty);
-    existing.price = product.price;
-  } else {
-    state.cart.push(cartLine(product, qty));
+  if (product.variant_count !== 1) {
+    showToast('Vui lòng chọn phân loại (màu/size...) trước khi mua');
+    openProductDetail(productId);
+    return;
   }
-
-  updateCartUI();
+  addLineToCart(cartLine(product, qty));
   if (notify) {
     showToast(`Đã thêm <strong>${esc(product.name.slice(0, 30))}...</strong> vào giỏ!`);
     openCartDrawer();
   }
 }
 
-function updateCartQty(productId, delta) {
-  const item = state.cart.find(i => i.id === productId);
+function updateCartQty(key, delta) {
+  const item = state.cart.find(i => i.key === key);
   if (!item) return;
-
   item.quantity = Math.min(50, item.quantity + delta);
-  if (item.quantity <= 0) {
-    state.cart = state.cart.filter(i => i.id !== productId);
-  }
-
+  if (item.quantity <= 0) state.cart = state.cart.filter(i => i.key !== key);
   updateCartUI();
 }
 
@@ -568,11 +684,12 @@ function updateCartUI() {
       <img src="${esc(item.image)}" alt="${esc(item.name)}">
       <div class="cart-drawer-item-info">
         <div class="drawer-item-title">${esc(item.name)}</div>
+        ${item.variant_name ? `<div class="drawer-item-variant">Phân loại: ${esc(item.variant_name)}</div>` : ''}
         <div class="drawer-item-price">${formatPrice(item.price)}</div>
         <div class="qty-stepper" style="display: inline-flex; height: 30px;">
-          <button style="width: 28px; height: 28px;" onclick="updateCartQty(${item.id}, -1)">-</button>
+          <button style="width: 28px; height: 28px;" onclick="updateCartQty('${item.key}', -1)">-</button>
           <span style="width: 32px; font-size: 13px;">${item.quantity}</span>
-          <button style="width: 28px; height: 28px;" onclick="updateCartQty(${item.id}, 1)">+</button>
+          <button style="width: 28px; height: 28px;" onclick="updateCartQty('${item.key}', 1)">+</button>
         </div>
       </div>
     </div>
@@ -590,15 +707,67 @@ function closeCartDrawer() {
 }
 
 // --- Checkout Modal Flow ---
+const provinceSelect = document.getElementById('custProvince');
+const summarySubtotal = document.getElementById('summarySubtotal');
+const summaryShipping = document.getElementById('summaryShipping');
+const summaryShippingNote = document.getElementById('summaryShippingNote');
+const PROVINCE_KEY = 'hm_province';
+
+async function loadProvinces() {
+  try {
+    const json = await (await fetch('/api/shipping/provinces')).json();
+    if (!json.success) return;
+    const byRegion = {};
+    for (const p of json.data) (byRegion[p.region_label] ||= []).push(p.name);
+    provinceSelect.innerHTML = '<option value="">-- Chọn Tỉnh / Thành phố --</option>' +
+      Object.entries(byRegion).map(([label, names]) => `<optgroup label="${esc(label)}">${names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</optgroup>`).join('');
+    try { provinceSelect.value = localStorage.getItem(PROVINCE_KEY) || ''; } catch (e) {}
+  } catch (e) {}
+}
+
+let quoteSeq = 0;
+async function updateCheckoutSummary() {
+  const totalCount = state.cart.reduce((sum, item) => sum + item.quantity, 0);
+  const subtotal = state.cart.reduce((sum, item) => sum + item.quantity * item.price, 0);
+  summaryCount.innerText = totalCount + ' sản phẩm';
+  summarySubtotal.innerText = formatPrice(subtotal);
+  const province = provinceSelect.value;
+  if (!province) {
+    summaryShipping.innerText = 'Chọn tỉnh/thành để tính';
+    summaryShippingNote.innerText = '';
+    summaryTotal.innerText = formatPrice(subtotal);
+    return;
+  }
+  const seq = ++quoteSeq;
+  summaryShipping.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+  try {
+    const json = await (await fetch('/api/shipping/quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ province, items: state.cart.map(i => ({ id: i.id, variation_id: i.variation_id, quantity: i.quantity })) })
+    })).json();
+    if (seq !== quoteSeq) return;
+    if (!json.success) throw new Error(json.error);
+    const q = json.data;
+    summaryShipping.innerText = q.fee === 0 ? 'Miễn phí' : formatPrice(q.fee);
+    summaryShippingNote.innerText = q.detail;
+    summaryTotal.innerText = formatPrice(subtotal + q.fee);
+  } catch (e) {
+    summaryShipping.innerText = 'Không tính được';
+    summaryShippingNote.innerText = e.message;
+    summaryTotal.innerText = formatPrice(subtotal);
+  }
+}
+
+provinceSelect.addEventListener('change', () => {
+  try { localStorage.setItem(PROVINCE_KEY, provinceSelect.value); } catch (e) {}
+  updateCheckoutSummary();
+});
+
 function openCheckoutModal() {
   closeCartDrawer();
-  const totalCount = state.cart.reduce((sum, item) => sum + item.quantity, 0);
-  const totalAmount = state.cart.reduce((sum, item) => sum + item.quantity * item.price, 0);
-
-  summaryCount.innerText = totalCount + ' sản phẩm';
-  summaryTotal.innerText = formatPrice(totalAmount);
-
   checkoutModal.classList.add('open');
+  updateCheckoutSummary();
 }
 
 closeCheckoutBtn.addEventListener('click', () => checkoutModal.classList.remove('open'));
@@ -610,6 +779,7 @@ checkoutForm.addEventListener('submit', async e => {
   const customer = {
     name: document.getElementById('custName').value.trim(),
     phone: document.getElementById('custPhone').value.trim(),
+    province: provinceSelect.value,
     address: document.getElementById('custAddress').value.trim(),
     note: document.getElementById('custNote').value.trim()
   };
@@ -617,23 +787,30 @@ checkoutForm.addEventListener('submit', async e => {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
-    // Chỉ gửi mã SP + số lượng – giá do server tính
+    // Gửi mã SP + phân loại + số lượng (+ giá đang thấy để server phát hiện giá vừa đổi); tổng tiền do server tính
     const res = await fetch('/api/orders/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customer, items: state.cart.map(i => ({ id: i.id, quantity: i.quantity, price: i.price })) })
+      body: JSON.stringify({ customer, items: state.cart.map(i => ({ id: i.id, variation_id: i.variation_id, quantity: i.quantity, price: i.price })) })
     });
     const json = await res.json();
-    if (res.status === 409 && Array.isArray(json.items)) {
+    if (res.status === 409 && Array.isArray(json.lines)) {
       // Giá / tồn kho vừa đổi trên DropBuy: cập nhật giỏ rồi để khách xác nhận lại tổng tiền
-      applyProductPatches(json.items);
-      openCheckoutModal();
+      for (const l of json.lines) {
+        const line = state.cart.find(i => i.key === lineKey(l.id, l.variation_id));
+        if (!line) continue;
+        if (!l.in_stock) line.quantity = 0;
+        else if (l.price != null) line.price = l.price;
+      }
+      state.cart = state.cart.filter(i => i.quantity > 0);
+      updateCartUI();
+      updateCheckoutSummary();
       alert(json.error + '\n\nGiỏ hàng đã được cập nhật theo dữ liệu mới nhất, vui lòng kiểm tra lại tổng tiền và bấm đặt hàng lần nữa.');
+      if (state.cart.length === 0) checkoutModal.classList.remove('open');
       return;
     }
     if (!json.success) {
       alert('Không tạo được đơn: ' + json.error);
-      if (/hết hàng|không còn/.test(json.error || '')) refreshCartPrices();
       return;
     }
 
@@ -722,6 +899,17 @@ socket.on('ORDER_STATUS_UPDATE', data => {
 
 socket.on('ORDER_QR_READY', showQr);
 
+socket.on('ORDER_EXPIRED', data => {
+  if (data.orderId !== state.activeOrder) return;
+  if (state.countdownInterval) clearInterval(state.countdownInterval);
+  const timerEl = document.getElementById('countdownTimer');
+  if (timerEl) timerEl.innerText = 'Đơn đã huỷ';
+  reportPaidBtn.disabled = true;
+  reportPaidBtn.innerHTML = '<i class="fa-solid fa-ban"></i> Đơn đã huỷ do quá hạn';
+  const alertText = document.getElementById('qrAlertText');
+  if (alertText) alertText.innerHTML = `<span style="color:#ef4444;">${esc(data.message)}</span> <strong>Vui lòng KHÔNG chuyển khoản cho đơn này.</strong>`;
+});
+
 socket.on('PAYMENT_CONFIRMED', data => {
   if (data.orderId !== state.activeOrder) return;
   qrStageReady.classList.add('hidden');
@@ -751,21 +939,27 @@ function applyProductPatches(patches) {
       Object.assign(inGrid, patch);
       gridDirty = true;
     }
-    const line = state.cart.find(i => i.id === patch.id);
-    if (line) {
+    for (const line of state.cart.filter(i => i.id === patch.id)) {
       if (patch.in_stock === false) {
-        state.cart = state.cart.filter(i => i.id !== patch.id);
+        line.quantity = 0;
         cartNotes.push(`"${patch.name}" vừa hết hàng`);
-      } else if (patch.price !== line.price) {
+      } else if (!line.variation_id && patch.price !== line.price) {
         cartNotes.push(`"${patch.name}" đổi giá ${formatPrice(line.price)} → ${formatPrice(patch.price)}`);
         line.price = patch.price;
       }
     }
     if (state.activeDetailProduct?.id === patch.id && productDetailModal.classList.contains('open')) {
-      Object.assign(state.activeDetailProduct, patch);
-      renderDetailModal(state.activeDetailProduct);
+      // Giá theo phân loại có thể đã đổi → tải lại chi tiết để lấy giá mới của từng phân loại
+      const keepVariant = state.selectedVariantId;
+      fetch(`/api/products/${patch.id}`).then(r => r.json()).then(j => {
+        if (!j.success || state.activeDetailProduct?.id !== patch.id) return;
+        state.activeDetailProduct = j.data;
+        state.selectedVariantId = keepVariant;
+        renderDetailModal(j.data);
+      }).catch(() => {});
     }
   }
+  state.cart = state.cart.filter(i => i.quantity > 0);
   if (gridDirty) renderProducts();
   if (cartNotes.length) {
     updateCartUI();
@@ -910,6 +1104,7 @@ cartBackdrop.addEventListener('click', closeCartDrawer);
 checkoutBtn.addEventListener('click', openCheckoutModal);
 
 // Init
+loadProvinces();
 loadCart();
 updateCartUI();
 fetchCategories();

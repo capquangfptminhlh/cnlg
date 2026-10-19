@@ -10,6 +10,9 @@ if (!fs.existsSync(DETAILS_DIR)) fs.mkdirSync(DETAILS_DIR, { recursive: true });
 if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
 
 const CDN_BASE = 'https://r6i.pen.dropbuy.vn';
+// Bản cache chi tiết hết hạn sau 6 giờ (trước đây cache vĩnh viễn → biến thể/ảnh/mô tả cũ mãi)
+const DETAIL_TTL_MS = Number(process.env.DETAIL_CACHE_HOURS || 6) * 3600 * 1000;
+const CACHE_VERSION = 2;
 
 /**
  * Format media item to full URL
@@ -62,14 +65,16 @@ async function downloadFile(url, destPath) {
 /**
  * Cào toàn bộ chi tiết sản phẩm từ Dropbuy (Bao gồm Album ảnh, Video, Mô tả, Thông số kỹ thuật)
  */
-async function fetchProductFullDetail(product, downloadImagesLocally = false) {
+async function fetchProductFullDetail(product, downloadImagesLocally = false, { force = false } = {}) {
   const productId = product.id || product.dropbuy_id;
   const cacheFile = path.join(DETAILS_DIR, `${productId}.json`);
 
-  // Nếu đã có cache và không yêu cầu download lại ảnh
-  if (fs.existsSync(cacheFile) && !downloadImagesLocally) {
+  // Dùng cache nếu còn hạn và đúng phiên bản cấu trúc (có dữ liệu biến thể)
+  if (fs.existsSync(cacheFile) && !downloadImagesLocally && !force) {
     try {
-      return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+      const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+      const fresh = Date.now() - new Date(cached.cached_at || 0).getTime() < DETAIL_TTL_MS;
+      if (fresh && cached.cache_version === CACHE_VERSION) return cached;
     } catch (e) {}
   }
 
@@ -138,6 +143,7 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false) {
     let gallery = [];
     let videoUrl = null;
     let variations = [];
+    let variationOptions = [];
     let specs = {};
 
     const rawIdx = unescaped.indexOf('"rawProduct":');
@@ -182,13 +188,27 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false) {
         }
 
         if (raw.variations && Array.isArray(raw.variations)) {
-          variations = raw.variations.map(v => ({
-            id: v.variation_id,
-            sku: v.sku,
-            name: v.name,
-            in_stock: v.in_stock,
-            specs: v.specs || {}
-          }));
+          variations = raw.variations
+            .filter(v => v.status === undefined || v.status === 'A')
+            .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+            .map(v => {
+              const media = Array.isArray(v.media_data) && v.media_data[0];
+              return {
+                id: v.variation_id,
+                sku: v.sku,
+                name: v.name,
+                is_default: !!v.is_default,
+                in_stock: v.in_stock !== false,
+                // Trang công khai hiển thị giá niêm yết ở trường price_f1 (giá CTV thật chỉ có khi đăng nhập)
+                public_price: Number(v.price_f1 || raw.price_public || 0),
+                weight_gram: Number(v.specs?.variation_weight_vtp || v.specs?.variation_weight || 0),
+                image: media ? formatMediaUrl(media.res_location, media.res_med_file_name || media.res_origin_file_name) : null,
+                specs: v.specs || {}
+              };
+            });
+        }
+        if (Array.isArray(raw.variation_set_metadata)) {
+          variationOptions = raw.variation_set_metadata.map(g => ({ display: g.display, options: (g.options || []).map(o => o.name) }));
         }
 
         if (raw.body_content && !raw.body_content.startsWith('$')) {
@@ -252,8 +272,8 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false) {
       gallery: gallery,
       video_url: videoUrl,
       variations: variations,
-      rating: 5.0,
-      sold_count: 89 + (productId % 150),
+      variation_options: variationOptions,
+      cache_version: CACHE_VERSION,
       cached_at: new Date().toISOString()
     };
 
@@ -275,8 +295,9 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false) {
       category_name: product.category_name,
       description: 'Sản phẩm chính hãng chất lượng cao phân phối từ kho tổng DropBuy.vn.',
       gallery: [{ id: 'main', is_video: false, url: product.image_hd || product.image, thumb: product.image }],
-      rating: 5.0,
-      sold_count: 89,
+      variations: [],
+      variation_options: [],
+      fetch_failed: true,
       cached_at: new Date().toISOString()
     };
   }

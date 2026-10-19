@@ -191,6 +191,29 @@
       </div>
     </div>
 
+    <!-- ===================== PHÍ VẬN CHUYỂN & HẠN THANH TOÁN ===================== -->
+    <div class="admin-card" id="shippingSection" style="margin-top: 24px;">
+      <h3 style="margin:0 0 10px;"><i class="fa-solid fa-truck-fast" style="color:#c9a84c;"></i> Phí Vận Chuyển & Hạn Thanh Toán</h3>
+      <form id="shippingForm" class="pricing-grid">
+        <div class="form-group checkbox-group" style="grid-column: 1 / -1;">
+          <label><input type="checkbox" id="shEnabled"> <strong>Tính phí vận chuyển cho khách</strong> (bỏ chọn = miễn phí ship mọi đơn)</label>
+        </div>
+        <div class="form-group"><label>Phí cơ bản – Miền Bắc (đ)</label><input type="number" id="shNorth" min="0" step="1000"></div>
+        <div class="form-group"><label>Phí cơ bản – Miền Trung (đ)</label><input type="number" id="shCentral" min="0" step="1000"></div>
+        <div class="form-group"><label>Phí cơ bản – Miền Nam (đ)</label><input type="number" id="shSouth" min="0" step="1000"></div>
+        <div class="form-group"><label>Khối lượng đã gồm trong phí cơ bản (gram)</label><input type="number" id="shIncluded" min="1" step="100"></div>
+        <div class="form-group"><label>Phụ phí mỗi kg vượt mức (đ)</label><input type="number" id="shPerKg" min="0" step="1000"></div>
+        <div class="form-group"><label>Miễn phí ship cho đơn từ (đ, 0 = tắt)</label><input type="number" id="shFree" min="0" step="10000"></div>
+        <div class="form-group"><label>Khối lượng mặc định khi chưa rõ (gram)</label><input type="number" id="shDefaultWeight" min="1" step="100"></div>
+        <div class="form-group"><label>Tự huỷ đơn chưa thanh toán sau (phút)</label><input type="number" id="odTimeout" min="5" step="5"></div>
+        <div class="form-group"><label>Cảnh báo đơn "khách báo đã CK" chưa xác nhận sau (giờ)</label><input type="number" id="odAlert" min="1" step="1"></div>
+        <div style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center;">
+          <button type="submit" class="btn-submit" style="width:auto;"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+          <span id="shippingSaveMsg" class="help-text">Khối lượng lấy theo từng phân loại trên DropBuy. Mã QR hết hạn đúng bằng thời gian tự huỷ.</span>
+        </div>
+      </form>
+    </div>
+
     <!-- ===================== THIẾT LẬP GIÁ BÁN (như CTV) ===================== -->
     <div class="admin-card" id="pricingSection" style="margin-top: 24px;">
       <div class="flex-between" style="flex-wrap: wrap; gap: 10px;">
