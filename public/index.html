@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HOÀNG MINH STORE - Tổng Kho Công Nghệ & Tiện Ích Chính Hãng</title>
+  <meta name="theme-color" content="#ee4d2d">
+  <title>Hoàng Minh Store | Mua sắm công nghệ, phụ kiện và gia dụng</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/marketplace.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -17,11 +19,11 @@
   <div class="top-bar">
     <div class="container flex-between">
       <div class="top-perks">
-        <span><i class="fa-solid fa-shield-check"></i> 100% Sản Phẩm Chính Hãng – Bảo Hành Uy Tín</span>
+        <span><i class="fa-solid fa-truck-fast"></i> Giao hàng toàn quốc</span>
         <span class="perk-divider">•</span>
-        <span><i class="fa-solid fa-truck-fast"></i> Giao Hàng Toàn Quốc – Đồng Kiểm Khi Nhận</span>
+        <span><i class="fa-solid fa-qrcode"></i> Thanh toán VietQR</span>
         <span class="perk-divider">•</span>
-        <span><i class="fa-solid fa-arrows-rotate"></i> 1 Đổi 1 Trong 30 Ngày</span>
+        <span><i class="fa-solid fa-box"></i> Theo dõi đơn hàng dễ dàng</span>
       </div>
       <div class="top-links">
         <a href="#" class="admin-link" id="openTrackBtn"><i class="fa-solid fa-magnifying-glass-location"></i> Tra Cứu Đơn Hàng</a>
@@ -45,7 +47,7 @@
       <div class="search-wrapper">
         <div class="search-box">
           <i class="fa-solid fa-magnifying-glass search-icon"></i>
-          <input type="text" id="searchInput" placeholder="Tìm kiếm trong 1,321+ sản phẩm công nghệ, gia dụng..." autocomplete="off">
+          <input type="text" id="searchInput" placeholder="Tìm phụ kiện, đồ công nghệ, đồ gia dụng..." autocomplete="off">
           <button id="searchClearBtn" class="search-clear hidden">&times;</button>
           <button id="searchBtn" class="search-submit">Tìm Kiếm</button>
         </div>
@@ -55,14 +57,6 @@
 
       <!-- Right: Hotline & Cart -->
       <div class="header-right">
-        <div class="support-pill">
-          <div class="support-icon"><i class="fa-solid fa-phone-volume"></i></div>
-          <div class="support-text">
-            <span class="label">Tổng đài đặt hàng</span>
-            <strong class="number">1900 6868</strong>
-          </div>
-        </div>
-
         <button class="cart-trigger-btn" id="openCartBtn">
           <div class="cart-icon-wrap">
             <i class="fa-solid fa-bag-shopping"></i>
@@ -89,42 +83,56 @@
     </div>
   </nav>
 
-  <!-- Hero Showcase Banner -->
+  <!-- Marketplace campaign & category discovery -->
   <section class="hero-showcase">
     <div class="container">
-      <div class="hero-card">
-        <div class="hero-text">
-          <div class="hero-tag"><i class="fa-solid fa-bolt"></i> TỔNG KHO PHÂN PHỐI SỈ & LẺ CHÍNH HÃNG</div>
-          <h1>Tổng Kho Sỉ & Lẻ Chính Hãng</h1>
-          <p>Hơn 1.300+ sản phẩm công nghệ, gia dụng chất lượng cao, bảo hành chính hãng, hình ảnh HD thực tế. Đặt hàng nhanh chóng, thanh toán VietQR tự động 24/7, giao hàng toàn quốc.</p>
-          <div class="hero-stats">
-            <div class="h-stat">
-              <strong id="heroTotalProd">1,321+</strong>
-              <span>Sản phẩm sẵn kho</span>
+      <div class="hero-market-grid">
+        <div class="hero-card">
+          <div class="hero-text">
+            <div class="hero-tag"><i class="fa-solid fa-sparkles"></i> HOÀNG MINH STORE • CÔNG NGHỆ & TIỆN ÍCH</div>
+            <h1>Mua sắm tiện hơn.<span>Khám phá nhiều hơn.</span></h1>
+            <p>Tìm phụ kiện, đồ công nghệ và gia dụng trong cùng một cửa hàng. Xem giá rõ ràng, chọn sản phẩm phù hợp và thanh toán tiện lợi.</p>
+            <div class="hero-actions">
+              <a href="#catalog" class="hero-primary"><i class="fa-solid fa-bag-shopping"></i> Khám phá sản phẩm <i class="fa-solid fa-arrow-right"></i></a>
+              <button type="button" class="hero-secondary" onclick="document.getElementById('openTrackBtn').click()"><i class="fa-solid fa-magnifying-glass-location"></i> Tra cứu đơn</button>
             </div>
-            <div class="h-stat-line"></div>
-            <div class="h-stat">
-              <strong>82</strong>
-              <span>Ngành hàng sỉ</span>
-            </div>
-            <div class="h-stat-line"></div>
-            <div class="h-stat">
-              <strong>1.5s</strong>
-              <span>Tốc độ cấp VietQR</span>
-            </div>
-            <div class="h-stat-line"></div>
-            <div class="h-stat">
-              <strong>100%</strong>
-              <span>Bảo mật Napas</span>
+            <div class="hero-stats">
+              <div class="h-stat"><strong id="heroTotalProd">—</strong><span>sản phẩm trong danh mục</span></div>
             </div>
           </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="hero-art-glow"></div>
+            <div class="hero-bag main"><i class="fa-solid fa-mobile-screen-button"></i></div>
+            <div class="hero-bag mini"><i class="fa-solid fa-headphones-simple"></i></div>
+            <i class="fa-solid fa-sparkles hero-spark one"></i>
+            <i class="fa-solid fa-star hero-spark two"></i>
+          </div>
         </div>
+        <div class="hero-side">
+          <a class="promo-card promo-peach" href="#categoriesContainer">
+            <span class="promo-kicker">Khám phá theo nhu cầu</span>
+            <strong>Danh mục sản phẩm đa dạng</strong>
+            <small>Chọn ngành hàng <i class="fa-solid fa-arrow-right"></i></small>
+            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+          </a>
+          <a class="promo-card promo-sky" href="#catalog">
+            <span class="promo-kicker">Lựa chọn dễ dàng</span>
+            <strong>Lọc theo giá, tìm đúng món</strong>
+            <small>Xem sản phẩm <i class="fa-solid fa-arrow-right"></i></small>
+            <i class="fa-solid fa-tags" aria-hidden="true"></i>
+          </a>
+        </div>
+      </div>
+      <div class="benefit-row">
+        <div class="benefit"><span class="benefit-icon"><i class="fa-solid fa-truck-fast"></i></span><span><strong>Giao hàng toàn quốc</strong><small>Chọn địa chỉ khi đặt hàng</small></span></div>
+        <div class="benefit"><span class="benefit-icon"><i class="fa-solid fa-qrcode"></i></span><span><strong>Thanh toán VietQR</strong><small>Nhận mã chuyển khoản theo đơn</small></span></div>
+        <div class="benefit"><span class="benefit-icon"><i class="fa-solid fa-box-open"></i></span><span><strong>Tra cứu đơn hàng</strong><small>Theo dõi trạng thái thuận tiện</small></span></div>
       </div>
     </div>
   </section>
 
   <!-- Products Main Content -->
-  <main class="container main-layout">
+  <main class="container main-layout" id="catalog">
     
     <!-- Filter & Sort Bar -->
     <div class="filter-bar">
@@ -163,7 +171,7 @@
     <!-- Load More Action -->
     <div class="flex-center" style="margin: 32px 0 16px 0;">
       <button class="btn-load-more" id="btnLoadMore">
-        <i class="fa-solid fa-angles-down"></i> Tải Thêm Sản Phẩm Nữa (Xem Thêm)
+        <i class="fa-solid fa-angles-down"></i> Xem thêm sản phẩm
       </button>
     </div>
 
@@ -465,6 +473,14 @@
       </div>
     </div>
   </footer>
+
+  <!-- Mobile shop navigation (uses existing storefront actions) -->
+  <nav class="mobile-bottom-nav" aria-label="Điều hướng mua sắm trên điện thoại">
+    <a href="/" class="active" aria-label="Trang chủ"><i class="fa-solid fa-house"></i><span>Trang chủ</span></a>
+    <a href="#categoriesContainer" aria-label="Danh mục"><i class="fa-solid fa-border-all"></i><span>Danh mục</span></a>
+    <button type="button" aria-label="Tra cứu đơn hàng" onclick="document.getElementById('openTrackBtn').click()"><i class="fa-solid fa-receipt"></i><span>Đơn hàng</span></button>
+    <button type="button" aria-label="Mở giỏ hàng" onclick="document.getElementById('openCartBtn').click()"><i class="fa-solid fa-cart-shopping"></i><span>Giỏ hàng</span></button>
+  </nav>
 
   <script src="/app.js"></script>
 </body>
