@@ -84,7 +84,7 @@ function renderProductPage(req, product, detail, config) {
 /** HTML trang chủ kèm meta mô tả cửa hàng */
 function renderHomePage(req, config, total) {
   const name = storeName(config);
-  const desc = `${config.store?.slogan || 'Tổng kho phân phối sỉ & lẻ chính hãng'} – ${total.toLocaleString('vi-VN')} sản phẩm từ kho DropBuy, giao toàn quốc, thanh toán VietQR.`;
+  const desc = `${config.store?.slogan || 'Tổng kho phân phối sỉ & lẻ chính hãng'} – Hơn ${total.toLocaleString('vi-VN')} sản phẩm công nghệ & gia dụng chính hãng, giao toàn quốc, thanh toán VietQR tự động.`;
   const head = `
   <meta name="description" content="${escAttr(desc)}">
   <link rel="canonical" href="${escAttr(baseUrl(req) + '/')}">

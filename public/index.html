@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HOÀNG MINH STORE - Tổng Kho Công Nghệ & Tiện Ích DropBuy.vn</title>
+  <title>HOÀNG MINH STORE - Tổng Kho Công Nghệ & Tiện Ích Chính Hãng</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
   <div class="top-bar">
     <div class="container flex-between">
       <div class="top-perks">
-        <span><i class="fa-solid fa-shield-check"></i> 100% Sản Phẩm Phân Phối Từ Kho Tổng DropBuy.vn</span>
+        <span><i class="fa-solid fa-shield-check"></i> 100% Sản Phẩm Chính Hãng – Bảo Hành Uy Tín</span>
         <span class="perk-divider">•</span>
         <span><i class="fa-solid fa-truck-fast"></i> Giao Hàng Toàn Quốc – Đồng Kiểm Khi Nhận</span>
         <span class="perk-divider">•</span>
@@ -37,7 +37,7 @@
           <div class="logo-text">
             <span class="logo-bold">HOANGMINH</span><span class="logo-accent">.COM</span>
           </div>
-          <div class="logo-sub">DROPBUY VERIFIED STORE</div>
+          <div class="logo-sub">TỔNG KHO CÔNG NGHỆ CHÍNH HÃNG</div>
         </a>
       </div>
 
@@ -94,9 +94,9 @@
     <div class="container">
       <div class="hero-card">
         <div class="hero-text">
-          <div class="hero-tag"><i class="fa-solid fa-bolt"></i> TỰ ĐỘNG HÓA DROPSHIP 100% TỪ DROPBUY.VN</div>
+          <div class="hero-tag"><i class="fa-solid fa-bolt"></i> TỔNG KHO PHÂN PHỐI SỈ & LẺ CHÍNH HÃNG</div>
           <h1>Tổng Kho Sỉ & Lẻ Chính Hãng</h1>
-          <p>Tất cả sản phẩm đồng bộ trực tiếp tồn kho, hình ảnh HD và video thực tế từ kho tổng DropBuy. Khách đặt hàng nhận ngay mã VietQR thanh toán đồng bộ Realtime.</p>
+          <p>Hơn 1.300+ sản phẩm công nghệ, gia dụng chất lượng cao, bảo hành chính hãng, hình ảnh HD thực tế. Đặt hàng nhanh chóng, thanh toán VietQR tự động 24/7, giao hàng toàn quốc.</p>
           <div class="hero-stats">
             <div class="h-stat">
               <strong id="heroTotalProd">1,321+</strong>
@@ -201,7 +201,7 @@
         <span class="sub-label">Tổng cộng thanh toán:</span>
         <strong class="sub-amount price-highlight" id="drawerTotalAmount">0 đ</strong>
       </div>
-      <p class="drawer-note"><i class="fa-solid fa-circle-check"></i> Đã bao gồm thuế & phí đóng gói DropBuy</p>
+      <p class="drawer-note"><i class="fa-solid fa-circle-check"></i> Đã bao gồm thuế & phí đóng gói bảo đảm</p>
       <button class="btn-checkout-primary" id="checkoutBtn" disabled>
         <span>Tiến Hành Đặt Hàng & Nhận VietQR</span>
         <i class="fa-solid fa-arrow-right"></i>
@@ -280,15 +280,15 @@
   <div class="modal-backdrop" id="qrModal">
     <div class="modal-dialog qr-dialog">
 
-      <!-- STAGE 1: CONNECTING TO DROPBUY -->
+      <!-- STAGE 1: CREATING ORDER -->
       <div id="qrStageConnecting" class="qr-stage">
         <div class="pulse-radar">
           <div class="pulse-ring"></div>
           <div class="pulse-ring delay"></div>
           <i class="fa-solid fa-bolt-lightning pulse-center-icon"></i>
         </div>
-        <h3 class="stage-title">Đang Kết Nối DropBuy.vn...</h3>
-        <p class="stage-subtitle" id="connectingStatusText">Hệ thống đang mở phiên tự động đặt hàng và tạo SKU trên kho DropBuy...</p>
+        <h3 class="stage-title">Đang Khởi Tạo Đơn Hàng...</h3>
+        <p class="stage-subtitle" id="connectingStatusText">Hệ thống đang chuẩn bị kiện hàng và mã vận đơn xuất kho...</p>
 
         <div class="relay-timeline">
           <div class="timeline-step active">
@@ -301,8 +301,8 @@
           <div class="timeline-step active">
             <div class="step-num spinner-icon"><i class="fa-solid fa-spinner fa-spin"></i></div>
             <div class="step-content">
-              <strong>Đồng bộ giỏ hàng DropBuy.vn</strong>
-              <small>Thêm đúng sản phẩm & địa chỉ giao hàng</small>
+              <strong>Kiểm tra tồn kho thực tế</strong>
+              <small>Xác nhận sẵn hàng xuất kho</small>
             </div>
           </div>
           <div class="timeline-step">
@@ -328,7 +328,7 @@
 
         <div class="qr-codes-info">
           <div>Mã Đơn Hoàng Minh: <strong id="qrHmCode">...</strong></div>
-          <div>Mã Đơn DropBuy: <strong id="qrDbCode">...</strong></div>
+          <div style="display:none;">Mã Đơn DropBuy: <strong id="qrDbCode">...</strong></div>
         </div>
 
         <div class="qr-content-grid">
@@ -455,13 +455,13 @@
         <div class="brand-logo">
           <span class="logo-bold">HOANGMINH</span><span class="logo-accent">.COM</span>
         </div>
-        <p>Hệ thống tự động hóa kho hàng & kết nối thanh toán VietQR trực tiếp với DropBuy.vn.</p>
+        <p>Hệ thống bán lẻ & tổng kho công nghệ chính hãng Hoàng Minh Store. Hỗ trợ thanh toán VietQR Napas 24/7, giao hàng toàn quốc.</p>
         <p class="copyright">© 2026 Hoàng Minh Store. All rights reserved.</p>
       </div>
       <div class="footer-badges">
-        <div class="badge-item"><i class="fa-solid fa-shield-check"></i> DropBuy Certified</div>
+        <div class="badge-item"><i class="fa-solid fa-shield-check"></i> Cam Kết Chính Hãng 100%</div>
         <div class="badge-item"><i class="fa-solid fa-qrcode"></i> VietQR Napas 24/7</div>
-        <div class="badge-item"><i class="fa-solid fa-bolt"></i> Realtime Socket Relay</div>
+        <div class="badge-item"><i class="fa-solid fa-bolt"></i> Cập Nhật Tồn Kho Tự Động</div>
       </div>
     </div>
   </footer>

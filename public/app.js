@@ -120,7 +120,7 @@ async function fetchCategories() {
 
 async function fetchProducts(append = false) {
   if (!append) {
-    catalogCount.innerText = 'Đang tải từ kho DropBuy...';
+    catalogCount.innerText = 'Đang tải danh mục sản phẩm...';
   }
   try {
     const params = new URLSearchParams({
@@ -219,7 +219,7 @@ function renderCategories() {
 // --- Render Products ---
 function productBadges(p) {
   let html = '';
-  if (p.is_mall) html += `<span class="badge-official"><i class="fa-solid fa-circle-check" style="color: #38bdf8;"></i> DropBuy Mall</span>`;
+  if (p.is_mall) html += `<span class="badge-official"><i class="fa-solid fa-circle-check" style="color: #38bdf8;"></i> Chính Hãng Mall</span>`;
   if (p.in_stock === false) html += `<span class="badge-discount">HẾT HÀNG</span>`;
   else if (p.discount_percent > 0) html += `<span class="badge-discount">-${p.discount_percent}%</span>`;
   return html;
@@ -242,7 +242,7 @@ function renderProducts() {
     <div class="luxury-card${soldOut ? ' is-sold-out' : ''}" data-id="${p.id}">
       <div class="card-media">
         ${productBadges(p)}
-        <img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" onerror="this.src='https://dropbuy.vn/d/logo.png'">
+        <img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'400\\' height=\\'400\\' viewBox=\\'0 0 400 400\\'><rect fill=\\'%23111422\\' width=\\'400\\' height=\\'400\\'/><text fill=\\'%238b92b3\\' font-size=\\'18\\' font-family=\\'sans-serif\\' x=\\'50%\\' y=\\'50%\\' text-anchor=\\'middle\\'>HOANGMINH.COM</text></svg>'">
 
         <div class="card-quick-overlay">
           <button class="btn-quick-view" onclick="openProductDetail(${p.id})">
@@ -252,7 +252,7 @@ function renderProducts() {
       </div>
 
       <div class="card-details">
-        <div class="card-category">${esc(p.category_name || 'DropBuy')}</div>
+        <div class="card-category">${esc(p.category_name || 'Công nghệ & Tiện ích')}</div>
         <h3 class="card-title" title="${esc(p.name)}" onclick="openProductDetail(${p.id})">${esc(p.name)}</h3>
 
         <div class="card-meta">
@@ -447,7 +447,7 @@ function renderDetailModal(prod) {
       <div class="detail-info">
         <div class="flex-between" style="gap:8px; flex-wrap:wrap;">
           <div class="detail-brand-badge">
-            <i class="fa-solid fa-certificate"></i> Phân phối từ kho DropBuy.vn${prod.is_mall ? ' · DropBuy Mall' : ''}
+            <i class="fa-solid fa-certificate"></i> Phân phối chính hãng Hoàng Minh Store${prod.is_mall ? ' · Mall Chính Hãng' : ''}
           </div>
           <button type="button" class="variant-chip" onclick="copyProductLink()"><i class="fa-solid fa-link"></i> Sao chép link</button>
         </div>
@@ -561,7 +561,7 @@ closeDetailModalBtn.addEventListener('click', () => {
 });
 
 // --- Link sản phẩm thật: /sp/<id>-<slug> (server trả sẵn tiêu đề, ảnh xem trước, dữ liệu cho Google) ---
-const HOME_TITLE = 'HOÀNG MINH STORE - Tổng Kho Công Nghệ & Tiện Ích DropBuy.vn';
+const HOME_TITLE = 'HOÀNG MINH STORE - Tổng Kho Công Nghệ & Tiện Ích Chính Hãng';
 function setProductHash(prod) {
   const url = `/sp/${prod.id}-${String(prod.slug || '').slice(0, 80)}`;
   if (location.pathname !== url) history.pushState({ productId: prod.id }, '', url);
@@ -709,7 +709,7 @@ function updateCartUI() {
       <div style="text-align: center; padding: 60px 20px; color: #94a3b8;">
         <i class="fa-solid fa-basket-shopping" style="font-size: 48px; color: #475569; margin-bottom: 12px;"></i>
         <h4 style="color: #e2e8f0; margin-bottom: 4px;">Giỏ hàng của bạn đang trống</h4>
-        <p style="font-size: 13px;">Hãy khám phá các sản phẩm từ kho DropBuy nhé!</p>
+        <p style="font-size: 13px;">Hãy khám phá các sản phẩm công nghệ giá tốt nhé!</p>
       </div>`;
     return;
   }
@@ -1019,7 +1019,7 @@ function setLiveStamp(at) {
     el.className = 'catalog-badge live-sync-badge';
     catalogCount.insertAdjacentElement('afterend', el);
   }
-  el.innerHTML = `<span class="live-dot"></span> Giá & tồn kho đồng bộ DropBuy lúc ${new Date(at).toLocaleTimeString('vi-VN')}`;
+  el.innerHTML = `<span class="live-dot"></span> Tồn kho & giá cập nhật lúc ${new Date(at).toLocaleTimeString('vi-VN')}`;
 }
 
 fetch('/api/realtime/status').then(r => r.json()).then(j => j.success && setLiveStamp(j.data.stock?.lastOk || j.data.lastSyncTime)).catch(() => {});
