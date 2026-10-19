@@ -560,21 +560,28 @@ closeDetailModalBtn.addEventListener('click', () => {
   clearProductHash();
 });
 
-// --- Link chia sẻ sản phẩm: /#/sp/<id>-<slug> ---
-const BASE_TITLE = document.title;
+// --- Link sản phẩm thật: /sp/<id>-<slug> (server trả sẵn tiêu đề, ảnh xem trước, dữ liệu cho Google) ---
+const HOME_TITLE = 'HOÀNG MINH STORE - Tổng Kho Công Nghệ & Tiện Ích DropBuy.vn';
 function setProductHash(prod) {
-  const hash = `#/sp/${prod.id}-${String(prod.slug || '').slice(0, 80)}`;
-  if (location.hash !== hash) history.replaceState(null, '', hash);
-  document.title = `${prod.name} | ${BASE_TITLE.split(' - ')[0]}`;
+  const url = `/sp/${prod.id}-${String(prod.slug || '').slice(0, 80)}`;
+  if (location.pathname !== url) history.pushState({ productId: prod.id }, '', url);
+  document.title = `${prod.name} | Hoàng Minh Store`;
 }
 function clearProductHash() {
-  if (location.hash.startsWith('#/sp/')) history.replaceState(null, '', location.pathname + location.search);
-  document.title = BASE_TITLE;
+  if (location.pathname.startsWith('/sp/') || location.hash.startsWith('#/sp/')) history.pushState(null, '', '/');
+  document.title = HOME_TITLE;
 }
 function openFromHash() {
-  const m = location.hash.match(/^#\/sp\/(\d+)/);
+  // Hỗ trợ cả link cũ dạng /#/sp/<id>
+  const m = location.pathname.match(/^\/sp\/(\d+)/) || location.hash.match(/^#\/sp\/(\d+)/);
   if (m && state.activeDetailProduct?.id !== Number(m[1])) openProductDetail(Number(m[1]));
+  else if (!m && productDetailModal.classList.contains('open')) {
+    productDetailModal.classList.remove('open');
+    state.activeDetailProduct = null;
+    document.title = HOME_TITLE;
+  }
 }
+window.addEventListener('popstate', openFromHash);
 window.addEventListener('hashchange', openFromHash);
 function copyProductLink() {
   const url = location.href;

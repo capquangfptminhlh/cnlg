@@ -171,6 +171,24 @@
       </div>
 
       <!-- Right: Orders Management -->
+      <div>
+      <div class="admin-card" id="reportSection" style="margin-bottom: 24px;">
+        <div class="flex-between" style="flex-wrap: wrap; gap: 8px;">
+          <h3 style="margin:0;"><i class="fa-solid fa-chart-line" style="color:#c9a84c;"></i> Doanh Thu &amp; Lãi</h3>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <small id="backupInfo" style="color:#94a3b8;"></small>
+            <button class="btn btn-outline" id="backupNowBtn" style="padding:6px 10px; font-size:12px;"><i class="fa-solid fa-floppy-disk"></i> Sao lưu ngay</button>
+          </div>
+        </div>
+        <div class="report-grid" id="reportTotals"></div>
+        <div id="reportPipeline" style="margin:10px 0; font-size:13px; color:#cbd5e1;"></div>
+        <div class="report-chart" id="reportChart" title="Doanh thu 30 ngày (theo ngày nhận tiền)"></div>
+        <div id="reportNote" style="font-size:12px; color:#94a3b8; margin-top:8px;"></div>
+        <details style="margin-top:10px; font-size:13px;">
+          <summary style="cursor:pointer; color:#cbd5e1;">Sản phẩm bán chạy (30 ngày)</summary>
+          <div id="reportTop" style="margin-top:6px;"></div>
+        </details>
+      </div>
       <div class="admin-card">
         <h3><i class="fa-solid fa-list-check"></i> Đơn Hàng Mới Nhất & Trạng Thái Đồng Bộ DropBuy</h3>
         <div class="orders-table-wrapper">
@@ -191,6 +209,7 @@
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
 

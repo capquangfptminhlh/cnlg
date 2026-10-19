@@ -21,6 +21,9 @@ const orderExpiry = require('./services/orderExpiry');
 const payments = require('./services/payments');
 const { notify } = require('./services/notify');
 const dropbuyCart = require('./services/dropbuyCart');
+const seo = require('./services/seo');
+const backup = require('./services/backup');
+const reports = require('./services/reports');
 
 const app = express();
 const server = http.createServer(app);
@@ -39,7 +42,31 @@ app.disable('x-powered-by');
 app.use(securityHeaders);
 app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
 app.use(express.json({ limit: '100kb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// --- Trang có SEO (render phía server) – đặt trước static để "/" không trả index.html trần ---
+app.get('/', (req, res) => {
+  res.type('html').send(seo.renderHomePage(req, readConfig(), scraper.getProducts().length));
+});
+
+app.get('/sp/:slugId', async (req, res) => {
+  const id = parseInt(String(req.params.slugId), 10);
+  const product = scraper.getProducts().find(p => p.id === id);
+  if (!product) return res.redirect(302, '/');
+  // Sai slug (tên SP đổi) → chuyển về URL chuẩn
+  const canonical = seo.productPath(product);
+  if (decodeURIComponent(req.path) !== canonical) return res.redirect(301, canonical);
+  // Chỉ dùng chi tiết đã cache (không gọi DropBuy cho mỗi lượt bot Google/Facebook)
+  let detail = null;
+  try {
+    const f = path.join(DATA_DIR, 'products_detail', `${id}.json`);
+    if (fs.existsSync(f)) detail = JSON.parse(fs.readFileSync(f, 'utf8'));
+  } catch (e) {}
+  res.type('html').send(seo.renderProductPage(req, product, detail, readConfig()));
+});
+
+app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemapXml(req, scraper.getProducts())));
+app.get('/robots.txt', (req, res) => res.type('text/plain').send(seo.robotsTxt(req)));
+
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 io.on('connection', socket => {
   socket.on('join-order', orderId => {
@@ -440,6 +467,24 @@ app.post('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
   res.json({ success: true, data: order });
 });
 
+app.get('/api/admin/report', requireAdmin, (req, res) => {
+  const days = Math.min(90, Math.max(7, parseInt(req.query.days, 10) || 30));
+  res.json({ success: true, data: reports.salesReport(orderStore.getOrders(), { days }) });
+});
+
+app.get('/api/admin/backups', requireAdmin, (req, res) => {
+  res.json({ success: true, data: backup.listBackups() });
+});
+
+app.post('/api/admin/backups', requireAdmin, (req, res) => {
+  try {
+    const r = backup.runBackup({ force: true });
+    res.json({ success: true, data: { day: path.basename(r.dir), files: r.copied } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 app.get('/api/admin/payments', requireAdmin, (req, res) => {
   res.json({ success: true, data: payments.recentPayments(50), configured: { sepay: !!process.env.SEPAY_WEBHOOK_KEY, casso: !!process.env.CASSO_SECURE_TOKEN, telegram: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) } });
 });
@@ -708,4 +753,5 @@ server.listen(PORT, () => {
   console.log(`================================================================`);
   realtimeSync.startRealtimeSync(io);
   orderExpiry.startOrderExpiry(io, readConfig);
+  backup.startBackups();
 });

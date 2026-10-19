@@ -742,3 +742,58 @@ async function loadPayments() {
 
 socket.on('ADMIN_ORDER_CHANGED', () => loadPayments());
 loadPayments();
+
+
+// ============================ DOANH THU & LÃI ============================
+async function loadReport() {
+  try {
+    const json = await (await adminFetch('/api/admin/report?days=30')).json();
+    if (!json.success) throw new Error(json.error);
+    const r = json.data;
+    const card = (label, b) => `<div class="report-box">
+      <div class="report-label">${label}</div>
+      <div class="report-value">${formatPrice(b.revenue)}</div>
+      <div class="report-sub">${b.orders} đơn · ${b.items} SP</div>
+      <div class="report-sub">Lãi gộp: <strong style="color:${b.profit >= 0 ? '#10b981' : '#ef4444'};">${formatPrice(b.profit)}</strong></div>
+      <div class="report-sub">Ship thu khách: ${formatPrice(b.shipping)}</div>
+    </div>`;
+    document.getElementById('reportTotals').innerHTML =
+      card('Hôm nay', r.totals.today) + card('7 ngày', r.totals.last7) + card('30 ngày', r.totals.last30) + card('Tất cả', r.totals.all);
+    const p = r.pipeline;
+    document.getElementById('reportPipeline').innerHTML =
+      `Đang chờ: <strong>${p.PENDING_PAYMENT}</strong> chờ CK · <strong style="color:#f59e0b;">${p.PAYMENT_REPORTED}</strong> khách báo đã CK · ` +
+      `<strong style="color:#10b981;">${p.PAID}</strong> đã nhận tiền chưa đặt kho · <strong>${p.PROCESSING}</strong> đang giao · ${p.COMPLETED} xong · ${p.CANCELLED} huỷ`;
+    const max = Math.max(1, ...r.daily.map(d => d.revenue));
+    document.getElementById('reportChart').innerHTML = r.daily.map(d =>
+      `<div class="report-bar" style="height:${Math.max(2, Math.round(d.revenue / max * 100))}%;" title="${d.day}: ${formatPrice(d.revenue)} · ${d.orders} đơn · lãi ${formatPrice(d.profit)}"></div>`).join('');
+    const t = r.totals.last30;
+    const notes = ['Tính theo ngày nhận tiền, chỉ đơn đã thanh toán. Lãi gộp = tiền hàng − giá vốn DropBuy lúc đặt, chưa trừ phí ship thật của kho.'];
+    if (t.cost_public_orders) notes.push(`⚠ ${t.cost_public_orders} đơn tính vốn theo giá công khai (lúc đặt chưa đăng nhập DropBuy) – lãi thật có thể cao hơn.`);
+    if (t.cost_unknown_orders) notes.push(`⚠ ${t.cost_unknown_orders} đơn thiếu giá vốn.`);
+    document.getElementById('reportNote').innerText = notes.join(' ');
+    document.getElementById('reportTop').innerHTML = r.top_products.length
+      ? `<table class="orders-table"><thead><tr><th>Sản phẩm</th><th>SL</th><th>Doanh thu</th><th>Lãi</th></tr></thead><tbody>${r.top_products.map(x =>
+          `<tr><td>${esc(x.name)}${x.variant_name ? `<br><small>${esc(x.variant_name)}</small>` : ''}</td><td>${x.quantity}</td><td>${formatPrice(x.revenue)}</td><td>${formatPrice(x.profit)}</td></tr>`).join('')}</tbody></table>`
+      : '<small style="color:#94a3b8;">Chưa có đơn đã thanh toán.</small>';
+  } catch (e) {
+    document.getElementById('reportTotals').innerText = 'Lỗi tải báo cáo: ' + e.message;
+  }
+}
+
+async function loadBackupInfo() {
+  try {
+    const json = await (await adminFetch('/api/admin/backups')).json();
+    const last = json.data?.[0];
+    document.getElementById('backupInfo').innerText = last ? `Bản sao lưu gần nhất: ${last.day} (${json.data.length} bản)` : 'Chưa có bản sao lưu';
+  } catch (e) {}
+}
+
+document.getElementById('backupNowBtn').addEventListener('click', async () => {
+  const json = await (await adminFetch('/api/admin/backups', { method: 'POST' })).json();
+  alert(json.success ? `Đã sao lưu: ${json.data.files.join(', ')} → data/backups/${json.data.day}` : 'Lỗi: ' + json.error);
+  loadBackupInfo();
+});
+
+socket.on('ADMIN_ORDER_CHANGED', () => loadReport());
+loadReport();
+loadBackupInfo();
