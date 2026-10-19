@@ -1,0 +1,43 @@
+{
+  "name": "dropbuy-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend clone tương thích bề mặt API /bff/* của dropbuy.vn (multi-tenant dropship marketplace)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:push": "prisma db push --skip-generate && prisma generate",
+    "db:reset": "prisma db push --force-reset --skip-generate && prisma generate && tsx scripts/seed.ts",
+    "seed": "tsx scripts/seed.ts",
+    "contract:openapi": "tsx scripts/gen-openapi.ts",
+    "contract:coverage": "tsx scripts/coverage.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@prisma/client": "6.10.1",
+    "bcryptjs": "2.4.3",
+    "fastify": "5.2.1",
+    "jose": "5.9.6"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "2.4.6",
+    "@types/node": "22.10.2",
+    "prisma": "6.10.1",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8"
+  },
+  "allowScripts": {
+    "@prisma/engines@6.10.1": true,
+    "esbuild@0.23.1": true,
+    "esbuild@0.21.5": true,
+    "prisma@6.10.1": true,
+    "@prisma/client@6.10.1": true
+  }
+}

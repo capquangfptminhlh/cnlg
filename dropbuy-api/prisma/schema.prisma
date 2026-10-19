@@ -1,0 +1,952 @@
+// Domain model cho bản clone dropbuy.vn.
+// Mã trạng thái 1 ký tự giữ nguyên như hệ thống gốc (xem src/lib/enums.ts).
+// Tiền tệ lưu Decimal(18,2) – đơn vị VND.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Tenant (site / "web con") ─────────────────────────────
+
+model Tenant {
+  id                       Int      @id @default(autoincrement())
+  fx_hash                  String   @unique
+  code                     String   @unique
+  name                     String
+  domain_primary           String?  @unique
+  domains                  String   @default("[]") // JSON tên miền phụ
+  owner_user_id            Int?
+  site_title               String?
+  site_meta_desc           String?
+  site_logo_path           String?
+  site_banner_path         String?
+  site_color               String?
+  features                 String   @default("[]")
+  notes                    String?
+  product_quantity_limit   Int      @default(0) // 0 = không giới hạn (tenant gốc)
+  shipping_markup_enabled  Boolean  @default(false)
+  shipping_markup_percent  Decimal  @default(0)
+  shipping_markup_amount   Decimal  @default(0)
+  status                   String   @default("A") // A active, L locked
+  cod_enabled              Boolean  @default(true)
+  guest_submit_enabled     Boolean  @default(true)
+  public_good_price        Boolean  @default(false)
+  gg_sso_enabled           Boolean  @default(false)
+  xu_enabled               Boolean  @default(true)
+  site_json_configs        String?  // JSON
+  racing_enabled           Boolean  @default(false)
+  racing_convert_rate      Decimal  @default(1)
+  racing_min_require_balance_u Decimal @default(0)
+  racing_pmh_ratio         Decimal  @default(1)
+  racing_start_time        DateTime?
+  racing_end_time          DateTime?
+  racing_pmh_package       Decimal  @default(100000)
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+}
+
+model TenantContract {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  tenant_id       Int
+  contract_type   String   @default("T") // T tenant site, S gg sso, Q product quantity
+  domain_type     String   @default("S") // S subdomain của sàn, C tên miền riêng
+  domain_name     String   @default("")
+  domain_dns_config String?             // JSON thông tin DNS do khách cung cấp
+  product_quantity Int     @default(0)
+  one_time_setup_fee Decimal @default(0)
+  amount          Decimal  @default(0) // phí tháng
+  last_subscription_date DateTime?
+  last_subscription_amount Decimal?
+  from_date       DateTime
+  to_date         DateTime
+  auto_renew      Boolean  @default(false)
+  status          String   @default("A") // A active, E expired, C canceled
+  created_at      DateTime @default(now())
+}
+
+// Shop đăng ký "tự động lên sàn" (auto-approve product) trên website con, trả phí tháng cho chủ website
+model TenantAapContract {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  tenant_id   Int
+  shop_id     Int
+  user_id     Int
+  from_date   DateTime
+  to_date     DateTime
+  amount      Decimal  @default(0)
+  auto_renew  Boolean  @default(false)
+  status      String   @default("A") // A, C huỷ, E hết hạn
+  last_subscription_date DateTime?
+  last_subscription_amount Decimal?
+  created_at  DateTime @default(now())
+
+  @@unique([tenant_id, shop_id])
+}
+
+model TenantFollowShop {
+  id         Int      @id @default(autoincrement())
+  unique_id  String   @unique @default(uuid())
+  tenant_id  Int
+  shop_id    Int
+  created_at DateTime @default(now())
+
+  @@unique([tenant_id, shop_id])
+}
+
+model TenantProduct {
+  id          Int      @id @default(autoincrement())
+  tenant_id   Int
+  product_id  Int
+  status      String   @default("A") // A show, H hidden
+  home_status String   @default("N") // N normal, H on homepage
+  num         Int      @default(0)
+  commission  Decimal  @default(0) // % hoa hồng tenant owner cộng thêm trên giá
+  created_at  DateTime @default(now())
+
+  @@unique([tenant_id, product_id])
+}
+
+model TenantHomeConfig {
+  id         Int      @id @default(autoincrement())
+  tenant_id  Int
+  block_code String
+  title      String?
+  config     String?  // JSON
+  num        Int      @default(0)
+  created_at DateTime @default(now())
+
+  @@unique([tenant_id, block_code])
+}
+
+model TenantBlockShop {
+  id         Int      @id @default(autoincrement())
+  tenant_id  Int
+  shop_id    Int
+  created_at DateTime @default(now())
+
+  @@unique([tenant_id, shop_id])
+}
+
+// ───────────────────────────── Users ─────────────────────────────
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  username           String    @unique
+  email              String?   @unique
+  phone              String?
+  password_hash      String
+  fullname           String    @default("")
+  link_fb            String    @default("")
+  default_address    String    @default("")
+  cccd               String    @default("")
+  status             String    @default("P") // UserStatus: P chờ kích hoạt, A hoạt động, L khoá
+  user_level         Int       @default(0)   // 0 khách lẻ, 1 = F1 (CTV cấp 1), 2 = F2...
+  is_sa              Boolean   @default(false)
+  parent_user_id     Int?
+  aff_code           String?   @unique
+  bank_ref_user_code String    @unique
+  tenant_id          Int       @default(1)
+  activation_code    String?   @unique
+  reset_token        String?   @unique
+  reset_token_exp    DateTime?
+  mfa_secret         String?
+  mfa_enabled        Boolean   @default(false)
+  mfa_enabled_at     DateTime?
+  vat_info           String?
+  good_pricing       String    @default("N") // N giá thường, G giá tốt
+  admin_comment      String?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+}
+
+model UserSetting {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  key        String
+  value      String
+  updated_at DateTime @updatedAt
+
+  @@unique([user_id, key])
+}
+
+model Address {
+  id           Int      @id @default(autoincrement())
+  unique_id    String   @unique
+  user_id      Int
+  fullname     String
+  phone        String
+  address_line String
+  province_id  Int
+  district_id  Int
+  ward_id      Int
+  is_default   Boolean  @default(false)
+  note         String?
+  kind         String   @default("S") // S địa chỉ gửi (thiết lập/dia-chi), R sổ địa chỉ nhận
+  created_at   DateTime @default(now())
+}
+
+model UserBankInfo {
+  id          Int      @id @default(autoincrement())
+  unique_id   String   @unique
+  user_id     Int
+  bank_code   String
+  bank_name   String
+  acc_number  String
+  acc_name    String
+  is_default  Boolean  @default(false)
+  created_at  DateTime @default(now())
+}
+
+model UserBlockShop {
+  id         Int      @id @default(autoincrement())
+  unique_id  String   @unique
+  user_id    Int
+  shop_id    Int
+  created_at DateTime @default(now())
+
+  @@unique([user_id, shop_id])
+}
+
+// ───────────────────────────── Referral / CTV ─────────────────────────────
+
+model UserReferral {
+  id             Int      @id @default(autoincrement())
+  user_id        Int      @unique // F-n
+  parent_user_id Int      // cấp trên
+  referral_group_id Int?  // nhóm hoa hồng cấp trên xếp vào
+  status         String   @default("W") // W chờ duyệt, A hoạt động, P chờ CTV xác thực
+  created_at     DateTime @default(now())
+  approved_at    DateTime?
+}
+
+// Nhóm hoa hồng của F1: tài khoản cấp dưới trong nhóm mua giá F1 + commission% (phần chênh về F1)
+model UserReferralGroup {
+  id            Int      @id @default(autoincrement())
+  owner_user_id Int
+  title         String
+  commission    Decimal  @default(0) // %
+  is_default    Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+}
+
+// Hoa hồng riêng theo sản phẩm trong nhóm
+model UserReferralGroupDetail {
+  id                Int      @id @default(autoincrement())
+  unique_id         String   @unique
+  referral_group_id Int
+  product_id        Int
+  commission        Decimal
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@unique([referral_group_id, product_id])
+}
+
+model ChangeReferralRequest {
+  id                 Int      @id @default(autoincrement())
+  code               String   @unique
+  user_id            Int
+  from_parent_user_id Int?
+  to_parent_user_id  Int
+  reason             String?
+  status             String   @default("P") // P chờ, A duyệt, R từ chối, C huỷ
+  created_at         DateTime @default(now())
+  processed_at       DateTime?
+}
+
+// ───────────────────────────── Shop / Depot ─────────────────────────────
+
+model Shop {
+  id                   Int      @id @default(autoincrement())
+  user_id              Int      @unique
+  name                 String
+  display_name         String
+  status               String   @default("A") // A hoạt động, S tạm ngưng (suspend), L khoá
+  admin_status         String   @default("A") // trạng thái do SA/tenant owner quản trị
+  is_mall              Boolean  @default(false)
+  enable_virtual_depot Boolean  @default(false)
+  link_fb              String   @default("")
+  fullname             String   @default("")
+  phone                String   @default("")
+  address_line         String   @default("")
+  province_id          Int      @default(0)
+  district_id          Int      @default(0)
+  ward_id              Int      @default(0)
+  avatar_url           String?
+  banner_url           String?
+  description          String?
+  notes                String?
+  reputation_score     Int      @default(100)
+  enable_aff           Boolean  @default(true)
+  enable_xu            Boolean  @default(false)
+  reject_shop_depot_contract Boolean @default(false)
+  virtual_depot_rent_rate_normal Decimal @default(2000) // VND / kg / ngày
+  virtual_depot_rent_rate_vip    Decimal @default(3000)
+  auto_approve_virtual_item Boolean @default(false)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+}
+
+model ShopDepot {
+  id           Int      @id @default(autoincrement())
+  unique_id    String   @unique
+  depot_code   String   @unique
+  shop_id      Int
+  name         String   @default("")
+  fullname     String
+  phone        String
+  address_line String
+  province_id  Int
+  district_id  Int
+  ward_id      Int
+  status       String   @default("A")
+  storage_id   Int      @default(6)
+  created_at   DateTime @default(now())
+}
+
+model ShopBlockBuyer {
+  id            Int      @id @default(autoincrement())
+  unique_id     String   @unique
+  shop_id       Int
+  buyer_user_id Int
+  block_type    String   @default("O") // O theo đơn, M thủ công
+  order_id      Int?
+  created_at    DateTime @default(now())
+
+  @@unique([shop_id, buyer_user_id])
+}
+
+// Hợp đồng gửi kho: buyer thuê kho của shop để giữ hàng (kho ảo)
+model ShopDepotContract {
+  id                         Int      @id @default(autoincrement())
+  unique_id                  String   @unique
+  code                       String   @unique
+  shop_id                    Int
+  buyer_user_id              Int
+  depot_code                 String
+  contract_type              String   @default("N") // N thường, V VIP (premium_type)
+  from_date                  DateTime
+  to_date                    DateTime
+  contract_duration          Int      // số ngày
+  rent_rate                  Decimal  @default(0) // VND / kg / ngày
+  weight_capacity_total      Decimal  @default(0) // gram
+  amount                     Decimal  @default(0)
+  status                     String   @default("P") // P chờ duyệt, A đã duyệt, R từ chối, E hết hạn, C huỷ
+  approved_at                DateTime?
+  extend_status              String?  // P chờ duyệt gia hạn, A duyệt, R từ chối
+  extend_capacity            Decimal? // gram xin thêm
+  extend_amount              Decimal?
+  extend_comment             String?
+  extend_duration            Int?
+  auto_generate_next_contract Boolean @default(false)
+  notes                      String?
+  created_at                 DateTime @default(now())
+}
+
+model ShopDepotContractLog {
+  id          Int      @id @default(autoincrement())
+  contract_id Int
+  action      String
+  notes       String?
+  created_at  DateTime @default(now())
+}
+
+// Đấu giá / thuê vị trí hiển thị trang chủ: SA mở kỳ (BidTime theo tháng), cấp slot cho shop, shop gắn sản phẩm
+model BidTime {
+  id         Int      @id @default(autoincrement())
+  unique_id  String   @unique
+  month      Int
+  year       Int
+  display    String   @default("T")
+  created_at DateTime @default(now())
+
+  @@unique([year, month])
+}
+
+model BidSlot {
+  id          Int      @id @default(autoincrement())
+  unique_id   String   @unique
+  bid_time_id Int
+  site_code   String   @default("HOME")
+  order       Int      // vị trí 1..n
+  shop_id     Int?
+  price       Decimal  @default(0)
+  enable      String   @default("T")
+  created_at  DateTime @default(now())
+}
+
+model BidSlotDetail {
+  id           Int      @id @default(autoincrement())
+  unique_id    String   @unique
+  bid_slot_id  Int
+  shop_id      Int
+  product_id   Int
+  sku          String?
+  num          Int      @default(0)
+  display      String   @default("T")
+  image_url    String?
+  created_at   DateTime @default(now())
+}
+
+// ───────────────────────────── Catalog ─────────────────────────────
+
+model Category {
+  id        Int     @id @default(autoincrement())
+  slug      String  @unique
+  name      String
+  parent_id Int?
+  num       Int     @default(0)
+}
+
+model Product {
+  id               Int      @id @default(autoincrement())
+  unique_id        String   @unique
+  shop_id          Int
+  category_id      Int?
+  name             String
+  slug             String
+  description      String   @default("")
+  product_type     String   @default("P") // P vật lý, V voucher/ảo
+  status           String   @default("A") // do shop đặt: A đăng bán, U ẩn/chưa đăng, X đã xoá
+  admin_status     String   @default("W") // do sàn duyệt: W chờ duyệt, A đã duyệt, L khoá
+  admin_comment    String?
+  aff_enabled      Boolean  @default(false)
+  aff_rate         Decimal  @default(0)  // % hoa hồng cho người rải link
+  vat_include      String   @default("F") // T/F
+  thumbnail_url    String   @default("")
+  images           String   @default("[]") // JSON array of urls
+  weight_gram      Int      @default(0)
+  is_mall          Boolean  @default(false)
+  warranty_type    String?
+  warranty_duration Int?
+  preorder_status  String   @default("F")
+  hang_xin         String   @default("F")
+  main_video_link  String?
+  view_count       Int      @default(0)
+  dump_at          DateTime?
+  admin_updated_at DateTime?
+  sold_count       Int      @default(0)
+  rate_avg         Decimal  @default(0)
+  rate_count       Int      @default(0)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+}
+
+model Variation {
+  id                String   @id // uuid
+  product_id        Int
+  name              String
+  sku               String   @unique
+  price_public      Decimal  // giá niêm yết (gạch ngang)
+  price_f1          Decimal  // giá cho CTV/F1 (fe_price_override_source = F1)
+  price_good        Decimal? // giá tốt cho user good_pricing
+  price_guest       Decimal? // giá cho khách vãng lai, null = price_public
+  weight_vtp        Decimal  @default(0)
+  weight_spx        Decimal  @default(0)
+  thumbnail_url     String?
+  status            String   @default("A")
+  num               Int      @default(0)
+  created_at        DateTime @default(now())
+}
+
+model Stock {
+  id            Int      @id @default(autoincrement())
+  variation_id  String
+  depot_id      Int
+  current_stock Int      @default(0)
+  pending_stock Int      @default(0) // đang giữ cho đơn chưa đóng gói
+  updated_at    DateTime @updatedAt
+
+  @@unique([variation_id, depot_id])
+}
+
+model ProductComment {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique
+  product_id     Int
+  shop_id        Int
+  user_id        Int?
+  fullname       String?
+  reply_to       String?  // code của comment cha
+  comment_content String
+  comment_media  String   @default("[]")
+  rate           Int?
+  status         String   @default("A")
+  created_at     DateTime @default(now())
+}
+
+// ───────────────────────────── Cart ─────────────────────────────
+
+// owner_key: "U:<user_id>" | "G:<client_id>" | "A:<aff_id>:<client_id>"
+model CartItem {
+  id                 Int      @id @default(autoincrement())
+  owner_key          String
+  tenant_id          Int      @default(1)
+  variation_id       String
+  quantity           Int
+  selected           Boolean  @default(false)
+  fs_program_code    String?
+  pvv_unique_id      String?  // mua từ kho ảo
+  last_price         Decimal?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@unique([owner_key, variation_id, fs_program_code, pvv_unique_id])
+}
+
+model CartVoucher {
+  id         Int      @id @default(autoincrement())
+  owner_key  String
+  voucher_code String
+  created_at DateTime @default(now())
+
+  @@unique([owner_key, voucher_code])
+}
+
+// ───────────────────────────── Vouchers / Flash sale ─────────────────────────────
+
+model Voucher {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  scope           String   // S shop, T tenant
+  shop_id         Int?
+  tenant_id       Int?
+  name            String
+  voucher_kind    String   @default("C") // C giảm tiền hàng, S giảm phí ship
+  discount_type   String   @default("A") // A số tiền, P phần trăm, S (nội bộ) = voucher ship
+  display_type    String   @default("P") // P công khai, H ẩn (nhập mã)
+  budget_amount   Decimal?
+  used_amount     Decimal  @default(0)
+  owner_user_id   Int?
+  products        String   @default("[]") // JSON product_ids áp dụng, rỗng = tất cả
+  discount_value  Decimal
+  max_discount    Decimal?
+  min_order_amount Decimal @default(0)
+  quantity        Int
+  used_quantity   Int      @default(0)
+  per_user_limit  Int      @default(1)
+  from_time       DateTime
+  to_time         DateTime
+  status          String   @default("A") // A hoạt động, D tạm dừng, C huỷ
+  created_at      DateTime @default(now())
+}
+
+model VoucherUsage {
+  id         Int      @id @default(autoincrement())
+  voucher_id Int
+  user_key   String
+  order_id   Int
+  amount     Decimal
+  created_at DateTime @default(now())
+}
+
+model FlashSaleProgram {
+  id                Int      @id @default(autoincrement())
+  code              String   @unique
+  tenant_id         Int      @default(1)
+  shop_id           Int?
+  name              String
+  body              String?
+  banner_image_url  String?
+  from_time         DateTime
+  to_time           DateTime
+  status            String   @default("A") // A, D dừng, C huỷ
+  created_at        DateTime @default(now())
+}
+
+model FlashSaleStock {
+  id            Int      @id @default(autoincrement())
+  unique_id     String   @unique
+  program_code  String
+  shop_id       Int
+  product_id    Int
+  variation_id  String
+  price         Decimal
+  quantity      Int
+  sold_quantity Int      @default(0)
+  limit_per_user Int     @default(0)
+  status        String   @default("A")
+  created_at    DateTime @default(now())
+
+  @@unique([program_code, variation_id])
+}
+
+// Hợp đồng shop tham gia flash-sale / hợp đồng dịch vụ chung (buff đánh giá, follow shop...)
+model ServiceContract {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  kind            String   // FS flash-sale, B buff, F follow-shop
+  tenant_id       Int      @default(1)
+  shop_id         Int
+  shop_user_id    Int
+  contract_type   String   @default("N") // N thường, V VIP
+  from_date       DateTime
+  to_date         DateTime
+  contract_duration Int
+  amount          Decimal  @default(0)
+  auto_generate_next_contract Boolean @default(false)
+  status          String   @default("A") // A, C huỷ, E hết hạn
+  created_at      DateTime @default(now())
+}
+
+// ───────────────────────────── Orders ─────────────────────────────
+
+model Order {
+  id                     Int      @id @default(autoincrement())
+  unique_id              String   @unique
+  code                   String   @unique
+  tenant_id              Int      @default(1)
+  buyer_user_id          Int?
+  guest_client_id        String?
+  aff_user_id            Int?     // người rải link
+  ctv_parent_user_id     Int?     // F-cấp trên hưởng chênh lệch
+  shop_id                Int
+  shop_depot_code        String
+  order_type             String   @default("N") // OrderType: N thường, A aff, V kho ảo (pvv)
+  order_status           String   @default("W")
+  shipping_method        String   @default("V") // V viettel post, S shopee express, T tự giao
+  delivery_option        String   @default("N") // N giao thường, X hoả tốc
+  payment_method         String   @default("B") // B ví, C COD, Q chuyển khoản QR
+  payment_balance_type   String   @default("A")
+  shipping_payment_balance_type String @default("A")
+  commodity_amount       Decimal
+  shipping_amount        Decimal  @default(0)
+  voucher_amount         Decimal  @default(0)
+  shop_voucher_amount    Decimal  @default(0)
+  tenant_voucher_amount  Decimal  @default(0)
+  shipping_voucher_amount Decimal @default(0)
+  total_amount           Decimal
+  cod_amount             Decimal  @default(0)
+  profit_amount          Decimal  @default(0)
+  tenant_profit_amount   Decimal  @default(0) // phần cộng thêm của website con → chủ website
+  weight_total_user      Decimal  @default(0)
+  weight_total_partner   Decimal?
+  weight_fee_partner     Decimal?
+  receiver_fullname      String
+  receiver_phone         String
+  receiver_email         String?
+  receiver_address_line  String
+  receiver_province_id   Int
+  receiver_district_id   Int
+  receiver_ward_id       Int
+  is_dropship            String   @default("F")
+  notes                  String?
+  shop_notes             String?
+  attachment_file_name   String?
+  shipping_ref_code      String?  @unique
+  count_print            Int      @default(0)
+  buyer_vat_info         String?
+  cancel_reason          String?
+  is_kn                  String   @default("F") // đang khiếu nại
+  settled                Boolean  @default(false) // đã tất toán tiền cho shop
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+  paid_at                DateTime?
+  packed_at              DateTime?
+  shipping_at            DateTime?
+  delivered_at           DateTime?
+  done_at                DateTime?
+}
+
+model OrderItem {
+  id               Int      @id @default(autoincrement())
+  order_id         Int
+  product_id       Int
+  variation_id     String
+  product_name     String
+  variation_name   String
+  sku              String
+  res_thumbnail_url String
+  quantity         Int
+  price            Decimal  // giá buyer trả
+  public_price     Decimal
+  base_price       Decimal  // giá F1 – phần shop nhận
+  fs_program_code  String?
+  pvv_unique_id    String?
+}
+
+model OrderEvent {
+  id         Int      @id @default(autoincrement())
+  order_id   Int
+  from_status String?
+  to_status  String
+  actor      String   // U buyer, S shop, A sa, T tenant owner, X system
+  actor_id   Int?
+  notes      String?
+  created_at DateTime @default(now())
+}
+
+model ComplainRequest {
+  id              Int      @id @default(autoincrement())
+  unique_id       String   @unique
+  order_id        Int
+  buyer_user_id   Int
+  shop_id         Int
+  tenant_id       Int      @default(1)
+  complain_type   String   // R hoàn hàng, M thiếu hàng, D hư hỏng, O khác
+  notes           String?
+  media           String   @default("[]")
+  refund_amount   Decimal  @default(0)
+  status          String   @default("P") // P chờ shop, S shop đồng ý (user thắng), J chờ phán xử, U user thắng, H shop thắng, C huỷ
+  judge_notes     String?
+  judged_by       Int?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+}
+
+// ───────────────────────────── Balance / ví ─────────────────────────────
+
+// balance_type: A khả dụng, L đặt cọc (lock), D ký quỹ, X phiếu mua hàng (xu), U điểm uy tín
+model Balance {
+  id         Int      @id @default(autoincrement())
+  unique_id  String   @unique
+  user_id    Int
+  balance_type String
+  amount     Decimal  @default(0)
+  updated_at DateTime @updatedAt
+
+  @@unique([user_id, balance_type])
+}
+
+model BalanceTxn {
+  id            Int      @id @default(autoincrement())
+  unique_id     String   @unique
+  balance_id    Int
+  user_id       Int
+  action_code   String   // I cộng, O trừ
+  business_code String   // ORDER_PAY, ORDER_REFUND, ORDER_SETTLE, DEPOSIT, WITHDRAW, TRANSFER, XU_EXCHANGE, CONTRACT_FEE, ADJUST
+  business_sub_code String?
+  amount        Decimal
+  balance_after Decimal
+  ref_code      String?
+  notes         String?
+  created_at    DateTime @default(now())
+}
+
+model DwTransaction {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  user_id      Int
+  dw_type      String   // D nạp, W rút
+  amount       Decimal
+  balance_type String   @default("A")
+  status       String   @default("P") // P chờ, C đã xác nhận, R từ chối
+  bank_info    String?
+  site         String?
+  confirmed_by Int?
+  created_at   DateTime @default(now())
+  confirmed_at DateTime?
+}
+
+model BalanceTransfer {
+  id               Int      @id @default(autoincrement())
+  complain_by_user_id Int?
+  code             String   @unique
+  from_user_id     Int
+  to_user_id       Int
+  from_balance_type String  @default("X")
+  to_balance_type  String   @default("X")
+  transfer_amount  Decimal
+  notes            String?
+  status           String   @default("P") // P chờ người nhận xác nhận, A người gửi duyệt, D hoàn tất, C huỷ, K khiếu nại
+  complain_status  String?  // P đang KN, F bên gửi thắng, T bên nhận thắng, C huỷ KN
+  complain_notes   String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+}
+
+// Sổ lệnh mua/bán xu (phiếu mua hàng) giữa user: rate = VND / 1 xu
+model XuExchangeRequest {
+  id                 Int      @id @default(autoincrement())
+  code               String   @unique
+  tenant_id          Int      @default(1)
+  user_id            Int
+  side               String   // S bán xu, B mua xu
+  rate               Decimal
+  origin_xu_volume   Decimal
+  xu_volume          Decimal  // còn lại chưa khớp
+  origin_commodity_amount Decimal
+  commodity_amount   Decimal  // tiền còn ký quỹ (lệnh mua)
+  status             String   @default("P") // P đang mở, D khớp hết, C huỷ
+  created_at         DateTime @default(now())
+  done_at            DateTime?
+  cancel_at          DateTime?
+}
+
+model XuExchangeMatch {
+  id              Int      @id @default(autoincrement())
+  buy_request_id  Int
+  sell_request_id Int
+  rate            Decimal
+  xu_volume       Decimal
+  commodity_amount Decimal
+  created_at      DateTime @default(now())
+}
+
+// ───────────────────────────── Kho ảo (product variation virtual) ─────────────────────────────
+
+// Hàng buyer sở hữu nhưng nằm ở kho shop
+model ProductVariationVirtual {
+  id            Int      @id @default(autoincrement())
+  unique_id     String   @unique
+  owner_user_id Int
+  shop_id       Int
+  depot_code    String
+  product_id    Int
+  variation_id  String
+  quantity      Int      @default(0)
+  pending_out   Int      @default(0)
+  base_price    Decimal
+  status        String   @default("A") // A, C huỷ (SA)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@unique([owner_user_id, variation_id, depot_code])
+}
+
+model PvvLedger {
+  id           Int      @id @default(autoincrement())
+  pvv_id       Int
+  action_code  String   // I nhập, O xuất
+  business_code String  // REQUEST_IN, ORDER_OUT, TRANSFER_IN, TRANSFER_OUT, CANCEL
+  quantity     Int
+  quantity_after Int
+  ref_code     String?
+  created_at   DateTime @default(now())
+}
+
+// Yêu cầu nhập hàng vào kho ảo (buyer mua sỉ, shop duyệt)
+model PvvRequest {
+  id               Int      @id @default(autoincrement())
+  unique_id        String   @unique
+  code             String   @unique
+  contract_id      Int?
+  fs_program_code  String?
+  shop_comment     String?
+  approved_at      DateTime?
+  rejected_at      DateTime?
+  buyer_user_id    Int
+  shop_id          Int
+  depot_code       String
+  variation_id     String
+  quantity         Int
+  unit_price       Decimal
+  total_amount     Decimal
+  depot_action_code String  @default("N") // N chưa xử lý, R đã nhận hàng, X chưa đủ hàng
+  status           String   @default("P") // P chờ duyệt, A duyệt, R từ chối, C buyer huỷ
+  notes            String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+}
+
+// Chuyển hàng kho ảo giữa 2 user (A -> B)
+model PvvTransfer {
+  id           Int      @id @default(autoincrement())
+  unique_id    String   @unique
+  code         String   @unique
+  to_depot_code String?
+  otp_code     String
+  otp_retry    Int      @default(0)
+  notes        String?
+  confirm_at   DateTime?
+  cancelled_at DateTime?
+  from_user_id Int
+  to_user_id   Int
+  pvv_id       Int
+  quantity     Int
+  price        Decimal  @default(0)
+  status       String   @default("P") // P chờ B xác nhận, D xong, C A huỷ
+  created_at   DateTime @default(now())
+}
+
+// ───────────────────────────── Integrations (KiotViet / Nhanh / Pancake) ─────────────────────────────
+
+model IntegrationConfig {
+  id          Int      @id @default(autoincrement())
+  shop_id     Int
+  provider    String   // kiotviet, nhanh, pancake
+  config      String   // JSON (client_id, secret, retailer...)
+  access_token String?
+  token_expired_at DateTime?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@unique([shop_id, provider])
+}
+
+model IntegrationProductMapping {
+  id            Int      @id @default(autoincrement())
+  shop_id       Int
+  provider      String
+  variation_id  String
+  external_code String
+  external_name String?
+  created_at    DateTime @default(now())
+
+  @@unique([shop_id, provider, variation_id])
+}
+
+model IntegrationWebhook {
+  id         Int      @id @default(autoincrement())
+  shop_id    Int
+  provider   String
+  event      String
+  url        String
+  created_at DateTime @default(now())
+
+  @@unique([shop_id, provider, event])
+}
+
+model IntegrationOrderLink {
+  id            Int      @id @default(autoincrement())
+  shop_id       Int
+  provider      String
+  order_id      Int
+  external_code String
+  status        String   @default("C")
+  created_at    DateTime @default(now())
+}
+
+// ───────────────────────────── Platform data ─────────────────────────────
+
+model BaselineData {
+  id            Int      @id @default(autoincrement())
+  bl_type_id    Int      // 1 lý do huỷ, 2 lý do khiếu nại, 3 ngân hàng, ...
+  num           Int      @default(0)
+  bl_text       String
+  bl_s_value    String?
+  display_status String  @default("A")
+  created_at    DateTime @default(now())
+}
+
+model Team {
+  id         Int      @id @default(autoincrement())
+  name       String
+  leader_user_id Int
+  season     Int      @default(2)
+  score      Decimal  @default(0)
+  updated_at DateTime @updatedAt
+}
+
+model Location {
+  id        Int    @id
+  level     Int    // 1 tỉnh, 2 huyện, 3 xã
+  parent_id Int?
+  name      String
+}
+
+model AsyncJob {
+  id         String   @id
+  kind       String
+  status     String   @default("P") // P, D done, F failed
+  result     String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}

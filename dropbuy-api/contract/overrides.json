@@ -1,0 +1,9 @@
+{
+  "_comment": "Hiệu chỉnh tay cho các endpoint mà bộ ghép tự động (scripts/schemas.mjs) ghép nhầm schema. Giá trị = chỉ số op trong contract/ops.json.",
+  "DELETE /bff/my-address/{}": 376,
+  "POST /bff/my-address": 377,
+  "PUT /bff/my-address": 378,
+  "GET /bff/my-address/list": 379,
+  "POST /bff/product-comments/{}/list": 464,
+  "POST /bff/variations/in-stock": 1073
+}

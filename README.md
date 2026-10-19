@@ -15,16 +15,29 @@ Hệ thống kết nối tự động hóa toàn diện giữa **hoangminh.com**
 ## 🤖 Dành Cho Nhà Phát Triển & AI Agent Tiếp Theo
 👉 Xem chi tiết toàn bộ kiến trúc, luồng xử lý và quy tắc kỹ thuật tại file [AGENT_INSTRUCTIONS.md](AGENT_INSTRUCTIONS.md).
 
+## 📁 Cấu Trúc Mã Nguồn
+
+```
+├── public/                # Giao diện Storefront & Admin (Dark Luxury Theme v2.0)
+├── services/              # Các dịch vụ: RealtimeSync 5m, NextAuth, VietQR, Puppeteer Relay
+├── data/                  # Cache danh mục 1.321 SP, cấu hình ngân hàng & đơn hàng
+├── server.js              # Express Storefront & WebSocket Relay Server (Port 3000)
+└── dropbuy-api/           # Trọn bộ Fastify BFF API, Prisma Schema, SQLite dev.db của DropBuy
+```
+
 ## 📦 Cài đặt & Khởi chạy
 
+### 1. Storefront & Relay System
 ```bash
-# 1. Cài đặt thư viện
 npm install
-
-# 2. Khởi chạy máy chủ
-npm start
-# hoặc
 node server.js
+```
+
+### 2. DropBuy BFF API (Tùy chọn)
+```bash
+cd dropbuy-api
+npm install
+npm run dev
 ```
 
 Truy cập:
