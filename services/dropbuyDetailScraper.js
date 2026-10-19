@@ -87,19 +87,52 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const html = await res.text();
 
-    // 1. Bóc tách mô tả từ og:description
-    const ogDescMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i) ||
-                        html.match(/<meta\s+name="description"\s+content="([^"]*)"/i);
-    let description = ogDescMatch ? ogDescMatch[1].replace(/\\n/g, '\n').replace(/&quot;/g, '"') : '';
+    // 1. Bóc tách mô tả đầy đủ 100% từ DropBuy (Hỗ trợ DOM container + RSC text chunk + Fallback)
+    let description = '';
+
+    // Cách 1: Bóc tách trực tiếp khối HTML mô tả trong DOM
+    const domMatch = html.match(/Chi tiết sản phẩm<\/div><div>([\s\S]*?)<\/div><\/div><\/div>/i) ||
+                     html.match(/Chi tiết sản phẩm<\/div>\s*<div[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i);
+    if (domMatch && domMatch[1].trim().length > 50) {
+      description = domMatch[1].trim();
+    }
 
     // 2. Bóc tách toàn bộ RSC payload
     const regex = /self\.__next_f\.push\(\[1,"(.*?)"\]\)/g;
     let match;
     let fullRsc = '';
+    const rscChunks = [];
     while ((match = regex.exec(html)) !== null) {
       fullRsc += match[1];
+      rscChunks.push(match[1]);
     }
     const unescaped = fullRsc.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+
+    // Cách 2: Nếu DOM chưa ra mô tả dài, bóc tách từ text chunk lớn nhất trong RSC payload
+    if (!description || description.length < 100) {
+      const candidates = [];
+      for (const chunk of rscChunks) {
+        if (chunk.length > 80 && !chunk.startsWith('{"') && !chunk.startsWith('["$') && !chunk.includes('"$undefined"')) {
+          const cleanChunk = chunk
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\')
+            .replace(/\\n/g, '\n')
+            .replace(/\\u0026/g, '&');
+          candidates.push(cleanChunk);
+        }
+      }
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => b.length - a.length);
+        description = candidates[0].replace(/\n/g, '<br>');
+      }
+    }
+
+    // Cách 3: Fallback cuối cùng nếu không có text chunk
+    if (!description) {
+      const ogDescMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i) ||
+                          html.match(/<meta\s+name="description"\s+content="([^"]*)"/i);
+      description = ogDescMatch ? ogDescMatch[1].replace(/\\n/g, '<br>').replace(/&quot;/g, '"') : '';
+    }
 
     // 3. Bóc tách rawProduct JSON
     let gallery = [];
