@@ -23,15 +23,18 @@
   // Real, keyboard accessible banner carousel — informational messages only;
   // never pretend a promotion, review score or discount exists.
   const slides = [
-    {label:'HOÀNG MINH STORE', over:'MUA SẮM THẢ GA',
-      headline:'THẾ GIỚI <em>TIỆN ÍCH</em><span>TRONG TẦM TAY</span>',
-      description:'Phụ kiện • Công nghệ • Gia dụng',cta:'KHÁM PHÁ NGAY',href:'#catalog'},
-    {label:'DANH MỤC MUA SẮM', over:'DỄ TÌM, DỄ CHỌN',
-      headline:'TÌM ĐÚNG <em>SẢN PHẨM</em><span>THEO NHU CẦU</span>',
-      description:'Lọc theo giá, chọn nhanh theo ngành hàng',cta:'XEM SẢN PHẨM',href:'#catalog'},
-    {label:'HOÀNG MINH STORE', over:'ĐẶT HÀNG TIỆN LỢI',
-      headline:'THANH TOÁN <em>VIETQR</em><span>THEO DÕI ĐƠN HÀNG</span>',
-      description:'Mua hàng trực tuyến và tra cứu trạng thái đơn',cta:'MUA SẮM NGAY',href:'#catalog'}
+    {label:'HOÀNG MINH STORE',over:'KHÁM PHÁ ĐIỀU HAY',
+      headline:'Mọi thứ bạn cần,<span><em>ở ngay đây.</em></span>',
+      description:'Phụ kiện, công nghệ và tiện ích cho mỗi ngày.',
+      cta:'Xem sản phẩm',href:'#catalog'},
+    {label:'MUA SẮM DỄ DÀNG',over:'DỄ TÌM · DỄ CHỌN',
+      headline:'Chọn đúng sản phẩm,<span><em>hợp nhu cầu.</em></span>',
+      description:'Duyệt danh mục, lọc giá và xem thông tin chi tiết.',
+      cta:'Khám phá danh mục',href:'#catalog'},
+    {label:'HOÀNG MINH STORE',over:'TIỆN LỢI MỖI NGÀY',
+      headline:'Thêm vào giỏ,<span><em>mua thật dễ.</em></span>',
+      description:'Chọn món bạn thích và quản lý giỏ hàng.',
+      cta:'Mua sắm ngay',href:'#catalog'}
   ];
   if (hero) {
     const heading=hero.querySelector('.market-banner-copy h1');
