@@ -147,6 +147,28 @@ const puppeteer=require('puppeteer-core');
     await page.waitForFunction(()=>!document.getElementById('productDetailModal').classList.contains('open'));
     console.log('Modal checkpoint afterDetail:',JSON.stringify(await page.evaluate(()=>({className:document.getElementById('productDetailModal').className,hash:location.hash,path:location.pathname,display:getComputedStyle(document.getElementById('productDetailModal')).display}))));
     console.log('Autocomplete keyboard & real product details: PASS');
+    // Closing detail while its API request is slow must not re-open it or
+    // write a stale #/sp/ URL after the response eventually resolves.
+    await page.evaluate(()=>{
+      window.__baseDemoFetch=window.fetch;
+      window.fetch=(input,init)=>typeof input==='string'&&/^\/api\/products\/\d+$/.test(input)
+        ?new Promise(resolve=>setTimeout(()=>resolve(window.__baseDemoFetch(input,init)),450))
+        :window.__baseDemoFetch(input,init);
+    });
+    await page.evaluate(id=>{window.openProductDetail(id);},snapshotData.products[0].id);
+    await page.waitForFunction(()=>document.getElementById('productDetailModal').classList.contains('open'));
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(()=>!document.getElementById('productDetailModal').classList.contains('open'));
+    await new Promise(resolve=>setTimeout(resolve,630));
+    const afterSlowClose=await page.evaluate(()=>({
+      open:document.getElementById('productDetailModal').classList.contains('open'),
+      url:location.pathname+location.hash
+    }));
+    assert.ok(!afterSlowClose.open && !afterSlowClose.url.includes('/sp/'),
+      'late product detail response changed closed dialog: '+JSON.stringify(afterSlowClose));
+    await page.evaluate(()=>{window.fetch=window.__baseDemoFetch;delete window.__baseDemoFetch;});
+    console.log('Close dialog before slow API finishes: PASS');
+
 
     await page.click('#searchClearBtn');
     await page.waitForFunction(()=>state.searchQuery==='' && state.products.length>10 && document.getElementById('catalogCount').getAttribute('aria-busy')==='false');
