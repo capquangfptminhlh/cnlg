@@ -183,9 +183,9 @@
   </section>
 
   <!-- FULL PRODUCT DETAIL MODAL (QUICK VIEW & FULL SPECS) -->
-  <div class="modal-backdrop" id="productDetailModal">
-    <div class="modal-dialog product-modal-dialog">
-      <button class="modal-close-icon" id="closeDetailModalBtn">&times;</button>
+  <div class="modal-backdrop" id="productDetailModal" aria-hidden="true">
+    <div class="modal-dialog product-modal-dialog" role="dialog" aria-modal="true" aria-label="Chi tiết sản phẩm">
+      <button type="button" class="modal-close-icon" id="closeDetailModalBtn" aria-label="Đóng chi tiết sản phẩm">&times;</button>
       
       <div class="detail-modal-content" id="detailModalBody">
         <!-- Injected via JS -->
@@ -195,12 +195,12 @@
 
   <!-- Cart Drawer -->
   <div class="drawer-backdrop" id="cartBackdrop"></div>
-  <aside class="cart-drawer" id="cartDrawer">
+  <aside class="cart-drawer" id="cartDrawer" role="dialog" aria-label="Giỏ hàng" aria-modal="true" aria-hidden="true">
     <div class="drawer-header flex-between">
       <div class="drawer-title">
         <i class="fa-solid fa-bag-shopping"></i> Giỏ Hàng (<span id="drawerCount">0</span>)
       </div>
-      <button class="drawer-close-btn" id="closeCartBtn">&times;</button>
+      <button type="button" class="drawer-close-btn" id="closeCartBtn" aria-label="Đóng giỏ hàng">&times;</button>
     </div>
     <div class="drawer-items" id="cartItemsContainer">
       <!-- Injected via JS -->
@@ -210,7 +210,7 @@
         <span class="sub-label">Tổng cộng thanh toán:</span>
         <strong class="sub-amount price-highlight" id="drawerTotalAmount">0 đ</strong>
       </div>
-      <p class="drawer-note"><i class="fa-solid fa-circle-check"></i> Đã bao gồm thuế & phí đóng gói bảo đảm</p>
+      <p class="drawer-note"><i class="fa-solid fa-circle-info"></i> Phí vận chuyển sẽ được tính tại bước đặt hàng.</p>
       <button class="btn-checkout-primary" id="checkoutBtn" disabled>
         <span>Tiến Hành Đặt Hàng</span>
         <i class="fa-solid fa-arrow-right"></i>
@@ -219,22 +219,22 @@
   </aside>
 
   <!-- Checkout Information Modal -->
-  <div class="modal-backdrop" id="checkoutModal">
-    <div class="modal-dialog checkout-dialog">
+  <div class="modal-backdrop" id="checkoutModal" aria-hidden="true">
+    <div class="modal-dialog checkout-dialog" role="dialog" aria-modal="true" aria-label="Thông tin nhận hàng">
       <div class="modal-top flex-between">
         <h3><i class="fa-solid fa-truck-ramp-box"></i> Thông Tin Nhận Hàng</h3>
-        <button class="modal-close-icon" id="closeCheckoutBtn">&times;</button>
+        <button type="button" class="modal-close-icon" id="closeCheckoutBtn" aria-label="Đóng trang đặt hàng">&times;</button>
       </div>
 
       <form id="checkoutForm" class="checkout-form">
         <div class="form-row">
           <div class="form-field">
             <label>Họ và tên người nhận <span class="req">*</span></label>
-            <input type="text" id="custName" required placeholder="Ví dụ: Nguyễn Văn An">
+            <input type="text" id="custName" required autocomplete="name" maxlength="120" placeholder="Ví dụ: Nguyễn Văn An">
           </div>
           <div class="form-field">
             <label>Số điện thoại nhận hàng <span class="req">*</span></label>
-            <input type="tel" id="custPhone" required placeholder="Ví dụ: 0912 345 678">
+            <input type="tel" id="custPhone" required autocomplete="tel" inputmode="tel" maxlength="20" placeholder="Ví dụ: 0912 345 678">
           </div>
         </div>
 
@@ -254,12 +254,12 @@
 
         <div class="form-field">
           <label>Số nhà, tên đường <span class="req">*</span></label>
-          <textarea id="custAddress" required rows="2" placeholder="Ví dụ: 12 Nguyễn Trãi, tổ 3"></textarea>
+          <textarea id="custAddress" required autocomplete="street-address" rows="2" maxlength="300" placeholder="Ví dụ: 12 Nguyễn Trãi, tổ 3"></textarea>
         </div>
 
         <div class="form-field">
           <label>Ghi chú đơn hàng (nếu có)</label>
-          <input type="text" id="custNote" placeholder="Ví dụ: Giao giờ hành chính, gọi trước khi giao">
+          <input type="text" id="custNote" maxlength="300" placeholder="Ví dụ: Giao giờ hành chính, gọi trước khi giao">
         </div>
 
         <div class="form-field" id="payMethodField">
@@ -450,11 +450,11 @@
 
   <!-- Toast Notification -->
   <!-- Tra cứu đơn hàng -->
-  <div class="modal-backdrop" id="trackModal">
+  <div class="modal-backdrop" id="trackModal" aria-hidden="true">
     <div class="modal-dialog checkout-dialog">
       <div class="modal-top flex-between">
         <h3><i class="fa-solid fa-magnifying-glass-location"></i> Tra Cứu Đơn Hàng</h3>
-        <button class="modal-close-icon" id="closeTrackBtn">&times;</button>
+        <button type="button" class="modal-close-icon" id="closeTrackBtn" aria-label="Đóng tra cứu đơn hàng">&times;</button>
       </div>
       <form id="trackForm" class="checkout-form">
         <div class="form-row">
