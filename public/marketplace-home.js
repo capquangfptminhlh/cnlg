@@ -40,6 +40,7 @@
     if (saved.has(id)) saved.delete(id); else saved.add(id);
     try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...saved])); } catch (_) { /* disabled storage */ }
     updateHeartButtons();
+    window.dispatchEvent(new Event('storefront:favorites-changed'));
   }
   function numericId(p) {
     const id = Number(p.id);
@@ -152,6 +153,12 @@
     new MutationObserver(updateMobileCartCount).observe(cartCountSource, {childList:true,characterData:true,subtree:true});
     updateMobileCartCount();
   }
+
+  // Keep all hearts consistent when a saved product is removed from the wishlist dialog.
+  window.addEventListener('storefront:favorite-write', () => {
+    saved = favorites();
+    updateHeartButtons();
+  });
 
   // The native product renderer emits the event after each successful product API refresh.
   // Also handle a restored view if integration loads the module after the product state.
