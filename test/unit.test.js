@@ -166,3 +166,17 @@ test('Admin: cùng 1 mật khẩu sai gửi nhiều lần chỉ tính 1 lần; 1
   assert.equal(call('sai-11'), 429);
   assert.equal(call('sai-1', '10.9.8.8'), 401); // IP khác không bị ảnh hưởng
 });
+
+test('Catalog: giá sỉ trong wholesale_price được dùng làm giá vốn khi base = wholesale', () => {
+  const scraper = require('../services/dropbuyScraper');
+  const pricing = require('../services/pricing');
+  const ctx = { rules: pricing.normalizeRules({ markupPercent: 15, base: 'wholesale', roundTo: 1000 }), rootMap: new Map() };
+  const item = { product_id: 141073, unique_id: 'var-1', price_public: 1000000, product_name: 'Bàn là', slug: 'ban-la' };
+  const p = scraper.mapItem(item, { ctx, priceMap: new Map([['var-1', { cost: 299000, source: 'F1' }]]) });
+  assert.equal(p.wholesale_price, 299000);
+  assert.equal(p.dropbuy_cost, 299000);
+  assert.equal(p.price, 344000); // 299.000 × 1,15 làm tròn lên 1.000
+  assert.equal(p.is_wholesale_price, true);
+  const noLogin = scraper.mapItem(item, { ctx, priceMap: new Map() });
+  assert.equal(noLogin.dropbuy_cost, 1000000);
+});

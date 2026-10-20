@@ -198,7 +198,8 @@ function mapItem(item, { ctx = getPricingContext(), priceMap, previous, keepWhol
 
 /** Tính lại giá bán của 1 SP theo quy tắc hiện tại (không cần gọi DropBuy). */
 function applyPricing(p, ctx = getPricingContext()) {
-  const r = pricing.computePrice(p, ctx.rules, ctx.rootMap);
+  // computePrice đọc giá sỉ ở trường `wholesale`; catalog lưu ở `wholesale_price`
+  const r = pricing.computePrice({ ...p, wholesale: p.wholesale_price }, ctx.rules, ctx.rootMap);
   p.price = r.price;
   p.original_price = r.original_price;
   p.dropbuy_cost = r.cost;
