@@ -398,3 +398,31 @@ body.is-overlay-open .store-to-top {visibility:hidden !important;}
   #productDetailModal .thumb-item,
   #checkoutModal .pay-option{transition:none !important;}
 }
+
+/* Mobile checkout overflow guard: preserve every field and total, no clipping. */
+@media(max-width:760px){
+  #checkoutModal .checkout-dialog{width:100%;max-width:100%;overflow-x:clip;box-sizing:border-box;}
+  #checkoutModal .checkout-form,#checkoutModal .checkout-form > *,
+  #checkoutModal .form-row,#checkoutModal .form-field,
+  #checkoutModal .pay-options,#checkoutModal .pay-option,
+  #checkoutModal .checkout-order-summary{
+    min-width:0;max-width:100%;box-sizing:border-box;
+  }
+  #checkoutModal .pay-option span{min-width:0;overflow-wrap:anywhere;}
+  #checkoutModal .checkout-actions {
+    width:calc(100% + 32px);
+    max-width:none;
+    box-sizing:border-box;
+    margin:0 -16px calc(-20px - env(safe-area-inset-bottom));
+    display:flex;min-width:0;
+  }
+  #checkoutModal .checkout-actions button {min-width:0;white-space:normal;line-height:1.35;}
+  #checkoutModal .checkout-actions .btn-ghost{flex:0 0 auto;padding:10px 13px;}
+  #checkoutModal .checkout-actions .btn-primary{flex:1 1 0;padding:10px 11px;}
+  #checkoutModal .summary-line,
+  #checkoutModal .summary-total-line {
+    flex-wrap:wrap;gap:4px 8px;overflow-wrap:anywhere;
+  }
+  #checkoutModal .summary-line > span:last-child,
+  #checkoutModal .summary-total-line > span:last-child{min-width:0;text-align:right;}
+}
