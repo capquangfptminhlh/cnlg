@@ -8,7 +8,8 @@
     "dev": "node --watch server.js",
     "sync": "node -e \"require('./services/dropbuyScraper').syncCatalog()\"",
     "test": "node --test test/unit.test.js",
-    "test:dropbuy": "node scripts/test-dropbuy-api.js"
+    "test:dropbuy": "node scripts/test-dropbuy-api.js",
+    "test:ui": "node --test test/storefront.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
