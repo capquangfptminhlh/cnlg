@@ -10,7 +10,7 @@ const pub=path.join(root,'public');
 const allowed=[
   'styles.css','marketplace.css','marketplace-v3.css','motion.css',
   'app.js','marketplace-home.js','favorites.js','motion.js',
-  'storefront-premium.css','storefront-premium.js'
+  'storefront-premium.css','storefront-premium.js','dialogs.js'
 ];
 fs.rmSync(dst,{recursive:true,force:true});
 fs.mkdirSync(dst,{recursive:true});
