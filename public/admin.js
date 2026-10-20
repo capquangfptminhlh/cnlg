@@ -713,6 +713,8 @@ async function loadShippingSettings() {
     if (!json.success) throw new Error(json.error);
     const { shipping, orders } = json.data;
     document.getElementById('shEnabled').checked = shipping.enabled;
+    document.getElementById('shMode').value = shipping.mode || 'live';
+    document.getElementById('shLiveExtra').value = shipping.liveExtra || 0;
     for (const [id, path] of Object.entries(SH_FIELDS)) document.getElementById(id).value = path.reduce((o, k) => o[k], shipping);
     document.getElementById('odTimeout').value = orders.paymentTimeoutMinutes;
     document.getElementById('odAlert').value = orders.reportedAlertHours;
@@ -731,7 +733,9 @@ document.getElementById('shippingForm').addEventListener('submit', async e => {
       includedWeightGram: val('shIncluded'),
       perExtraKg: val('shPerKg'),
       freeShipThreshold: val('shFree'),
-      defaultWeightGram: val('shDefaultWeight')
+      defaultWeightGram: val('shDefaultWeight'),
+      mode: document.getElementById('shMode').value,
+      liveExtra: val('shLiveExtra')
     },
     orders: { paymentTimeoutMinutes: val('odTimeout'), reportedAlertHours: val('odAlert') }
   };

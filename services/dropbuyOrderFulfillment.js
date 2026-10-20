@@ -45,13 +45,7 @@ function normalizeAutoOrder(raw = {}) {
 }
 
 const inFlight = new Set();
-let cartLock = Promise.resolve(); // giỏ DropBuy dùng chung → đặt lần lượt từng đơn
-
-function withCartLock(fn) {
-  const run = cartLock.then(fn, fn);
-  cartLock = run.catch(() => {});
-  return run;
-}
+const { withCartLock, snapshotCart, selectOnly, restoreCart, groupByDepot, shippingFor } = dropbuyCart;
 
 function emit(io, order, status, message) {
   if (!io) return;
@@ -91,49 +85,6 @@ function codPerDepot(order, depots) {
   return cods;
 }
 
-async function shippingFor(depot, receiver, cod, method, config) {
-  const first = depot.lines[0];
-  const allowV = depot.lines.every(l => l.allow_sm_v === 'T');
-  const allowS = depot.lines.every(l => l.allow_sm_s === 'T');
-  const candidates = method === 'V' ? ['V'] : method === 'S' ? ['S'] : ['V', 'S'];
-  const options = [];
-  for (const m of candidates) {
-    if ((m === 'V' && !allowV) || (m === 'S' && !allowS)) continue;
-    const r = await bff('/carts/get-shipping-fee', {
-      method: 'POST',
-      config,
-      body: {
-        cod_amount: cod,
-        order_type: 'N',
-        receiver_province_id: receiver.province_id,
-        receiver_district_id: 0,
-        receiver_ward_id: receiver.ward_id,
-        sender_province_id: first.province_id,
-        sender_district_id: first.district_id,
-        sender_ward_id: first.ward_id,
-        shipping_method: m,
-        shop_depot_code: depot.code
-      }
-    });
-    if (Number.isFinite(Number(r?.shipping_amount))) options.push({ method: m, fee: Number(r.shipping_amount) });
-  }
-  if (!options.length) throw new Error(`Kho ${depot.code} không có đơn vị vận chuyển phù hợp (${method}).`);
-  return options.sort((a, b) => a.fee - b.fee)[0];
-}
-
-async function restoreCart(before, ours, config) {
-  try {
-    const back = before.filter(c => ours.has(c.variation_id)).map(c => ({ variation_id: c.variation_id, quantity: c.quantity }));
-    if (back.length) await bff('/carts/set-quantity', { method: 'PUT', config, body: { items: back } });
-    const now = await bff('/carts/my-cart', { method: 'POST', config, body: {} });
-    const wasSelected = new Map(before.map(c => [c.variation_id, !!c.selected_for_checkout]));
-    const items = (now?.cart_items || []).map(c => ({ variation_id: c.variation_id, selected_for_checkout: wasSelected.get(c.variation_id) || false }));
-    if (items.length) await bff('/carts/set-selected-items', { method: 'PUT', config, body: { items } });
-  } catch (e) {
-    console.warn('[DropBuy] Không khôi phục được giỏ hàng cũ:', e.message);
-  }
-}
-
 /**
  * Đặt đơn dropship trên DropBuy, trừ quỹ. Ném lỗi kèm lý do nếu bị chặn; không bao giờ gửi lặp 1 đơn.
  */
@@ -154,34 +105,15 @@ async function placeOrderOnDropbuy(orderId, io, { manual = false } = {}) {
 
   inFlight.add(orderId);
   return withCartLock(async () => {
-    const ours = new Set(lines.map(i => i.variation_id));
     let before = null;
     let submitted = false;
     try {
-      // 1. Giỏ hiện tại (để khôi phục sau)
-      const cart0 = await bff('/carts/my-cart', { method: 'POST', config, body: {} });
-      before = (cart0?.cart_items || []).map(x => ({ variation_id: x.variation_id, quantity: Number(x.quantity) || 0, selected_for_checkout: !!x.selected_for_checkout }));
-
-      // 2. Đúng số lượng của đơn, chỉ chọn các món của đơn
-      await bff('/carts/set-quantity', { method: 'PUT', config, body: { items: lines.map(i => ({ variation_id: i.variation_id, quantity: i.quantity })) } });
-      const cart1 = await bff('/carts/my-cart', { method: 'POST', config, body: {} });
-      const sel = (cart1?.cart_items || []).map(x => ({ variation_id: x.variation_id, selected_for_checkout: ours.has(x.variation_id) }));
-      await bff('/carts/set-selected-items', { method: 'PUT', config, body: { items: sel } });
-      const cart = await bff('/carts/my-cart', { method: 'POST', config, body: {} });
-      const picked = (cart?.cart_items || []).filter(x => ours.has(x.variation_id));
-      for (const l of lines) {
-        const x = picked.find(p => p.variation_id === l.variation_id);
-        if (!x) throw new Error(`"${l.name}" không vào được giỏ DropBuy (hết hàng / ngừng bán?).`);
-        if (Number(x.quantity) !== l.quantity) throw new Error(`"${l.name}": giỏ DropBuy có ${x.quantity}, đơn cần ${l.quantity}.`);
-      }
+      // 1. Giỏ hiện tại (để khôi phục sau) → 2. đúng số lượng, chỉ chọn các món của đơn
+      before = await snapshotCart(config);
+      const picked = await selectOnly(lines, config);
 
       // 3. Gom theo kho, tính ship
-      const depotMap = new Map();
-      for (const x of picked) {
-        if (!depotMap.has(x.shop_depot_code)) depotMap.set(x.shop_depot_code, { code: x.shop_depot_code, lines: [] });
-        depotMap.get(x.shop_depot_code).lines.push({ ...x, selected_for_checkout: true });
-      }
-      const depots = [...depotMap.values()];
+      const depots = groupByDepot(picked);
       const cods = codPerDepot(order, depots);
       const receiver = { province_id: Number(c.province_id), ward_id: Number(c.ward_id) };
       for (let k = 0; k < depots.length; k++) {
@@ -267,7 +199,7 @@ async function placeOrderOnDropbuy(orderId, io, { manual = false } = {}) {
       notify.paymentIssue(`Đơn ${orderId}: chưa đặt được trên DropBuy – ${err.message}`);
       throw err;
     } finally {
-      if (before) await restoreCart(before, ours, config);
+      if (before) await restoreCart(before, lines, config);
       inFlight.delete(orderId);
     }
   });

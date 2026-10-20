@@ -827,18 +827,18 @@ async function updateCheckoutSummary() {
     return;
   }
   const seq = ++quoteSeq;
-  summaryShipping.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+  summaryShipping.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang hỏi phí ship từ kho...';
   try {
     const json = await (await fetch('/api/shipping/quote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ province, items: state.cart.map(i => ({ id: i.id, variation_id: i.variation_id, quantity: i.quantity })) })
+      body: JSON.stringify({ province, ward_id: Number(wardSelect.value) || null, items: state.cart.map(i => ({ id: i.id, variation_id: i.variation_id, quantity: i.quantity })) })
     })).json();
     if (seq !== quoteSeq) return;
     if (!json.success) throw new Error(json.error);
     const q = json.data;
     summaryShipping.innerText = q.fee === 0 ? 'Miễn phí' : formatPrice(q.fee);
-    summaryShippingNote.innerText = q.detail;
+    summaryShippingNote.innerText = q.source === 'dropbuy' ? `Phí thật từ kho: ${q.detail}` : q.detail;
     summaryTotal.innerText = formatPrice(subtotal + q.fee);
   } catch (e) {
     summaryShipping.innerText = 'Không tính được';
@@ -852,6 +852,7 @@ provinceSelect.addEventListener('change', () => {
   loadWards(provinceSelect.value);
   updateCheckoutSummary();
 });
+wardSelect.addEventListener('change', updateCheckoutSummary);
 
 function openCheckoutModal() {
   closeCartDrawer();

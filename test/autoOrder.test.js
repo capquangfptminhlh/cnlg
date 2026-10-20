@@ -12,6 +12,7 @@ const scraper = require('../services/dropbuyScraper');
 const orderStore = require('../services/orderStore');
 const fulfillment = require('../services/dropbuyOrderFulfillment');
 const session = require('../services/dropbuySession');
+const shippingLive = require('../services/shippingLive');
 
 let config;
 scraper.getConfig = () => config;
@@ -45,6 +46,11 @@ function fakeDropbuy({ balance = 5000000, cart = [], submit = 'ok', fee = 17000 
         const cur = state.cart.find(c => c.variation_id === it.variation_id);
         if (cur) cur.selected_for_checkout = it.selected_for_checkout;
       }
+      return ok({});
+    }
+    if (u.endsWith('/carts/delete-items')) {
+      const del = new Set(body.items.map(i => i.variation_id));
+      state.cart = state.cart.filter(c => !del.has(c.variation_id));
       return ok({});
     }
     if (u.endsWith('/carts/get-shipping-fee')) return ok({ shipping_method: body.shipping_method, shipping_amount: body.shipping_method === 'S' ? fee - 6000 : fee });
@@ -214,4 +220,32 @@ test('Hết phiên DropBuy → WAITING_DROPBUY_LOGIN, không gửi', async () =>
   await assert.rejects(fulfillment.placeOrderOnDropbuy(o.id, null), /đăng nhập/);
   assert.equal(orderStore.getOrderById(o.id).dropbuy_sync.status, 'WAITING_DROPBUY_LOGIN');
   assert.equal(db.submits.length, 0);
+});
+
+test('Báo phí ship thật: đúng phí kho rẻ nhất, giỏ shop trả về y nguyên, lần 2 lấy từ bộ nhớ', async () => {
+  shippingLive.clearCache();
+  const db = fakeDropbuy({ cart: [{ variation_id: 'var-x', quantity: 3, selected_for_checkout: true }, { variation_id: 'var-a', quantity: 5, selected_for_checkout: false }] });
+  const lines = [{ variation_id: 'var-a', quantity: 2 }, { variation_id: 'var-b', quantity: 1 }];
+  const q = await shippingLive.liveQuote({ lines, provinceId: 2, wardId: 49290, config });
+  assert.equal(q.depots.length, 2);
+  assert.equal(q.fee, 11000 + 11000); // kho A rẻ nhất SPX 11k, kho B chỉ SPX 11k
+  assert.equal(q.cached, false);
+  assert.equal(db.submits.length, 0); // báo giá không bao giờ đặt đơn
+  const byId = Object.fromEntries(db.cart.map(c => [c.variation_id, c]));
+  assert.deepEqual(Object.keys(byId).sort(), ['var-a', 'var-x']); // var-b chỉ thêm để báo giá → đã xoá
+  assert.equal(byId['var-a'].quantity, 5);
+  assert.equal(byId['var-a'].selected_for_checkout, false);
+  assert.equal(byId['var-x'].selected_for_checkout, true);
+  const calls = db.calls.length;
+  const q2 = await shippingLive.liveQuote({ lines: [...lines].reverse(), provinceId: 2, wardId: 49290, config });
+  assert.equal(q2.cached, true);
+  assert.equal(q2.fee, q.fee);
+  assert.equal(db.calls.length, calls);
+});
+
+test('Báo phí ship: chưa đăng nhập → lỗi 401 để server dùng bảng phí ước tính', async () => {
+  shippingLive.clearCache();
+  fakeDropbuy();
+  global.fetch = async () => ({ ok: true, status: 200, json: async () => ({}) });
+  await assert.rejects(shippingLive.liveQuote({ lines: [{ variation_id: 'var-a', quantity: 1 }], provinceId: 2, wardId: 49290, config }), e => e.code === 401);
 });

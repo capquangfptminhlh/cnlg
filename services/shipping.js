@@ -7,7 +7,9 @@
  *   includedWeightGram: 1000,     // khối lượng đã gồm trong phí cơ bản
  *   perExtraKg: 5000,             // phụ phí mỗi kg (hoặc phần lẻ) vượt mức
  *   freeShipThreshold: 500000,    // đơn từ mức này được miễn phí ship (0 = tắt)
- *   defaultWeightGram: 500        // khối lượng giả định khi chưa biết khối lượng SP
+ *   defaultWeightGram: 500,       // khối lượng giả định khi chưa biết khối lượng SP
+ *   mode: 'live',                 // 'live' = phí thật của DropBuy theo kho + phường (cần đăng nhập), 'flat' = bảng phí trên
+ *   liveExtra: 0                  // cộng thêm vào phí DropBuy (vd phí đóng gói); 0 = thu đúng phí DropBuy
  * }
  */
 
@@ -24,7 +26,7 @@ const PROVINCES = [
 ];
 const REGION_LABEL = { north: 'Miền Bắc', central: 'Miền Trung', south: 'Miền Nam' };
 
-const DEFAULTS = { enabled: true, fees: { north: 25000, central: 35000, south: 30000 }, includedWeightGram: 1000, perExtraKg: 5000, freeShipThreshold: 500000, defaultWeightGram: 500 };
+const DEFAULTS = { enabled: true, fees: { north: 25000, central: 35000, south: 30000 }, includedWeightGram: 1000, perExtraKg: 5000, freeShipThreshold: 500000, defaultWeightGram: 500, mode: 'live', liveExtra: 0 };
 
 function n(v, def, min = 0) {
   const x = Number(v);
@@ -39,7 +41,9 @@ function normalizeShipping(raw = {}) {
     includedWeightGram: n(r.includedWeightGram, DEFAULTS.includedWeightGram, 1),
     perExtraKg: n(r.perExtraKg, DEFAULTS.perExtraKg),
     freeShipThreshold: n(r.freeShipThreshold, DEFAULTS.freeShipThreshold),
-    defaultWeightGram: n(r.defaultWeightGram, DEFAULTS.defaultWeightGram, 1)
+    defaultWeightGram: n(r.defaultWeightGram, DEFAULTS.defaultWeightGram, 1),
+    mode: r.mode === 'flat' ? 'flat' : 'live',
+    liveExtra: n(r.liveExtra, DEFAULTS.liveExtra)
   };
 }
 

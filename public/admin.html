@@ -278,6 +278,14 @@
         <div class="form-group checkbox-group" style="grid-column: 1 / -1;">
           <label><input type="checkbox" id="shEnabled"> <strong>Tính phí vận chuyển cho khách</strong> (bỏ chọn = miễn phí ship mọi đơn)</label>
         </div>
+        <div class="form-group"><label>Cách tính phí ship</label>
+          <select id="shMode">
+            <option value="live">Phí thật của DropBuy theo kho + phường (khuyên dùng)</option>
+            <option value="flat">Bảng phí cố định bên dưới</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Cộng thêm vào phí DropBuy (đ)</label><input type="number" id="shLiveExtra" min="0" step="1000"></div>
+        <div class="form-group" style="grid-column: 1 / -1;"><small class="help-text">Phí thật: hỏi DropBuy đúng các món + phường của khách (cần đăng nhập DropBuy; nhớ 30 phút). Khi chưa đăng nhập hoặc DropBuy lỗi, tự dùng bảng phí cố định và ghi "ước tính". Bảng phí dưới đây là phương án dự phòng.</small></div>
         <div class="form-group"><label>Phí cơ bản – Miền Bắc (đ)</label><input type="number" id="shNorth" min="0" step="1000"></div>
         <div class="form-group"><label>Phí cơ bản – Miền Trung (đ)</label><input type="number" id="shCentral" min="0" step="1000"></div>
         <div class="form-group"><label>Phí cơ bản – Miền Nam (đ)</label><input type="number" id="shSouth" min="0" step="1000"></div>

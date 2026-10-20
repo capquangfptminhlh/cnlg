@@ -27,6 +27,45 @@ const reports = require('./services/reports');
 const dropbuyOrderFulfillment = require('./services/dropbuyOrderFulfillment');
 const vnAddress = require('./services/vnAddress');
 const dropbuySession = require('./services/dropbuySession');
+const shippingLive = require('./services/shippingLive');
+
+const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
+/**
+ * Phí ship tính cho khách. Mặc định = phí thật DropBuy báo cho đúng các món + phường nhận (+ liveExtra),
+ * miễn phí nếu đạt ngưỡng (shop chịu). Không lấy được (chưa đăng nhập / DropBuy lỗi) → bảng phí cố định, ghi "ước tính".
+ * lines: [{ variation_id, quantity, name, weight_gram }]
+ */
+async function quoteShipping({ province, wardId, subtotal, lines, cfg = readConfig() }) {
+  const rules = shipping.normalizeShipping(cfg.shipping);
+  const flat = note => {
+    const q = shipping.quote({ province, subtotal, lines }, cfg.shipping);
+    return { ...q, source: 'flat', detail: note && !q.free_ship ? `${q.detail} (ước tính)` : q.detail, live_error: note || null };
+  };
+  if (rules.mode !== 'live' || !rules.enabled) return flat();
+  if (!wardId) return flat('chọn phường/xã để tính phí thật');
+  try {
+    const addr = await vnAddress.resolve(province, wardId);
+    if (!addr) return flat('phường/xã không hợp lệ');
+    const live = await shippingLive.liveQuote({
+      lines: lines.map(l => ({ variation_id: l.variation_id, quantity: l.quantity, name: l.name })),
+      provinceId: addr.province.id,
+      wardId: addr.ward.id,
+      codAmount: subtotal,
+      method: dropbuyOrderFulfillment.normalizeAutoOrder(cfg.autoOrder).shippingMethod,
+      config: cfg
+    });
+    const carriers = [...new Set(live.depots.map(d => CARRIER[d.method] || d.method))].join(' + ');
+    const base = { source: 'dropbuy', region: shipping.regionOf(province), weight_gram: live.weight_gram, live: { fee: live.fee, depots: live.depots, quoted_at: new Date().toISOString() } };
+    if (rules.freeShipThreshold > 0 && subtotal >= rules.freeShipThreshold) {
+      return { ...base, fee: 0, free_ship: true, detail: `Miễn phí ship cho đơn từ ${rules.freeShipThreshold.toLocaleString('vi-VN')} đ` };
+    }
+    const fee = live.fee + rules.liveExtra;
+    return { ...base, fee, free_ship: false, detail: `${carriers}${live.depots.length > 1 ? ` – ${live.depots.length} kho` : ''}${live.weight_gram ? `, ${(live.weight_gram / 1000).toLocaleString('vi-VN')} kg` : ''}` };
+  } catch (e) {
+    console.warn('[Ship] Không lấy được phí ship DropBuy:', e.message);
+    return flat(e.code === 401 ? 'chưa kết nối kho' : 'kho chưa phản hồi');
+  }
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -291,18 +330,19 @@ async function priceCartLines(items) {
     const vs = await variants.variantsWithPrices(p, detail).catch(() => []);
     const v = vs.find(x => x.id === it.variation_id) || vs.find(x => x.id === p.variation_id) || (vs.length === 1 ? vs[0] : null);
     if (v) { price = v.price; weight = v.weight_gram; }
-    lines.push({ id: p.id, variation_id: it.variation_id || null, quantity: qty, price, weight_gram: weight });
+    lines.push({ id: p.id, name: p.name, variation_id: v?.id || it.variation_id || p.variation_id || null, quantity: qty, price, weight_gram: weight });
   }
   return lines;
 }
 
-app.post('/api/shipping/quote', rateLimit('quote', 10 * 60e3, 200), async (req, res) => {
+app.post('/api/shipping/quote', rateLimit('quote', 10 * 60e3, 60), async (req, res) => {
   try {
-    const { province, items } = req.body || {};
+    const { province, items, ward_id } = req.body || {};
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ success: false, error: 'Giỏ hàng trống' });
+    if (!shipping.regionOf(province)) return res.status(400).json({ success: false, error: 'Vui lòng chọn Tỉnh/Thành phố nhận hàng hợp lệ.' });
     const lines = await priceCartLines(items.slice(0, 30));
     const subtotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
-    const q = shipping.quote({ province, subtotal, lines }, readConfig().shipping);
+    const q = await quoteShipping({ province, wardId: Number(ward_id) || null, subtotal, lines });
     res.json({ success: true, data: { subtotal, shipping_fee: q.fee, total: subtotal + q.fee, ...q } });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -376,7 +416,8 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       return { id: line.id, sku: r.sku, variation_id: r.variation_id, variant_name: r.variant_name || null, name: p.name, price: r.price, quantity: line.quantity, image: p.image, weight_gram: r.weight_gram || 0, dropbuy_url: p.dropbuy_url, dropbuy_cost: r.cost, cost_is_wholesale: !!r.cost_is_wholesale, live_verified: r.live };
     });
     const subtotal = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
-    const ship = shipping.quote({ province, subtotal, lines: orderItems }, readConfig().shipping);
+    // Cùng cách tính với lúc khách xem (phí DropBuy thật được nhớ 30 phút) → khách trả đúng số đã thấy
+    const ship = await quoteShipping({ province, wardId: addr.ward.id, subtotal, lines: orderItems });
     const total_amount = subtotal + ship.fee;
     if (paymentMethod === 'COD' && total_amount > payOpts.cod.maxTotal) {
       return res.status(400).json({ success: false, error: `Đơn trên ${payOpts.cod.maxTotal.toLocaleString('vi-VN')} đ vui lòng chọn chuyển khoản.` });
@@ -391,7 +432,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       total_amount,
       payment_method: paymentMethod
     });
-    orderStore.updateOrder(order.id, { subtotal, shipping_fee: ship.fee, shipping_detail: ship.detail, weight_gram: ship.weight_gram, live_verified: orderItems.every(i => i.live_verified) });
+    orderStore.updateOrder(order.id, { subtotal, shipping_fee: ship.fee, shipping_detail: ship.detail, shipping_source: ship.source, shipping_live: ship.live || null, weight_gram: ship.weight_gram, live_verified: orderItems.every(i => i.live_verified) });
     order.subtotal = subtotal;
     order.shipping_fee = ship.fee;
     console.log(`[Order] Đã tiếp nhận đơn hàng #${order.id}: ${subtotal.toLocaleString('vi-VN')} đ + ship ${ship.fee.toLocaleString('vi-VN')} đ`);
