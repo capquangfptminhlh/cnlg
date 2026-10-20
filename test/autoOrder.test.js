@@ -250,3 +250,12 @@ test('Báo phí ship: chưa đăng nhập → lỗi 401 để server dùng bản
   global.fetch = async () => ({ ok: true, status: 200, json: async () => ({}) });
   await assert.rejects(shippingLive.liveQuote({ lines: [{ variation_id: 'var-a', quantity: 1 }], provinceId: 2, wardId: 49290, config }), e => e.code === 401);
 });
+
+test('Hạn mức ngày không tính đơn đã huỷ (đã hoàn quỹ)', () => {
+  const now = new Date().toISOString();
+  const orders = [
+    { status: 'PROCESSING', dropbuy_sync: { status: 'ORDERED', ordered_at: now, spend: 100000 } },
+    { status: 'CANCELLED', dropbuy_sync: { status: 'ORDERED', ordered_at: now, spend: 28000, current_status: 'C' } }
+  ];
+  assert.equal(fulfillment.spentToday(orders), 100000);
+});

@@ -68,7 +68,8 @@ function spentToday(orders = orderStore.getOrders()) {
   const today = vnDate();
   return orders.reduce((s, o) => {
     const d = o.dropbuy_sync;
-    return d?.status === 'ORDERED' && d.ordered_at && vnDate(new Date(d.ordered_at)) === today ? s + (d.spend || 0) : s;
+    // Đơn đã huỷ trên DropBuy được hoàn quỹ → không tính vào hạn mức ngày
+    return d?.status === 'ORDERED' && o.status !== 'CANCELLED' && d.current_status !== 'C' && d.ordered_at && vnDate(new Date(d.ordered_at)) === today ? s + (d.spend || 0) : s;
   }, 0);
 }
 
