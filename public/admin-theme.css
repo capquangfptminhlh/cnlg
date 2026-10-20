@@ -1,0 +1,279 @@
+/* ==========================================================================
+   ADMIN – giao diện đồng bộ với trang chủ (nền sáng, cam #ef4d31, Be Vietnam Pro)
+   Nạp SAU styles.css, chỉ dùng cho admin.html. Màu viết thẳng trong admin.js/html
+   (thiết kế cho nền tối cũ) được đổi sang bản đọc rõ trên nền sáng ở cuối file.
+   ========================================================================== */
+:root {
+  --shop-bg: #f6f7fb;
+  --bg-base: #f6f7fb;
+  --bg-surface: #f8f9fc;
+  --bg-card: #ffffff;
+  --bg-card-hover: #ffffff;
+  --bg-input: #ffffff;
+  --bg-overlay: rgba(27, 35, 48, .58);
+  --gold: #ef4d31;
+  --gold-light: #ff775d;
+  --gold-dim: #fff1eb;
+  --gold-glow: 0 3px 16px rgba(238, 77, 45, .16);
+  --accent: #ef4d31;
+  --accent-dim: rgba(238, 77, 45, .1);
+  --text-primary: #222734;
+  --text-secondary: #5d6779;
+  --text-muted: #667085;
+  --border: #e9ebf1;
+  --border-gold: #f6c9bd;
+  --radius-sm: 8px;
+  --radius: 11px;
+  --radius-lg: 16px;
+  --shadow-card: 0 4px 18px rgba(30, 38, 65, .04);
+  --shadow-hover: 0 10px 28px rgba(33, 43, 66, .10);
+  --font: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+
+  --ok: #067647;
+  --ok-bg: #ecfdf3;
+  --ok-border: #abefc6;
+  --warn: #b54708;
+  --warn-bg: #fffaeb;
+  --warn-border: #fedf89;
+  --bad: #d92d20;
+  --bad-bg: #fef3f2;
+  --bad-border: #fecdca;
+}
+
+.admin-body {
+  background: var(--shop-bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+}
+
+/* ---------- Header: cùng dải gradient của trang chủ ---------- */
+.admin-header {
+  background: linear-gradient(100deg, #ff542e 0%, #f94b2e 52%, #f43b30 100%);
+  backdrop-filter: none;
+  border-bottom: 0;
+  box-shadow: 0 3px 16px rgba(225, 64, 34, .13);
+  padding: 12px 0;
+}
+.admin-header .brand-logo { color: #fff; font-weight: 900; letter-spacing: .2px; }
+.admin-header .logo-bold, .admin-header .logo-accent { color: #fff !important; -webkit-text-fill-color: #fff; background: none; }
+.admin-tag {
+  background: rgba(255, 255, 255, .18);
+  border: 1px solid rgba(255, 255, 255, .35);
+  color: #fff;
+}
+.btn-back-store {
+  background: #fff;
+  border: 1px solid #fff;
+  color: #e5402a;
+  font-weight: 700;
+}
+.btn-back-store:hover { color: #c8321f; border-color: #fff; box-shadow: 0 4px 14px rgba(120, 30, 10, .18); }
+
+.admin-main { padding-top: 22px; }
+
+/* ---------- Thẻ & khối ---------- */
+.stat-card, .admin-action-bar, .admin-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+.stat-card:hover { border-color: var(--border-gold); box-shadow: var(--shadow-hover); }
+.stat-card::before { background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+.stat-icon { background: var(--gold-dim); border: 1px solid var(--border-gold); color: var(--gold); }
+.stat-label { color: var(--text-muted); }
+.stat-val { color: var(--text-primary); }
+.stat-val.price { color: var(--gold); }
+.stat-val.status-online { color: var(--ok); }
+
+.admin-card h3, .admin-action-bar h3 { color: var(--text-primary); font-weight: 800; }
+.admin-card h3 i, .admin-action-bar h3 i { color: var(--gold) !important; }
+.admin-card h4 {
+  color: var(--text-primary);
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.admin-card h4 i { color: var(--gold); }
+.admin-card details summary { color: var(--text-secondary) !important; }
+.help-text { color: var(--text-muted); }
+.divider { border-top-color: var(--border); }
+
+/* ---------- Form ---------- */
+.form-group label, .pricing-field > span { color: var(--text-secondary); font-weight: 600; }
+.form-group input, .form-group select, .form-group textarea,
+.pricing-field input, .pricing-field select,
+.admin-card input[type="text"], .admin-card input[type="number"], .admin-card input[type="password"],
+.admin-card input[type="search"], .admin-card select, .admin-card textarea {
+  background: #fff;
+  border: 1px solid #d9dee8;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus,
+.admin-card input:focus, .admin-card select:focus, .admin-card textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(239, 77, 49, .12);
+}
+.admin-card input::placeholder, .admin-card textarea::placeholder { color: #98a2b3; }
+.checkbox-group label { color: var(--text-primary); }
+.admin-body input[type="checkbox"], .admin-body input[type="radio"] { accent-color: var(--gold); }
+
+/* ---------- Nút: cam đặc như nút chính trang chủ ---------- */
+.btn-sync-now, .btn-submit, .admin-body .btn.btn-primary {
+  background: var(--gold) !important;
+  background-image: none !important;
+  color: #fff !important;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  box-shadow: none;
+}
+.btn-sync-now:hover:not(:disabled), .btn-submit:hover, .admin-body .btn.btn-primary:hover {
+  background: #db3d27 !important;
+  filter: none;
+  box-shadow: 0 4px 14px rgba(239, 77, 49, .25);
+}
+.admin-body .btn.btn-outline, .btn-ghost {
+  background: #fff;
+  border: 1px solid #d9dee8;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+}
+.admin-body .btn.btn-outline:hover, .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+.btn-check-paid {
+  background: var(--ok-bg);
+  border: 1px solid var(--ok-border);
+  color: var(--ok);
+  font-weight: 700;
+}
+.btn-check-paid:hover { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+/* ---------- Bảng ---------- */
+.orders-table-wrapper { border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; }
+.orders-table th {
+  background: #f8f9fc;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+.orders-table td { color: var(--text-primary); border-bottom: 1px solid #f0f2f6; }
+.orders-table tr:hover td { background: #fffaf7; }
+.orders-table code { background: var(--gold-dim); border: 1px solid var(--border-gold); color: #c8321f; }
+.order-items-cell { color: var(--text-secondary); }
+.order-items-cell a { color: var(--gold) !important; }
+
+/* ---------- Nhãn trạng thái ---------- */
+.status-pill { font-weight: 700; }
+.status-pill.paid { background: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok); }
+.status-pill.pending { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn); }
+.status-pill.reported { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn); }
+.status-pill.cancelled { background: #f2f4f7; border: 1px solid #e4e7ec; color: #667085; }
+.auth-badge { font-weight: 700; }
+.badge-connected { background: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok); }
+.badge-disconnected { background: var(--bad-bg); border: 1px solid var(--bad-border); color: var(--bad); }
+
+/* ---------- Giá bán, báo cáo, tự đặt đơn ---------- */
+.pricing-stat { background: #f8f9fc; border: 1px solid var(--border); }
+.pricing-stat span { color: var(--text-muted); }
+.pricing-stat strong { color: var(--gold); }
+.pricing-cat { color: var(--text-primary); }
+.pricing-cat small { color: var(--text-muted); }
+.pricing-pagination { color: var(--text-muted); }
+.report-box { background: #f8f9fc; border: 1px solid var(--border); }
+.report-label { color: var(--text-muted); }
+.report-value { color: var(--gold); }
+.report-sub { color: var(--text-secondary); }
+.report-chart { background: #f8f9fc; }
+.report-bar { background: linear-gradient(180deg, #ff775d, #ef4d31); }
+
+/* ---------- Màu viết thẳng trong mã (thiết kế cho nền tối) → bản đọc rõ trên nền sáng ---------- */
+.admin-body [style*="color:#94a3b8"], .admin-body [style*="color: #94a3b8"],
+.admin-body [style*="color:#9ca3af"], .admin-body [style*="color: #9ca3af"],
+.admin-body [style*="color:#64748b"], .admin-body [style*="color: #64748b"],
+.admin-body [style*="color:#6b7280"], .admin-body [style*="color: #6b7280"] { color: var(--text-muted) !important; }
+.admin-body [style*="color:#cbd5e1"], .admin-body [style*="color: #cbd5e1"],
+.admin-body [style*="color:#e2e8f0"], .admin-body [style*="color: #e2e8f0"] { color: var(--text-secondary) !important; }
+.admin-body [style*="color:#c9a84c"], .admin-body [style*="color: #c9a84c"] { color: var(--gold) !important; }
+.admin-body [style*="color:#10b981"], .admin-body [style*="color: #10b981"],
+.admin-body [style*="color:#4caf6e"], .admin-body [style*="color: #4caf6e"] { color: var(--ok) !important; }
+.admin-body [style*="color:#f59e0b"], .admin-body [style*="color: #f59e0b"] { color: var(--warn) !important; }
+.admin-body [style*="color:#ef4444"], .admin-body [style*="color: #ef4444"] { color: var(--bad) !important; }
+.admin-body [style*="color:#38bdf8"], .admin-body [style*="color: #38bdf8"] { color: #026aa2 !important; }
+.admin-body [style*="background:#0f172a"], .admin-body [style*="background: #0f172a"],
+.admin-body [style*="background:#334155"], .admin-body [style*="background: #334155"] { background: #f8f9fc !important; color: var(--text-primary) !important; }
+.admin-body [style*="background:#f59e0b"], .admin-body [style*="background: #f59e0b"] { background: var(--gold) !important; color: #fff !important; }
+/* khung cảnh báo đỏ / vàng dùng rgba trên nền tối */
+.admin-body [style*="rgba(239,68,68,.15)"], .admin-body [style*="rgba(239, 68, 68, 0.15)"] {
+  background: var(--bad-bg) !important; border-color: var(--bad-border) !important; color: var(--bad) !important;
+}
+.admin-body [style*="rgba(245, 158, 11, 0.15)"], .admin-body [style*="rgba(245,158,11,.15)"] {
+  background: var(--warn-bg) !important; border-color: var(--warn-border) !important; color: var(--warn) !important;
+}
+.admin-body [style*="rgba(76, 175, 110, 0.15)"], .admin-body [style*="rgba(16, 185, 129, 0.15)"] {
+  background: var(--ok-bg) !important; border-color: var(--ok-border) !important; color: var(--ok) !important;
+}
+.admin-body code { color: #c8321f; }
+
+/* ---------- Mobile ---------- */
+@media (max-width: 640px) {
+  .admin-header .container { gap: 8px; }
+  .admin-tag { display: none; }
+  .btn-back-store { padding: 7px 12px; font-size: 12px; }
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stat-card { padding: 14px; gap: 10px; }
+  .stat-icon { width: 38px; height: 38px; font-size: 16px; }
+  .stat-val { font-size: 18px; }
+  .admin-card, .admin-action-bar { padding: 16px; }
+}
+
+/* Khung đăng nhập DropBuy (gradient tối viết thẳng trong HTML) */
+.admin-body .admin-card[style*="linear-gradient"] {
+  background: #fff !important;
+  border: 1px solid var(--border-gold) !important;
+  box-shadow: 0 0 0 3px var(--gold-dim), var(--shadow-card);
+}
+.admin-body [style*="rgba(15, 23, 42"], .admin-body [style*="rgba(15,23,42"] { background: #f8f9fc !important; }
+.admin-body [style*="rgba(255,255,255,.04)"], .admin-body [style*="rgba(255,255,255,.03)"] { background: #f8f9fc !important; }
+
+/* Màu do admin.js gán qua element.style → trình duyệt lưu dạng rgb() */
+.admin-body [style*="color: rgb(16, 185, 129)"] { color: var(--ok) !important; }
+.admin-body [style*="color: rgb(239, 68, 68)"] { color: var(--bad) !important; }
+.admin-body [style*="color: rgb(245, 158, 11)"] { color: var(--warn) !important; }
+.admin-body [style*="color: rgb(148, 163, 184)"], .admin-body [style*="color: rgb(156, 163, 175)"] { color: var(--text-muted) !important; }
+.admin-body [style*="background: rgba(16, 185, 129, 0.15)"] { background: var(--ok-bg) !important; border-color: var(--ok-border) !important; }
+.admin-body [style*="background: rgba(239, 68, 68, 0.15)"] { background: var(--bad-bg) !important; border-color: var(--bad-border) !important; }
+.admin-body [style*="background: rgba(245, 158, 11, 0.15)"] { background: var(--warn-bg) !important; border-color: var(--warn-border) !important; }
+
+/* Bảng đơn: không ép chữ xuống từng dòng – giữ bề rộng tối thiểu, cuộn ngang trong khung */
+.orders-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.orders-table { min-width: 920px; }
+.orders-table th { white-space: nowrap; }
+.orders-table td { vertical-align: top; }
+.order-items-cell { min-width: 220px; }
+/* Phần tử con của lưới không được nở theo bảng (để bảng cuộn trong khung thay vì làm tràn trang) */
+.admin-two-cols > *, .admin-card, .stats-grid > *, .pricing-grid > *, .report-grid > * { min-width: 0; }
+.admin-body { overflow-x: clip; } /* clip: không tạo khung cuộn nên header sticky vẫn chạy */
+
+/* Ô cài đặt: nhãn ở trên, ô nhập bên dưới (ô tick vẫn nằm cùng dòng với chữ) */
+.pricing-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.pricing-field > span { display: flex; align-items: center; gap: 8px; }
+.pricing-field > input, .pricing-field > select { width: 100%; padding: 9px 11px; font-size: 13px; }
+.pricing-field small { font-size: 12px; }
+
+/* ---------- Mobile: thẻ thống kê gọn, tiêu đề không bị ép, nút xếp dọc ---------- */
+@media (max-width: 640px) {
+  .stat-icon { display: none; }
+  .stat-card { padding: 12px 14px; }
+  .stat-label { font-size: 10.5px; letter-spacing: .2px; }
+  .stat-val { font-size: 17px; overflow-wrap: anywhere; }
+  .stat-val.status-online { font-size: 15px; }
+  .admin-main .flex-between { flex-wrap: wrap; gap: 8px; }
+  .admin-main .flex-between > h3, .admin-main .flex-between > div:first-child { min-width: 0; flex: 1 1 100%; }
+  .admin-card h3, .admin-action-bar h3 { font-size: 16px; }
+  .admin-action-bar .btn-sync-now, .admin-action-bar button { width: 100%; justify-content: center; }
+  .admin-action-bar > div:last-child, .admin-action-bar [style*="display: flex"] { flex-wrap: wrap; width: 100%; }
+  .auth-badge { max-width: 100%; overflow-wrap: anywhere; }
+}
