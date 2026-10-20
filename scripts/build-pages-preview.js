@@ -48,7 +48,7 @@ app=app.replace(
 );
 fs.writeFileSync(path.join(dst,'app.js'),app);
 
-const demoCss=String.raw\`
+const demoCss=String.raw`
 .pages-demo-ribbon {
   position:relative;z-index:1001;width:100%;display:flex;justify-content:center;align-items:center;
   gap:12px;text-align:center;padding:8px 12px;background:#1e293b;color:#fff;font:600 12px/1.5 system-ui,sans-serif;
@@ -65,7 +65,7 @@ body[data-demo-mode="true"] .btn-confirm-transfer {display:none;}
  .pages-demo-ribbon {gap:5px;flex-wrap:wrap;font-size:10px;}
  .pages-demo-ribbon strong {font-size:10px;}
 }
-\`;
+`;
 fs.writeFileSync(path.join(dst,'pages-preview.css'),demoCss);
 const expected=['index.html','pages-preview.js','pages-preview.css','.nojekyll',...allowed];
 assert.deepEqual(fs.readdirSync(dst).sort(),expected.sort(),'unexpected site contents');
