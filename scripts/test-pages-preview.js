@@ -145,6 +145,7 @@ const puppeteer=require('puppeteer-core');
     await page.waitForFunction(()=>document.getElementById('productDetailModal').classList.contains('open'),{timeout:10000});
     await page.keyboard.press('Escape');
     await page.waitForFunction(()=>!document.getElementById('productDetailModal').classList.contains('open'));
+    console.log('Modal checkpoint afterDetail:',JSON.stringify(await page.evaluate(()=>({className:document.getElementById('productDetailModal').className,hash:location.hash,path:location.pathname,display:getComputedStyle(document.getElementById('productDetailModal')).display}))));
     console.log('Autocomplete keyboard & real product details: PASS');
 
     await page.click('#searchClearBtn');
@@ -156,6 +157,7 @@ const puppeteer=require('puppeteer-core');
     await page.screenshot({path:join(screenshots,'cart.png')});
     await page.keyboard.press('Escape');
     await page.waitForFunction(()=>!document.getElementById('cartDrawer').classList.contains('open'));
+    console.log('Modal checkpoint afterCart:',JSON.stringify(await page.evaluate(()=>({className:document.getElementById('productDetailModal').className,hash:location.hash,path:location.pathname,display:getComputedStyle(document.getElementById('productDetailModal')).display}))));
     console.log('Cart + keyboard close: PASS');
 
     await page.click('#productGrid .card-heart');
@@ -165,6 +167,7 @@ const puppeteer=require('puppeteer-core');
     await page.screenshot({path:join(screenshots,'favorites.png')});
     await page.keyboard.press('Escape');
     await page.waitForFunction(()=>!document.getElementById('favoritesModal').classList.contains('open'));
+    console.log('Modal checkpoint afterFavorites:',JSON.stringify(await page.evaluate(()=>({className:document.getElementById('productDetailModal').className,hash:location.hash,path:location.pathname,display:getComputedStyle(document.getElementById('productDetailModal')).display}))));
     console.log('Favorites: PASS');
 
     await page.setViewport({width:390,height:844,deviceScaleFactor:2,isMobile:true,hasTouch:true});
