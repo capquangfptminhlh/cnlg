@@ -75,7 +75,7 @@ const puppeteer=require('puppeteer-core');
     console.log('Search: PASS');
 
     await page.click('#searchClearBtn');
-    await page.waitForFunction(()=>state.searchQuery==='');
+    await page.waitForFunction(()=>state.searchQuery==='' && state.products.length>10 && document.getElementById('catalogCount').getAttribute('aria-busy')==='false');
     await page.waitForSelector('#productGrid .btn-add-mini:not([disabled])');
     await page.click('#productGrid .btn-add-mini:not([disabled])');
     await page.waitForFunction(()=>document.getElementById('cartDrawer').classList.contains('open'));
