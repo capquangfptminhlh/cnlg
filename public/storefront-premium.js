@@ -12,33 +12,50 @@
     document.getElementById('heroProductImageC')
   ].filter(Boolean);
   let generation=0;
-  const abortImage = (img) => {
-    if(!img || !img.isConnected) return;
+  function createPictureLabel(img) {
     const card=img.closest('.luxury-card,.featured-card');
     const container=img.closest('.card-media,.featured-media');
-    if(!container || container.querySelector('.premium-image-fallback')) return;
+    if(!container)return null;
+    let fallback=container.querySelector('.premium-image-fallback');
+    if(fallback)return fallback;
     const name=card?.querySelector('.card-title,.featured-name')?.textContent?.trim()||'Sản phẩm đang cập nhật ảnh';
-    const fallback=document.createElement('div');
+    fallback=document.createElement('div');
     fallback.className='premium-image-fallback';
     fallback.setAttribute('role','img');
-    fallback.setAttribute('aria-label','Ảnh sản phẩm chưa khả dụng: '+name);
+    fallback.setAttribute('aria-label','Ảnh minh họa chưa khả dụng: '+name);
     const icon=document.createElement('i');
     icon.className='fa-solid fa-box-open';
     icon.setAttribute('aria-hidden','true');
     const title=document.createElement('strong');
     title.textContent=name;
     const hint=document.createElement('small');
-    hint.textContent='ĐANG CẬP NHẬT ẢNH';
+    hint.textContent='HÌNH ẢNH SẢN PHẨM';
     fallback.append(icon,title,hint);
-    img.remove();
     const overlay=container.querySelector('.card-quick-overlay');
     container.insertBefore(fallback,overlay||null);
-  };
+    return fallback;
+  }
   function trackImage(img) {
     if(pending.has(img))return;
     pending.add(img);
-    img.addEventListener('error',()=>abortImage(img),{once:true});
-    if(img.complete&&!img.naturalWidth)abortImage(img);
+    if(img.complete&&img.naturalWidth>0)return;
+    const placeholder=createPictureLabel(img);
+    img.classList.add('picture-pending');
+    const onLoaded=()=>{
+      img.classList.remove('picture-pending');
+      placeholder?.remove();
+    };
+    const onError=()=>{
+      // Keep the identified placeholder but remove a broken image icon.
+      img.remove();
+      if(placeholder)placeholder.querySelector('small').textContent='ẢNH CHƯA KHẢ DỤNG';
+    };
+    img.addEventListener('load',onLoaded,{once:true});
+    img.addEventListener('error',onError,{once:true});
+    if(img.complete) {
+      if(img.naturalWidth>0)onLoaded();
+      else onError();
+    }
   }
   function observeCards() {
     document.querySelectorAll('#productGrid .card-media img,#featuredProducts .featured-media img')
