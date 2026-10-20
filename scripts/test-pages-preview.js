@@ -1,6 +1,6 @@
 'use strict';
-/* Test the exact GitHub Pages artifact in headless Chrome using synthetic data.
-   Does not connect to the live shop or perform any real checkout. */
+/* Test cached real retail catalog on GitHub Pages in headless Chrome.
+   No real API, payments, or customer records are used. */
 const assert=require('node:assert/strict');
 const {createServer}=require('node:http');
 const {readFileSync,existsSync,mkdirSync}=require('node:fs');
@@ -10,6 +10,20 @@ const puppeteer=require('puppeteer-core');
 (async()=>{
   const directory=resolve(__dirname,'..','.pages-preview-dist');
   const screenshots=resolve(__dirname,'..','preview-test-artifacts');
+  const snapshotData=JSON.parse(readFileSync(join(directory,'products-public.json'),'utf8'));
+  assert.ok(snapshotData.products.length>100,'complete cached catalog should be available');
+  assert.ok(snapshotData.categories.length>10,'real category tree should be available');
+  const matchingCat=snapshotData.categories.find(c=>c.parent_id===null&&c.product_count>0);
+  assert.ok(matchingCat,'must have a populated top-level category');
+  function categorySet(rootId) {
+    const set=new Set([Number(rootId)]);let again=true;
+    while(again){again=false;for(const c of snapshotData.categories)if(c.parent_id!=null&&set.has(Number(c.parent_id))&&!set.has(Number(c.id))){set.add(Number(c.id));again=true;}}
+    return set;
+  }
+  const descendantSet=categorySet(matchingCat.id);
+  const searchTerm=String(snapshotData.products.find(p=>p.name&&p.name.length>5)?.name||'').trim().split(/\s+/).slice(0,2).join(' ');
+  assert.ok(searchTerm.length>1,'search term from catalog');
+
   mkdirSync(screenshots,{recursive:true});
   const types={'.html':'text/html','.css':'text/css','.js':'text/javascript','.svg':'image/svg+xml'};
   const server=createServer((req,res)=>{
@@ -61,18 +75,24 @@ const puppeteer=require('puppeteer-core');
       demo:document.body.dataset.demoMode
     }));
     assert.ok(snapshot.cards>=20,'catalog must display results');
+    assert.equal(Number(snapshot.total.replace(/\D/g,'')),snapshotData.products.length,
+      'frontpage must show every existing cached product count');
     assert.equal(snapshot.featured,6,'featured section should display real API-shaped mock data');
     assert.equal(snapshot.demo,'true','DEMO must be visible');
     assert.ok(snapshot.disabledPayment,'payment must be disabled');
     await revealAll(page);
     await page.screenshot({path:join(screenshots,'desktop.png'),fullPage:true});
     console.log('Desktop initial:',JSON.stringify(snapshot));
+    console.log('Full retail snapshot:',JSON.stringify({items:snapshotData.products.length,categories:snapshotData.categories.length}));
 
     await page.click('.market-main-banner [data-market-next]');
     await page.waitForFunction(()=>document.querySelector('.market-main-banner').dataset.slide==='1');
     console.log('Banner next: PASS');
-    await page.click('#categoriesContainer .cat-btn[data-id="2"]');
-    await page.waitForFunction(()=>typeof state!=='undefined'&&String(state.currentCategory)==='2'&&state.products.every(p=>p.category_id===2));
+    await page.click('#categoriesContainer .cat-btn[data-id="'+matchingCat.id+'"]');
+    await page.waitForFunction(id=>typeof state!=='undefined'&&String(state.currentCategory)===String(id)&&
+      document.getElementById('catalogCount').getAttribute('aria-busy')==='false',{},matchingCat.id);
+    assert.ok(await page.evaluate(ids=>state.products.every(p=>ids.includes(Number(p.category_id))),[...descendantSet]),
+      'selected category includes child categories');
     assert.ok((await page.$$('#productGrid .luxury-card')).length>0);
     console.log('Category navigation: PASS');
 
@@ -85,9 +105,10 @@ const puppeteer=require('puppeteer-core');
     console.log('Price filter + sort: PASS');
 
     await page.click('#searchInput');
-    await page.type('#searchInput','tai nghe');
+    await page.type('#searchInput',searchTerm);
     await page.click('#searchBtn');
-    await page.waitForFunction(()=>state.searchQuery==='tai nghe'&&state.products.length>0&&state.products.every(p=>p.name.toLowerCase().includes('tai nghe')));
+    await page.waitForFunction(q=>state.searchQuery===q&&state.products.length>0&&
+      document.getElementById('catalogCount').getAttribute('aria-busy')==='false',{},searchTerm);
     console.log('Search: PASS');
 
     await page.click('#searchClearBtn');
