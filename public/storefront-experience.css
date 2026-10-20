@@ -437,10 +437,10 @@ body.is-overlay-open .store-to-top {visibility:hidden !important;}
   box-shadow:0 8px 22px rgba(28,38,53,.14);
 }
 body:has(#cartDrawer.open) #toastNotification:not(.hidden){
-  bottom:132px;right:16px;
+  bottom:clamp(215px,26vh,310px);right:16px;
 }
 @media(max-width:760px){
   body:has(#cartDrawer.open) #toastNotification:not(.hidden){
-    bottom:calc(135px + env(safe-area-inset-bottom));right:12px;
+    bottom:calc(clamp(215px,26vh,310px) + env(safe-area-inset-bottom));right:12px;
   }
 }
