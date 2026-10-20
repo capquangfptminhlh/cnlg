@@ -212,6 +212,54 @@ const puppeteer=require('puppeteer-core');
     assert.equal(mobile.nav,'grid','mobile bottom navigation must be visible');
     console.log('Mobile:',JSON.stringify(mobile));
 
+    // Purchase journey: genuine catalog product, mobile gallery, quantities,
+    // checkout presentation. NEVER submit an order on the demo.
+    const availableProduct=snapshotData.products.find(p=>p.in_stock!==false);
+    await page.evaluate(id=>openProductDetail(id),availableProduct.id);
+    await page.waitForFunction(()=>Boolean(document.querySelector('#productDetailModal.open .detail-title')));
+    const initialQty=await page.$eval('#modalQtyDisplay',x=>x.textContent.trim());
+    assert.equal(initialQty,'1');
+    await page.click('#productDetailModal .qty-stepper button[aria-label="Tăng số lượng"]');
+    assert.equal(await page.$eval('#modalQtyDisplay',x=>x.textContent.trim()),'2');
+    await page.click('#productDetailModal .qty-stepper button[aria-label="Giảm số lượng"]');
+    assert.equal(await page.$eval('#modalQtyDisplay',x=>x.textContent.trim()),'1');
+    const productGeometry=await page.evaluate(()=>{
+      const m=document.querySelector('#productDetailModal .product-modal-dialog');
+      const thumbs=[...document.querySelectorAll('#productDetailModal .thumb-item')];
+      const bounds=m.getBoundingClientRect();
+      return {right:bounds.right,width:bounds.width,height:bounds.height,
+        docWidth:document.documentElement.scrollWidth,thumbs:thumbs.length,
+        buttons:thumbs.every(x=>x.tagName==='BUTTON'),aria:thumbs.every(x=>x.hasAttribute('aria-label'))};
+    });
+    assert.ok(productGeometry.right<=mobile.width+2,
+      'product sheet clips mobile: '+JSON.stringify(productGeometry));
+    assert.ok(productGeometry.buttons&&productGeometry.aria&&productGeometry.thumbs>0,
+      'gallery thumbnails must be keyboard-accessible');
+    await page.screenshot({path:join(screenshots,'detail-mobile.png')});
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(()=>!document.getElementById('productDetailModal').classList.contains('open'));
+
+    await page.evaluate(()=>openCheckoutModal());
+    await page.waitForFunction(()=>document.getElementById('checkoutModal').classList.contains('open'));
+    assert.equal(await page.$eval('#submitOrderBtn',el=>el.disabled),true,
+      'demo must not allow real orders');
+    const checkoutGeometry=await page.evaluate(()=>{
+      const m=document.querySelector('#checkoutModal .checkout-dialog');
+      const r=m.getBoundingClientRect();
+      return {width:r.width,right:r.right,scrollWidth:m.scrollWidth,clientWidth:m.clientWidth,
+        codLabel:document.querySelector('#payOptCod strong')?.textContent.trim()};
+    });
+    assert.ok(checkoutGeometry.right<=mobile.width+2 &&
+      checkoutGeometry.scrollWidth<=checkoutGeometry.clientWidth+3,
+      'mobile checkout overflows: '+JSON.stringify(checkoutGeometry));
+    await page.screenshot({path:join(screenshots,'checkout-mobile.png')});
+    await page.click('#closeCheckoutBtn');
+    await page.waitForFunction(()=>!document.getElementById('checkoutModal').classList.contains('open'));
+    console.log('Mobile detail gallery + quantity + safe checkout: PASS',
+      JSON.stringify({productGeometry,checkoutGeometry}));
+
+
+
     // Catch narrow-phone clipping and tablet sidebar/banner overflow.
     for(const width of [360,768]){
       await page.setViewport({width,height:800,deviceScaleFactor:1,isMobile:false,hasTouch:false});
@@ -235,7 +283,7 @@ const puppeteer=require('puppeteer-core');
     }
 
     assert.deepEqual(pageErrors,[],'browser must not emit unhandled exceptions');
-    console.log('UI SMOKE TEST PASSED. Artifacts: desktop.png, cart.png, favorites.png, mobile.png');
+    console.log('UI SMOKE TEST PASSED. Artifacts: desktop.png, cart.png, favorites.png, mobile.png, detail-mobile.png, checkout-mobile.png');
   } finally {
     await browser?.close();
     await new Promise(resolve=>server.close(resolve));
