@@ -1,0 +1,184 @@
+/* Hoàng Minh Store — final responsive storefront polish.
+   Deliberately sits after premium.css; optimizes browsing, not decorative UI. */
+:root {
+  --shop-card-radius:10px;
+  --shop-touch:min(44px, 100%);
+}
+a,button,input,select { -webkit-tap-highlight-color:transparent; }
+button, a, input, select { touch-action:manipulation; }
+:where(.market-shortcut,.cat-btn,.price-pill,.featured-buy,.btn-buy-instant,.btn-add-mini,.store-to-top):focus-visible{
+  outline:3px solid #fda77e;
+  outline-offset:3px;
+}
+#catalog,#categoryPanel,#featuredSection { scroll-margin-top:22px; }
+.card-title,.featured-name {
+  display:-webkit-box !important;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;
+}
+.card-title { min-height:36px;max-height:40px; }
+.featured-name { min-height:36px;max-height:40px; }
+.card-media,.featured-media { overflow:hidden; }
+.featured-media img,.card-media img { object-fit:contain; }
+.market-main-banner .premium-product-shot{will-change:auto;}
+@media (min-width:701px){
+  .featured-header h2{letter-spacing:-.45px;}
+  .filter-bar{row-gap:12px;}
+  .premium-catalog-heading{min-width:195px;}
+  .main-layout{padding-bottom:26px;}
+  .market-shortcuts{padding-block:12px;}
+  .market-shortcut{gap:5px;}
+  .shortcut-icon{width:43px;height:43px;font-size:19px;}
+  .market-sidebar{max-height:410px;}
+  .market-sidebar .cat-scroll{max-height:338px;}
+}
+@media (max-width:700px){
+  body { background:#f7f8fb; }
+  .top-bar { display:none !important; }
+  body .main-header,body.shop-scrolled .main-header {
+    position:relative !important;
+    padding:8px 0 9px !important;
+    min-height:0 !important;
+    box-shadow:0 3px 10px rgba(129,49,27,.09);
+  }
+  .main-header .container {gap:7px !important;}
+  .main-header .brand-logo {
+    padding-left:29px;
+    min-height:31px;
+    justify-content:center;
+  }
+  .main-header .brand-logo::before {font-size:20px;}
+  .logo-text {font-size:15px !important;letter-spacing:-.55px;}
+  .logo-sub {font-size:6.5px;letter-spacing:.1px;margin-top:1px;}
+  .header-right .cart-trigger-btn {padding:2px 4px !important;border:0;}
+  .cart-icon-wrap i{font-size:21px;}
+  .search-box {height:38px;box-shadow:0 2px 4px rgba(78,29,20,.12);}
+  .search-icon {font-size:14px;}
+  .search-box input {font-size:16px;padding:7px 2px;}
+  .search-box input::placeholder{font-size:12px;}
+  .search-submit {
+    height:31px;min-width:60px;
+    font-size:10px;padding:0 9px;margin-right:4px;
+  }
+  .market-desktop-layout {padding-top:8px;}
+  .market-hero{gap:0;}
+  .market-main-banner{min-height:174px !important;height:174px;border-radius:10px;}
+  .market-main-banner[data-slide] { background:linear-gradient(120deg,#fff0e6 0%,#ffe0d0 60%,#ffc5b1 100%); }
+  .market-main-banner[data-slide="1"] { background:linear-gradient(110deg,#f1f7ff 0%,#d3e4fc 100%); }
+  .market-main-banner[data-slide="2"] { background:linear-gradient(110deg,#fff0e4 0%,#f8d7ea 100%); }
+  .market-banner-copy {padding:18px 9px 11px 16px;max-width:67%;}
+  .market-banner-label {display:none;}
+  .banner-overline {
+    color:#eb593f;font-size:8px !important;
+    letter-spacing:1.1px;margin-bottom:5px;
+  }
+  .market-banner-copy h1 {
+    font-size:21px !important;
+    line-height:1.2;letter-spacing:-1.15px;
+    margin-bottom:7px;max-width:235px;
+  }
+  .market-banner-copy p {
+    font-size:9px;line-height:1.4;max-width:205px;
+    margin:0 0 10px;display:-webkit-box;-webkit-box-orient:vertical;
+    -webkit-line-clamp:2;overflow:hidden;
+  }
+  .banner-shop-btn {
+    font-size:10px;padding:7px 11px;
+    border-radius:6px;min-height:30px;
+  }
+  .banner-catalog-count {font-size:8px;line-height:1.2;margin-top:8px;}
+  .banner-catalog-count strong {font-size:9px;}
+  .market-main-banner .banner-slides{bottom:3px;}
+  .market-main-banner .banner-carousel-control{display:none;}
+  .premium-gallery.market-banner-art{
+    width:44%;height:174px;top:0;right:0;bottom:auto;
+  }
+  .premium-gallery-backdrop {
+    width:125px;height:125px;right:-16px;top:21px;
+    box-shadow:0 0 0 11px rgba(255,255,255,.2);
+  }
+  .premium-product-shot.primary{
+    width:86px;height:100px;
+    top:32px;right:21%;border-width:2px;border-radius:10px;
+  }
+  .premium-product-shot.secondary{
+    width:53px;height:57px;
+    top:21px;right:-5%;border-width:2px;border-radius:9px;
+  }
+  .premium-product-shot.tertiary{
+    width:58px;height:54px;right:-3%;bottom:21px;
+    border-width:2px;border-radius:9px;
+  }
+  .premium-product-image{padding:3px;}
+  .premium-float-label{display:none;}
+  .market-banner-side {display:none !important;}
+  /* Compact horizontal department chips: immediate access to products */
+  .market-sidebar {
+    order:2;
+    margin-top:7px;
+    background:transparent;
+    border:0;border-radius:0;box-shadow:none;
+  }
+  .market-sidebar .sidebar-heading {display:none;}
+  .market-sidebar .cat-scroll{
+    gap:6px;padding:2px 0 4px;
+    scroll-snap-type:x proximity;
+    overflow-x:auto;overscroll-behavior-x:contain;
+  }
+  .market-sidebar .cat-btn{
+    min-height:36px;padding:7px 11px;
+    border:1px solid #e5e9f0;
+    background:white;border-radius:7px;
+    font-size:10px;scroll-snap-align:start;
+  }
+  .market-sidebar .cat-btn.active {background:#fff0e8;border-color:#fab99f;color:#ee4d2d;}
+  .market-sidebar .cat-btn i {font-size:12px;}
+  /* Four genuinely useful shortcuts; other actions remain in the bottom nav */
+  .market-shortcuts {
+    margin-top:7px;
+    padding:9px 5px;
+    gap:0;min-height:69px;border-radius:8px;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    box-shadow:none;
+  }
+  .market-shortcut{font-size:9px;gap:3px;font-weight:750;}
+  .market-shortcut:nth-child(n+5){display:none;}
+  .shortcut-icon {
+    width:34px;height:34px;border-radius:11px;
+    font-size:16px;
+  }
+  .featured-section {
+    margin-top:10px;
+    padding-top:13px;padding-bottom:12px;
+    border-radius:9px;
+  }
+  .featured-header {margin-bottom:9px;align-items:flex-end;}
+  .featured-header h2 {font-size:16px;letter-spacing:-.45px;}
+  .premium-section-heading p{display:none;}
+  .premium-section-heading .premium-heading-kicker{font-size:8px;letter-spacing:1.1px;}
+  .featured-header a{font-size:10px;}
+  .featured-grid,.product-grid{gap:7px;}
+  .featured-card:nth-child(n+5){display:none;}
+  .featured-info,.card-details {padding:8px;gap:4px;}
+  .featured-name,.card-title{font-size:11px;min-height:35px;max-height:37px;}
+  .featured-price,.card-pricing .price-highlight{font-size:15px !important;}
+  .featured-buy,.btn-buy-instant{height:32px;min-height:32px;}
+  .main-layout{padding-top:11px;padding-bottom:16px;}
+  .filter-bar{padding:12px 10px;border-radius:9px;}
+  .filter-left{gap:7px;}
+  .price-filters{margin-inline:-1px;}
+  .mobile-bottom-nav{padding-bottom:env(safe-area-inset-bottom);}
+  .mobile-bottom-nav a,.mobile-bottom-nav button{min-height:55px;}
+  .card-heart{width:28px;height:28px;}
+}
+@media(max-width:370px){
+  .market-banner-copy{max-width:67%;padding:18px 8px 9px 12px;}
+  .market-banner-copy h1{font-size:19px !important;}
+  .market-banner-copy p{font-size:8px;}
+  .premium-gallery.market-banner-art{width:39%;}
+  .premium-product-shot.primary{width:73px;height:88px;right:19%;}
+  .premium-product-shot.secondary{width:46px;height:48px;}
+  .premium-product-shot.tertiary{width:50px;height:49px;}
+}
+@media(prefers-reduced-motion:reduce){
+ .premium-product-shot{animation:none !important;}
+}
