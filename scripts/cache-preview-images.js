@@ -8,7 +8,7 @@ const dist=path.resolve(__dirname,'../.pages-preview-dist');
 const fileName=path.join(dist,'products-public.json');
 const data=JSON.parse(fs.readFileSync(fileName,'utf8'));
 const max=Number(process.env.CATALOG_IMAGE_LIMIT)||60;
-const concurrency=6,timeoutMs=5000,maxBytes=500000;
+const concurrency=12,timeoutMs=7500,maxBytes=600000;
 let cursor=0,downloaded=0,failed=0,bytes=0;
 const images=path.join(dist,'images','catalog');
 fs.mkdirSync(images,{recursive:true});
@@ -33,6 +33,10 @@ async function run(p){
     const dest=String(p.id)+ext;
     fs.writeFileSync(path.join(images,dest),buffer);
     p.image='./images/catalog/'+dest;
+    p.image_hd=p.image;
+    if(Array.isArray(p.gallery)&&p.gallery.length){
+      p.gallery[0]={...p.gallery[0],url:p.image,thumb:p.image};
+    }
     downloaded++;bytes+=buffer.length;
   }catch(err){failed++;}
 }
