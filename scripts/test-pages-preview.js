@@ -133,6 +133,20 @@ const puppeteer=require('puppeteer-core');
       document.getElementById('catalogCount').getAttribute('aria-busy')==='false',{},searchTerm);
     console.log('Search: PASS');
 
+    // The autocomplete is a usable keyboard interaction, not decoration.
+    await page.click('#searchClearBtn');
+    await page.waitForFunction(()=>state.searchQuery==='');
+    await page.type('#searchInput',searchTerm);
+    await page.waitForSelector('#searchDropdown [data-preview-id]',{visible:true,timeout:10000});
+    await page.keyboard.press('ArrowDown');
+    const suggestionFocused=await page.evaluate(()=>document.activeElement?.hasAttribute('data-preview-id'));
+    assert.equal(suggestionFocused,true,'ArrowDown should focus a real product suggestion');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(()=>document.getElementById('productDetailModal').classList.contains('open'),{timeout:10000});
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(()=>!document.getElementById('productDetailModal').classList.contains('open'));
+    console.log('Autocomplete keyboard & real product details: PASS');
+
     await page.click('#searchClearBtn');
     await page.waitForFunction(()=>state.searchQuery==='' && state.products.length>10 && document.getElementById('catalogCount').getAttribute('aria-busy')==='false');
     await page.waitForSelector('#productGrid .btn-add-mini:not([disabled])');
