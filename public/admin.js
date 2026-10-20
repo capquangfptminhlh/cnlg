@@ -119,17 +119,19 @@ function renderOrders(orders) {
     } else if (o.status === 'PAID') {
       actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="pushToDropbuyCart('${esc(o.id)}')"><i class="fa-solid fa-cart-arrow-down"></i> Đưa vào giỏ DropBuy</button>
         <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="copyReceiver('${esc(o.id)}')"><i class="fa-regular fa-copy"></i> Sao chép người nhận</button>
-        <button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="setOrderStatus('${esc(o.id)}', 'PROCESSING')">Đã đặt bên DropBuy</button>
-        ${o.dropbuy_sync?.status === 'IN_DROPBUY_CART' ? '<br><small style="color:#10b981;">✓ Đã nằm trong giỏ DropBuy</small>' : ''}`;
+        <button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="attachDropbuyCode('${esc(o.id)}')">Đã đặt – nhập mã DropBuy</button>
+        ${o.dropbuy_sync?.status === 'IN_DROPBUY_CART' ? '<br><small style="color:#10b981;">✓ Đã nằm trong giỏ DropBuy</small>' : ''}
+        ${o.dropbuy_sync?.status === 'WAITING_DROPBUY_LOGIN' ? '<br><small style="color:#ef4444;">⚠ Chưa đăng nhập DropBuy</small>' : ''}
+        ${o.dropbuy_sync?.status === 'FAILED' ? `<br><small style="color:#ef4444;">⚠ ${esc(o.dropbuy_sync.error || 'Lỗi DropBuy')}</small>` : ''}`;
     } else if (o.status === 'PROCESSING') {
-      actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="setOrderStatus('${esc(o.id)}', 'COMPLETED')">Đã giao xong</button>`;
+      actions = `${o.dropbuy_sync?.problem ? `<small style="color:#ef4444;">⚠ ${esc(o.dropbuy_sync.problem)} – cần hoàn tiền / xử lý</small><br>` : ''}<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="setOrderStatus('${esc(o.id)}', 'COMPLETED')">Đã giao xong</button>`;
     } else {
       actions = `<span style="color: #10b981; font-size: 12px;"><i class="fa-solid fa-check"></i> ${label}</span>`;
     }
     return `
     <tr>
       <td><strong>#${esc(o.id)}</strong><br><small style="color:#6b7280;">${new Date(o.created_at).toLocaleString('vi-VN')}</small></td>
-      <td><code>${esc(o.dropbuy_sync?.order_id || 'Chưa đặt')}</code><br><small style="color:#6b7280;">${esc(o.dropbuy_sync?.relay_mode || '')}</small></td>
+      <td><code>${esc(o.dropbuy_sync?.order_code || 'Chưa đặt')}</code>${o.dropbuy_sync?.current_label ? `<br><small style="color:#10b981;">${esc(o.dropbuy_sync.current_label)}</small>` : ''}${o.dropbuy_sync?.shipping_ref_code ? `<br><small style="color:#6b7280;">VĐ: ${esc(o.dropbuy_sync.shipping_ref_code)}</small>` : ''}</td>
       <td>
         <strong>${esc(o.customer?.name)}</strong><br>
         <small style="color: #6b7280;">${esc(o.customer?.phone)}</small><br>
@@ -153,6 +155,18 @@ async function pushToDropbuyCart(orderId) {
     const lines = json.data.pushed.map(p => `• ${p.name}${p.variant_name ? ` [${p.variant_name}]` : ''} × ${p.quantity}${p.in_cart ? '' : ' (KHÔNG thấy trong giỏ!)'}`).join('\n');
     copyReceiver(orderId, true);
     if (confirm(`${json.message}\n\n${lines}\n\nThông tin người nhận đã được sao chép. Mở giỏ DropBuy ngay?`)) window.open(json.data.cart_url, '_blank', 'noopener');
+    loadData();
+  } catch (e) {
+    alert('Lỗi: ' + e.message);
+  }
+}
+
+async function attachDropbuyCode(orderId) {
+  const code = prompt(`Mã đơn trên DropBuy của đơn #${orderId} (xem ở dropbuy.vn → Đơn mua):`);
+  if (!code) return;
+  try {
+    const json = await (await adminFetch(`/api/admin/orders/${orderId}/dropbuy-code`, { method: 'POST', body: JSON.stringify({ code }) })).json();
+    if (!json.success) throw new Error(json.error);
     loadData();
   } catch (e) {
     alert('Lỗi: ' + e.message);

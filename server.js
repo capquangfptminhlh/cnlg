@@ -413,10 +413,10 @@ function confirmOrderPayment(orderId, meta = {}) {
   io.emit('ADMIN_ORDER_CHANGED', { orderId, status: 'PAID' });
   notify.paymentConfirmed(updated, meta.via === 'admin' ? 'admin xác nhận' : `tự động qua ${meta.via}`);
 
-  // TỰ ĐỘNG GỌI API DROPBUY ĐỂ ĐẨY ĐƠN HÀNG XUẤT KHO NGAY LẬP TỨC
+  // Tự đưa các món vào giỏ DropBuy để admin đặt dropship (không tự đặt đơn / trừ tiền)
   setImmediate(() => {
-    dropbuyOrderFulfillment.fulfillOrderOnDropbuy(updated, io).catch(err => {
-      console.error(`[DropBuy Auto Order Failed] Không đẩy được đơn #${orderId} sang DropBuy:`, err.message);
+    dropbuyOrderFulfillment.fulfillOrderOnDropbuy(orderId, io).catch(err => {
+      console.error(`[DropBuy] Không đưa được đơn #${orderId} vào giỏ DropBuy:`, err.message);
     });
   });
 
@@ -498,13 +498,22 @@ app.get('/api/admin/payments', requireAdmin, (req, res) => {
   res.json({ success: true, data: payments.recentPayments(50), configured: { sepay: !!process.env.SEPAY_WEBHOOK_KEY, casso: !!process.env.CASSO_SECURE_TOKEN, telegram: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) } });
 });
 
-// Đẩy đơn tự động qua API DropBuy (đặt đơn + thanh toán ví + chuyển trạng thái)
-app.post('/api/admin/orders/:id/fulfill-dropbuy', requireAdmin, async (req, res) => {
-  const order = orderStore.getOrderById(req.params.id);
-  if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
+// Đưa đơn đã nhận tiền vào giỏ DropBuy (bấm tay = cho phép đưa lại)
+app.post(['/api/admin/orders/:id/fulfill-dropbuy', '/api/admin/orders/:id/push-dropbuy-cart'], requireAdmin, async (req, res) => {
   try {
-    const result = await dropbuyOrderFulfillment.fulfillOrderOnDropbuy(order, io);
-    res.json({ success: true, message: 'Đã kích hoạt tạo đơn tự động trên DropBuy thành công!', data: result });
+    const result = await dropbuyOrderFulfillment.fulfillOrderOnDropbuy(req.params.id, io, { force: true });
+    if (!result.success) return res.status(400).json({ success: false, error: 'Chưa đăng nhập DropBuy – đăng nhập ở mục DropBuy trong admin trước.' });
+    res.json({ success: true, message: 'Đã đưa vào giỏ DropBuy. Đặt đơn dropship tới khách rồi dán mã đơn DropBuy vào admin.', data: result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Admin đã đặt trên DropBuy → gắn mã đơn để tự theo dõi tới khi giao xong
+app.post('/api/admin/orders/:id/dropbuy-code', requireAdmin, (req, res) => {
+  try {
+    const order = dropbuyOrderFulfillment.attachDropbuyCode(req.params.id, req.body?.code, io);
+    res.json({ success: true, data: order });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
@@ -513,8 +522,9 @@ app.post('/api/admin/orders/:id/fulfill-dropbuy', requireAdmin, async (req, res)
 // Đồng bộ trạng thái các đơn đang xử lý từ DropBuy
 app.post('/api/admin/orders/sync-dropbuy-status', requireAdmin, async (req, res) => {
   try {
-    await dropbuyOrderFulfillment.syncDropbuyOrdersStatus(io);
-    res.json({ success: true, message: 'Đã đồng bộ trạng thái đơn hàng từ DropBuy thành công!' });
+    const r = await dropbuyOrderFulfillment.syncDropbuyOrdersStatus(io);
+    if (r.skipped) return res.status(400).json({ success: false, error: 'Chưa đăng nhập DropBuy.' });
+    res.json({ success: true, message: `Đã kiểm tra ${r.checked} đơn trên DropBuy.`, data: r });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

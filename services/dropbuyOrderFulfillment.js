@@ -1,222 +1,146 @@
-const fs = require('fs');
-const path = require('path');
 const scraper = require('./dropbuyScraper');
 const orderStore = require('./orderStore');
+const dropbuyCart = require('./dropbuyCart');
 const { notify } = require('./notify');
 
+/**
+ * VÒNG ĐỜI ĐƠN TRÊN DROPBUY
+ *
+ * 1. Đơn đã nhận tiền (PAID) → tự đưa các món vào giỏ DropBuy của shop (chỉ giỏ, không trừ tiền).
+ * 2. Admin đặt đơn dropship trên DropBuy rồi dán mã đơn DropBuy vào admin → đơn chuyển PROCESSING.
+ * 3. Mỗi 2 phút đọc lịch sử đơn DropBuy (orders/history) theo mã đó:
+ *    D/F (hoàn thành / đã giao) → COMPLETED; C/B/X/N (huỷ, bom, hoàn, giao lỗi) → cần xử lý (hoàn tiền khách).
+ *
+ * Chưa tự gọi orders/{fx}/normal-submit: API cần mã tỉnh/quận/xã và mã kho (shop_depot_code) theo danh mục
+ * của DropBuy mà cửa hàng chưa thu thập, gửi sai sẽ giao nhầm địa chỉ. Bật khi đã đối chiếu với 1 đơn thật.
+ */
 const BFF = 'https://dropbuy.vn/api/proxy/bff';
+const DONE = new Set(['D', 'F']);
+const FAILED = { C: 'DropBuy đã huỷ đơn', B: 'Khách bom hàng', X: 'Hàng hoàn về kho', N: 'Giao không thành công' };
+const STATUS_LABEL = { U: 'Nháp', P: 'Chờ thanh toán', O: 'Đã thanh toán', W: 'Chờ đóng hàng', G: 'Đã đóng hàng', Q: 'Chờ lấy hàng', S: 'Đang giao', F: 'Đã giao', D: 'Hoàn thành', K: 'Đang khiếu nại', C: 'Đã huỷ', B: 'Bom hàng', X: 'Hoàn hàng', N: 'Giao không thành công' };
 
-function headers(config) {
-  return {
-    'content-type': 'application/json',
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    origin: 'https://dropbuy.vn',
-    referer: 'https://dropbuy.vn/gio-hang',
-    cookie: config.dropbuy?.cookieHeader || ''
-  };
+const inFlight = new Set();
+
+function emit(io, order, status, message) {
+  if (!io) return;
+  if (message) io.to(order.id).emit('ORDER_STATUS_UPDATE', { orderId: order.id, status, message });
+  io.emit('ADMIN_ORDER_CHANGED', { orderId: order.id, status });
 }
 
-async function callBff(endpoint, method, body, config) {
-  const res = await fetch(`${BFF}${endpoint}`, {
-    method,
-    headers: headers(config),
-    body: body ? JSON.stringify(body) : undefined
-  });
-  const text = await res.text();
-  let json;
+/** Bước 1 – gọi sau khi xác nhận tiền về. Không đổi trạng thái khách nhìn thấy. */
+async function fulfillOrderOnDropbuy(orderOrId, io, { force = false } = {}) {
+  const id = typeof orderOrId === 'string' ? orderOrId : orderOrId.id;
+  const order = orderStore.getOrderById(id);
+  if (!order) throw new Error('Không tìm thấy đơn hàng');
+  if (order.status !== 'PAID') throw new Error('Chỉ chuyển sang DropBuy khi đơn đã nhận tiền và chưa đặt kho.');
+  const synced = order.dropbuy_sync?.status;
+  if (synced === 'ORDERED' || (synced === 'IN_DROPBUY_CART' && !force)) throw new Error('Đơn này đã được đưa sang DropBuy rồi.');
+  if (inFlight.has(id)) throw new Error('Đơn đang được xử lý.');
+  inFlight.add(id);
   try {
-    json = JSON.parse(text);
-  } catch {
-    throw new Error(`DropBuy trả về HTTP ${res.status} không phải JSON`);
-  }
-  if (!json.success && json.error_code !== 0) {
-    throw new Error(json.message || `DropBuy lỗi HTTP ${res.status}`);
-  }
-  return json.data || json;
-}
-
-/**
- * TỰ ĐỘNG ĐẶT ĐƠN HÀNG LÊN DROPBUY KHI ĐÃ NHẬN TIỀN
- * 1. Đưa sản phẩm vào giỏ
- * 2. Gọi API đặt hàng Dropship của DropBuy
- * 3. Thanh toán bằng ví DropBuy (nếu có số dư)
- */
-async function fulfillOrderOnDropbuy(order, io) {
-  const config = scraper.getConfig();
-  const hasLiveSession = !!config.dropbuy?.cookieHeader;
-
-  console.log(`[DropBuy Fulfillment] Bắt đầu đẩy đơn #${order.id} sang DropBuy (Chế độ: ${hasLiveSession ? 'API THẬT' : 'MÔ PHỎNG'})...`);
-
-  if (!hasLiveSession) {
-    // Chế độ mô phỏng khi chưa gắn tài khoản thật
-    const dropbuyCode = `DB${Date.now().toString().slice(-7)}`;
-    const updated = orderStore.updateOrder(order.id, {
-      status: 'PROCESSING',
-      processing_at: new Date().toISOString(),
-      dropbuy_sync: {
-        status: 'ORDERED_SIMULATION',
-        order_code: dropbuyCode,
-        order_id: dropbuyCode,
-        mode: 'SIMULATION',
-        synced_at: new Date().toISOString(),
-        note: 'Đơn hàng đã được chuyển sang bộ phận kho đóng gói.'
-      }
+    const config = scraper.getConfig();
+    if (!config.dropbuy?.cookieHeader) {
+      orderStore.updateOrder(id, {
+        needs_attention: true,
+        dropbuy_sync: { ...(order.dropbuy_sync || {}), status: 'WAITING_DROPBUY_LOGIN', note: 'Chưa đăng nhập DropBuy trong admin.', updated_at: new Date().toISOString() }
+      });
+      notify.paymentIssue(`Đơn ${id} đã nhận tiền nhưng admin chưa đăng nhập DropBuy – chưa đưa được vào giỏ.`);
+      emit(io, order, order.status);
+      return { success: false, mode: 'NO_SESSION' };
+    }
+    const cart = await dropbuyCart.pushOrderToCart(order, config);
+    orderStore.updateOrder(id, {
+      needs_attention: true,
+      dropbuy_sync: { ...(order.dropbuy_sync || {}), status: 'IN_DROPBUY_CART', pushed_at: new Date().toISOString(), note: 'Đã vào giỏ DropBuy – đặt đơn dropship rồi dán mã đơn DropBuy vào admin.' }
     });
-
-    if (io) {
-      io.to(order.id).emit('ORDER_STATUS_UPDATE', {
-        orderId: order.id,
-        status: 'PROCESSING',
-        message: 'Kho hàng đã tiếp nhận đơn và đang tiến hành đóng gói xuất kho.'
-      });
-      io.emit('ADMIN_ORDER_CHANGED', { orderId: order.id, status: 'PROCESSING' });
-    }
-    return { success: true, mode: 'SIMULATION', dropbuy_code: dropbuyCode };
-  }
-
-  // Chế độ LIVE API THẬT
-  try {
-    const lines = (order.items || []).filter(i => i.variation_id);
-    if (!lines.length) throw new Error('Đơn không có variation_id để đặt trên DropBuy');
-
-    // Bước 1: Đưa vào giỏ hàng
-    const current = await callBff('/carts/my-cart', 'POST', {}, config).catch(() => ({ cart_items: [] }));
-    const existing = new Map((current?.cart_items || []).map(c => [c.variation_id, Number(c.quantity) || 0]));
-    const items = lines.map(i => ({
-      variation_id: i.variation_id,
-      quantity: (existing.get(i.variation_id) || 0) + i.quantity,
-      selected_for_checkout: true
-    }));
-    await callBff('/carts/set-quantity', 'PUT', { items }, config);
-
-    // Bước 2: Gọi API checkout dropship
-    const receiverPayload = {
-      receiver_fullname: order.customer.name,
-      receiver_phone: order.customer.phone,
-      receiver_address_line: order.customer.address,
-      receiver_province_id: 1, // Mặc định hoặc từ order.shipping_detail
-      receiver_district_id: 1,
-      receiver_ward_id: 1,
-      is_dropship: true,
-      payment_method: 'B', // Thanh toán qua số dư ví DropBuy của shop
-      notes: `Đơn từ hoangminh.com #${order.id} – ${order.customer.note || ''}`
-    };
-
-    const submitResult = await callBff('/orders/normal-submit', 'POST', receiverPayload, config);
-    const dropbuyOrder = Array.isArray(submitResult) ? submitResult[0] : submitResult;
-    const dropbuyCode = dropbuyOrder?.code || dropbuyOrder?.unique_id || `DB${Date.now().toString().slice(-7)}`;
-    const dropbuyId = dropbuyOrder?.id || dropbuyCode;
-
-    // Bước 3: Nếu đơn ở trạng thái P (chờ thanh toán), gọi thanh toán ví
-    if (dropbuyOrder?.order_status === 'P' && dropbuyOrder?.id) {
-      await callBff('/orders/thanh-toan', 'POST', { order_id: dropbuyOrder.id }, config).catch(e => {
-        console.warn(`[DropBuy Fulfillment] Thanh toán ví chưa hoàn tất (${e.message}), admin có thể thanh toán bù trên DropBuy.`);
-      });
-    }
-
-    const updated = orderStore.updateOrder(order.id, {
-      status: 'PROCESSING',
-      processing_at: new Date().toISOString(),
-      dropbuy_sync: {
-        status: 'SUBMITTED_TO_DROPBUY',
-        order_id: dropbuyId,
-        order_code: dropbuyCode,
-        mode: 'LIVE_API',
-        synced_at: new Date().toISOString(),
-        note: 'Đã tạo đơn thành công trên hệ thống DropBuy.vn.'
-      }
-    });
-
-    if (io) {
-      io.to(order.id).emit('ORDER_STATUS_UPDATE', {
-        orderId: order.id,
-        status: 'PROCESSING',
-        message: 'Đơn hàng đã được đẩy thành công lên kho DropBuy và đang được xử lý xuất kho.'
-      });
-      io.emit('ADMIN_ORDER_CHANGED', { orderId: order.id, status: 'PROCESSING' });
-    }
-
-    notify.newOrder({ ...updated, dropbuy_code: dropbuyCode });
-    return { success: true, mode: 'LIVE_API', dropbuy_code: dropbuyCode };
-
+    emit(io, order, order.status);
+    return { success: true, mode: 'CART', ...cart };
   } catch (err) {
-    console.error(`[DropBuy Fulfillment Error] Lỗi đẩy đơn #${order.id}:`, err.message);
-    orderStore.updateOrder(order.id, {
-      dropbuy_sync: {
-        status: 'FAILED',
-        error: err.message,
-        failed_at: new Date().toISOString()
-      }
+    orderStore.updateOrder(id, {
+      needs_attention: true,
+      dropbuy_sync: { ...(order.dropbuy_sync || {}), status: 'FAILED', error: err.message, failed_at: new Date().toISOString() }
     });
-    notify.paymentIssue(`Đơn #${order.id} lỗi khi đẩy API DropBuy: ${err.message}`);
+    notify.paymentIssue(`Đơn ${id}: không đưa được vào giỏ DropBuy – ${err.message}`);
     throw err;
+  } finally {
+    inFlight.delete(id);
   }
 }
 
-/**
- * ĐỒNG BỘ TRẠNG THÁI TẤT CẢ CÁC ĐƠN ĐANG XỬ LÝ TỪ DROPBUY
- * Quét các đơn PROCESSING, kiểm tra trạng thái trên DropBuy:
- * - W / O: Kho đang đóng hàng
- * - D / F: Giao thành công -> Chuyển COMPLETED
- * - C: Bị huỷ -> Chuyển CANCELLED
- */
+/** Bước 2 – admin đã đặt trên DropBuy, gắn mã đơn DropBuy để theo dõi tự động. */
+function attachDropbuyCode(orderId, code, io) {
+  const order = orderStore.getOrderById(orderId);
+  if (!order) throw new Error('Không tìm thấy đơn hàng');
+  if (!['PAID', 'PROCESSING'].includes(order.status)) throw new Error('Chỉ gắn mã DropBuy cho đơn đã nhận tiền.');
+  const clean = String(code || '').trim().toUpperCase();
+  if (!/^[A-Z0-9-]{4,40}$/.test(clean)) throw new Error('Mã đơn DropBuy không hợp lệ.');
+  const dup = orderStore.getOrders().find(o => o.id !== orderId && o.dropbuy_sync?.order_code === clean);
+  if (dup) throw new Error(`Mã này đã gắn cho đơn ${dup.id}.`);
+  const now = new Date().toISOString();
+  const updated = orderStore.updateOrder(orderId, {
+    status: 'PROCESSING',
+    processing_at: order.processing_at || now,
+    needs_attention: false,
+    dropbuy_sync: { ...(order.dropbuy_sync || {}), status: 'ORDERED', order_code: clean, ordered_at: now, error: null }
+  });
+  emit(io, updated, 'PROCESSING', 'Kho đã nhận đơn và đang chuẩn bị hàng.');
+  return updated;
+}
+
+async function fetchHistory(config, orderCode) {
+  const res = await fetch(`${BFF}/orders/history`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      origin: 'https://dropbuy.vn',
+      referer: 'https://dropbuy.vn/',
+      cookie: config.dropbuy.cookieHeader
+    },
+    body: JSON.stringify({ order_code: orderCode, page_num: 1, page_size: 5 })
+  });
+  const json = await res.json().catch(() => null);
+  if (!json?.success) throw new Error(json?.message || `DropBuy lỗi HTTP ${res.status}`);
+  return json.data?.items || [];
+}
+
+/** Bước 3 – đồng bộ trạng thái các đơn PROCESSING đã có mã DropBuy. */
 async function syncDropbuyOrdersStatus(io) {
   const config = scraper.getConfig();
-  const orders = orderStore.getOrders();
-  const processingOrders = orders.filter(o => o.status === 'PROCESSING');
-
-  if (!processingOrders.length) return;
-
-  if (config.dropbuy?.cookieHeader) {
-    try {
-      const history = await callBff('/orders/history', 'POST', { page: 1, limit: 50 }, config);
-      const dropbuyList = Array.isArray(history) ? history : history?.orders || history?.data || [];
-      const dropbuyMap = new Map();
-
-      for (const d of dropbuyList) {
-        if (d.code) dropbuyMap.set(d.code, d);
-        if (d.id) dropbuyMap.set(String(d.id), d);
-      }
-
-      for (const order of processingOrders) {
-        const dbCode = order.dropbuy_sync?.order_code || order.dropbuy_sync?.order_id;
-        if (!dbCode || !dropbuyMap.has(dbCode)) continue;
-
-        const dbOrder = dropbuyMap.get(dbCode);
-        const dbStatus = dbOrder.order_status || dbOrder.status;
-
-        // Hoàn tất (Đã giao hàng thành công)
-        if (dbStatus === 'D' || dbStatus === 'F') {
-          console.log(`[DropBuy Sync] Đơn #${order.id} trên DropBuy đã giao thành công (${dbCode}) -> COMPLETED`);
-          orderStore.updateOrder(order.id, {
-            status: 'COMPLETED',
-            completed_at: new Date().toISOString(),
-            dropbuy_sync: { ...(order.dropbuy_sync || {}), current_status: dbStatus, completed_at: new Date().toISOString() }
-          });
-          if (io) {
-            io.to(order.id).emit('ORDER_STATUS_UPDATE', { orderId: order.id, status: 'COMPLETED', message: 'Đơn hàng đã được giao thành công!' });
-            io.emit('ADMIN_ORDER_CHANGED', { orderId: order.id, status: 'COMPLETED' });
-          }
-        } else if (dbStatus === 'C') {
-          // Bị huỷ
-          orderStore.updateOrder(order.id, {
-            status: 'CANCELLED',
-            cancelled_at: new Date().toISOString(),
-            cancel_reason: 'Kho DropBuy đã huỷ đơn'
-          });
-          if (io) {
-            io.to(order.id).emit('ORDER_STATUS_UPDATE', { orderId: order.id, status: 'CANCELLED', message: 'Đơn hàng đã bị huỷ từ kho.' });
-            io.emit('ADMIN_ORDER_CHANGED', { orderId: order.id, status: 'CANCELLED' });
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('[DropBuy Sync Error] Không kiểm tra được lịch sử đơn DropBuy:', e.message);
+  if (!config.dropbuy?.cookieHeader) return { checked: 0, skipped: 'NO_SESSION' };
+  const targets = orderStore.getOrders().filter(o => o.status === 'PROCESSING' && o.dropbuy_sync?.order_code);
+  let checked = 0;
+  for (const order of targets) {
+    const code = order.dropbuy_sync.order_code;
+    const items = await fetchHistory(config, code);
+    const d = items.find(x => String(x.code).toUpperCase() === code);
+    checked += 1;
+    if (!d) continue;
+    const st = d.order_status;
+    const now = new Date().toISOString();
+    const sync = {
+      ...order.dropbuy_sync,
+      current_status: st,
+      current_label: STATUS_LABEL[st] || st,
+      shipping_ref_code: d.shipping_ref_code || order.dropbuy_sync.shipping_ref_code || null,
+      dropbuy_total: d.total_amount ?? null,
+      dropbuy_profit: d.profit_amount ?? null,
+      checked_at: now
+    };
+    if (DONE.has(st)) {
+      const updated = orderStore.updateOrder(order.id, { status: 'COMPLETED', completed_at: now, dropbuy_sync: sync });
+      emit(io, updated, 'COMPLETED', 'Đơn hàng đã giao thành công!');
+    } else if (FAILED[st]) {
+      // Khách đã trả tiền cho shop → không tự huỷ, báo admin hoàn tiền / xử lý
+      if (!order.needs_attention) notify.paymentIssue(`Đơn ${order.id} (DropBuy ${code}): ${FAILED[st]} – cần hoàn tiền hoặc xử lý cho khách.`);
+      orderStore.updateOrder(order.id, { needs_attention: true, dropbuy_sync: { ...sync, problem: FAILED[st] } });
+      emit(io, order, order.status);
+    } else if (st !== order.dropbuy_sync.current_status || sync.shipping_ref_code !== order.dropbuy_sync.shipping_ref_code) {
+      orderStore.updateOrder(order.id, { dropbuy_sync: sync });
+      emit(io, order, order.status);
     }
   }
+  return { checked };
 }
 
-module.exports = {
-  fulfillOrderOnDropbuy,
-  syncDropbuyOrdersStatus
-};
+module.exports = { fulfillOrderOnDropbuy, attachDropbuyCode, syncDropbuyOrdersStatus, STATUS_LABEL };
