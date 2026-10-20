@@ -27,9 +27,9 @@
     icon.className='fa-solid fa-box-open';
     icon.setAttribute('aria-hidden','true');
     const title=document.createElement('strong');
-    title.textContent=name;
+    title.textContent='Hoàng Minh Store';
     const hint=document.createElement('small');
-    hint.textContent='HÌNH ẢNH SẢN PHẨM';
+    hint.textContent='Ảnh đang cập nhật';
     fallback.append(icon,title,hint);
     const overlay=container.querySelector('.card-quick-overlay');
     container.insertBefore(fallback,overlay||null);
@@ -48,7 +48,7 @@
     const onError=()=>{
       // Keep the identified placeholder but remove a broken image icon.
       img.remove();
-      if(placeholder)placeholder.querySelector('small').textContent='ẢNH CHƯA KHẢ DỤNG';
+      if(placeholder)placeholder.querySelector('small').textContent='Ảnh chưa khả dụng';
     };
     img.addEventListener('load',onLoaded,{once:true});
     img.addEventListener('error',onError,{once:true});
