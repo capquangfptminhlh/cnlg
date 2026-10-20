@@ -444,7 +444,7 @@ if (btnDropbuyLogin) {
     try {
       const res = await adminFetch('/api/dropbuy/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password, totp_code: (document.getElementById('dropbuyLoginTotp')?.value || '').trim() || undefined })
       });
       const data = await res.json();
       if (!res.ok || !data.success) {

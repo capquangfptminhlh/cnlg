@@ -96,8 +96,9 @@ async function getAuthStatus() {
  * Đăng nhập DropBuy siêu tốc qua NextAuth API, tự động fallback sang Puppeteer nếu cần
  * @param {string} username - SĐT / Email / Tên truy cập DropBuy
  * @param {string} password - Mật khẩu DropBuy
+ * @param {string} [totpCode] - Mã xác minh 2 bước (chỉ khi tài khoản bật)
  */
-async function loginDropbuy(username, password) {
+async function loginDropbuy(username, password, totpCode) {
   if (!username || !password) {
     throw new Error('Vui lòng nhập đầy đủ tài khoản và mật khẩu DropBuy!');
   }
@@ -107,12 +108,32 @@ async function loginDropbuy(username, password) {
 
   console.log(`[DropBuy Auth] Bắt đầu xác thực tài khoản: ${cleanUser}...`);
 
-  // --- PHƯƠNG PHÁP 1: GỌI TRỰC TIẾP NEXTAUTH API (SIÊU TỐC ~500MS) ---
+  // --- PHƯƠNG PHÁP 1: GỌI TRỰC TIẾP NHƯ TRANG ĐĂNG NHẬP DROPBUY (~1s) ---
+  // B1: POST /api/proxy/login/get-challenge {username} → challenge_key, challenge_token (mfa_enabled, challenge_next)
+  // B2: NextAuth credentials "password-login": username, hashed_password (= mật khẩu nguyên văn, trang DropBuy không băm),
+  //     challenge_key, challenge_token, totp_code. Thành công → cookie session-token; phiên dùng được phải có user.sid.
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+  let networkError = null;
   try {
-    console.log('[DropBuy Auth] Thử đăng nhập nhanh qua NextAuth API...');
-    const csrfRes = await fetch('https://dropbuy.vn/api/auth/csrf', {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+    console.log('[DropBuy Auth] Lấy mã challenge đăng nhập...');
+    const chRes = await fetch('https://dropbuy.vn/api/proxy/login/get-challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': UA, Origin: 'https://dropbuy.vn', Referer: 'https://dropbuy.vn/dang-nhap' },
+      body: JSON.stringify({ username: cleanUser })
     });
+    const ch = await chRes.json().catch(() => null);
+    if (!ch) throw new Error(`get-challenge HTTP ${chRes.status}`);
+    if (!ch.success || !ch.data) {
+      throw Object.assign(new Error(ch.message || 'Không lấy được mã đăng nhập DropBuy.'), { final: true });
+    }
+    if (ch.data.challenge_message && ch.data.challenge_next !== 'password') {
+      throw Object.assign(new Error(ch.data.challenge_message), { final: true });
+    }
+    if (ch.data.mfa_enabled && !totpCode) {
+      throw Object.assign(new Error('Tài khoản DropBuy bật xác minh 2 bước – nhập thêm mã 2 bước (OTP) rồi đăng nhập lại.'), { final: true, needTotp: true });
+    }
+
+    const csrfRes = await fetch('https://dropbuy.vn/api/auth/csrf', { headers: { 'User-Agent': UA } });
     const csrfData = await csrfRes.json();
     const rawCookies = csrfRes.headers.getSetCookie ? csrfRes.headers.getSetCookie() : [csrfRes.headers.get('set-cookie')];
     const initialCookie = rawCookies.filter(Boolean).map(c => c.split(';')[0]).join('; ');
@@ -122,26 +143,29 @@ async function loginDropbuy(username, password) {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Cookie': initialCookie,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': UA,
         'Origin': 'https://dropbuy.vn',
         'Referer': 'https://dropbuy.vn/dang-nhap'
       },
       body: new URLSearchParams({
         csrfToken: csrfData.csrfToken,
         username: cleanUser,
-        password: cleanPass,
+        hashed_password: cleanPass,
+        challenge_key: ch.data.challenge_key || '',
+        challenge_token: ch.data.challenge_token || '',
+        totp_code: totpCode ? String(totpCode).trim() : '',
+        callbackUrl: 'https://dropbuy.vn/',
         json: 'true'
       }),
       redirect: 'manual'
     });
 
-    const setCookies = loginRes.headers.getSetCookie ? loginRes.headers.getSetCookie() : [loginRes.headers.get('set-cookie')];
-    const allSetCookies = setCookies.filter(Boolean);
-    const sessionTokenCookie = allSetCookies.find(c => c.includes('session-token'));
-
+    const setCookies = (loginRes.headers.getSetCookie ? loginRes.headers.getSetCookie() : [loginRes.headers.get('set-cookie')]).filter(Boolean);
+    const sessionTokenCookie = setCookies.find(c => c.includes('session-token'));
     if (sessionTokenCookie) {
-      const fullCookieHeader = allSetCookies.map(c => c.split(';')[0]).join('; ');
+      const fullCookieHeader = setCookies.map(c => c.split(';')[0]).filter(c => !/=$/.test(c)).join('; ');
       const sessionCheck = await verifySession(fullCookieHeader);
+      if (!sessionCheck.valid) throw new Error('Đăng nhập xong nhưng DropBuy không trả phiên làm việc (sid).');
 
       const cfg = getConfig();
       cfg.dropbuy = {
@@ -150,37 +174,31 @@ async function loginDropbuy(username, password) {
         authenticated: true,
         authenticatedAt: new Date().toISOString(),
         cookieHeader: fullCookieHeader,
-        sessionToken: sessionTokenCookie.split(';')[0].split('=')[1],
-        user: sessionCheck.valid ? sessionCheck.user : { name: cleanUser },
+        sessionToken: sessionTokenCookie.split(';')[0].split('=').slice(1).join('='),
+        user: sessionCheck.user,
         simulationMode: false
       };
       saveConfig(cfg);
 
-      console.log(`[DropBuy Auth] ✅ Đăng nhập NextAuth thành công cho user: ${cleanUser}!`);
-      return {
-        success: true,
-        username: cleanUser,
-        user: cfg.dropbuy.user,
-        method: 'API_DIRECT'
-      };
+      console.log(`[DropBuy Auth] ✅ Đăng nhập DropBuy thành công cho user: ${cleanUser}`);
+      return { success: true, username: cleanUser, user: cfg.dropbuy.user, method: 'API_DIRECT' };
     }
 
-    // Nếu API trả về CredentialsSignin
-    const bodyText = await loginRes.text();
-    if (bodyText.includes('CredentialsSignin') || loginRes.status === 401) {
-      throw new Error('Mật khẩu hoặc tài khoản DropBuy không chính xác. Vui lòng kiểm tra lại!');
+    const bodyText = await loginRes.text().catch(() => '');
+    if (/CredentialsSignin|error=/.test(bodyText + (loginRes.headers.get('location') || '')) || loginRes.status === 401) {
+      throw Object.assign(new Error(ch.data.mfa_enabled ? 'Sai mật khẩu hoặc mã 2 bước DropBuy.' : 'Sai mật khẩu DropBuy.'), { final: true });
     }
+    throw new Error(`DropBuy trả về HTTP ${loginRes.status} khi đăng nhập`);
   } catch (apiErr) {
-    if (apiErr.message.includes('Mật khẩu hoặc tài khoản')) {
-      throw apiErr;
-    }
-    console.warn('[DropBuy Auth] Direct API không khả dụng, chuyển sang Headless Browser:', apiErr.message);
+    if (apiErr.final) throw apiErr;
+    networkError = apiErr;
+    console.warn('[DropBuy Auth] Đăng nhập trực tiếp lỗi, thử trình duyệt ẩn:', apiErr.message);
   }
 
   // --- PHƯƠNG PHÁP 2: FALLBACK SANG HEADLESS PUPPETEER ---
   const executablePath = getBrowserExecutable();
   if (!executablePath) {
-    throw new Error('Không tìm thấy trình duyệt Chrome/Edge để tự động đăng nhập DropBuy.');
+    throw new Error(`Không đăng nhập được DropBuy (${networkError?.message || 'lỗi mạng'}) và không có Chrome/Edge để thử cách khác.`);
   }
 
   const browser = await puppeteer.launch({

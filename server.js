@@ -777,11 +777,11 @@ app.post('/api/admin/download-all-images', requireAdmin, (req, res) => {
 
 app.post('/api/dropbuy/login', requireAdmin, async (req, res) => {
   try {
-    const { username, password } = req.body || {};
+    const { username, password, totp_code } = req.body || {};
     if (!username || !password) {
       return res.status(400).json({ success: false, error: 'Vui lòng nhập tài khoản và mật khẩu DropBuy' });
     }
-    const result = await dropbuyAuth.loginDropbuy(username, password);
+    const result = await dropbuyAuth.loginDropbuy(username, password, totp_code);
     realtimeSync.runFullSync5Min(io).catch(err => console.error('[Sync after login]:', err.message));
     io.emit('DROPBUY_AUTH_CHANGED', { authenticated: true });
     res.json({ success: true, message: 'Đăng nhập DropBuy thành công! Đang đồng bộ lại giá sỉ.', data: { username: result.username, method: result.method } });
