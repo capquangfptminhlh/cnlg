@@ -357,7 +357,7 @@ async function openProductDetail(productId) {
 }
 
 function selectedVariant(prod = state.activeDetailProduct) {
-  return (prod?.variants || []).find(v => v.id === state.selectedVariantId) || null;
+  return (prod?.variants || []).find(v => String(v.id) === String(state.selectedVariantId)) || null;
 }
 
 /** Tách tên phân loại "Màu đen, XL" theo nhóm lựa chọn (Màu sắc / Size) nếu khớp */
@@ -387,7 +387,7 @@ function renderVariantPicker(prod) {
               const p = v.name.split(',').map(x => x.trim());
               return v.in_stock && p[gi] === opt && p.every((x, i) => i === gi || !chosen[i] || x === chosen[i]);
             });
-            return `<button type="button" class="variant-chip ${chosen[gi] === opt ? 'active' : ''} ${ok ? '' : 'disabled'}" onclick="pickVariantOption(${gi}, ${oi})">${esc(opt)}</button>`;
+            return `<button type="button" class="variant-chip ${chosen[gi] === opt ? 'active' : ''} ${ok ? '' : 'disabled'}" aria-pressed="${chosen[gi] === opt}" ${ok ? `onclick="pickVariantOption(${gi}, ${oi})"` : 'disabled'}>${esc(opt)}</button>`;
           }).join('')}
         </div>
       </div>`).join('');
@@ -396,7 +396,7 @@ function renderVariantPicker(prod) {
     <div class="variant-group">
       <div class="variant-group-label">Phân loại:</div>
       <div class="variant-chips">
-        ${vs.map(v => `<button type="button" class="variant-chip ${sel?.id === v.id ? 'active' : ''} ${v.in_stock ? '' : 'disabled'}" ${v.in_stock ? `onclick="pickVariant('${v.id}')"` : 'disabled'} title="${v.in_stock ? '' : 'Hết hàng'}">${esc(v.name)}</button>`).join('')}
+        ${vs.map(v => `<button type="button" class="variant-chip ${String(sel?.id) === String(v.id) ? 'active' : ''} ${v.in_stock ? '' : 'disabled'}" aria-pressed="${String(sel?.id) === String(v.id)}" ${v.in_stock ? `onclick="pickVariant('${v.id}')"` : 'disabled'} title="${v.in_stock ? '' : 'Hết hàng'}">${esc(v.name)}</button>`).join('')}
       </div>
     </div>`;
 }
@@ -445,10 +445,10 @@ function renderDetailModal(prod) {
 
         <div class="thumbs-strip">
           ${gallery.map((item, idx) => `
-            <div class="thumb-item ${idx === state.selectedGalleryIndex ? 'active' : ''}" onclick="switchDetailMedia(${idx})">
+            <button type="button" class="thumb-item ${idx === state.selectedGalleryIndex ? 'active' : ''}" aria-label="Xem ${item.is_video ? 'video' : 'ảnh'} ${idx + 1}" aria-pressed="${idx === state.selectedGalleryIndex}" onclick="switchDetailMedia(${idx})">
               <img src="${esc(item.thumb || item.url)}" alt="Ảnh ${idx + 1}">
               ${item.is_video ? `<div class="thumb-video-badge"><i class="fa-solid fa-play"></i></div>` : ''}
-            </div>
+            </button>
           `).join('')}
         </div>
       </div>
@@ -490,9 +490,9 @@ function renderDetailModal(prod) {
         <div class="detail-qty-row">
           <span style="font-weight: 700; color: #cbd5e1;">Số lượng mua:</span>
           <div class="qty-stepper">
-            <button onclick="changeModalQty(-1)">-</button>
+            <button type="button" aria-label="Giảm số lượng" onclick="changeModalQty(-1)" ${modalQty <= 1 ? 'disabled' : ''}>−</button>
             <span id="modalQtyDisplay">${modalQty}</span>
-            <button onclick="changeModalQty(1)">+</button>
+            <button type="button" aria-label="Tăng số lượng" onclick="changeModalQty(1)" ${modalQty >= 50 ? 'disabled' : ''}>+</button>
           </div>
         </div>
 
@@ -528,6 +528,11 @@ function changeModalQty(delta) {
   modalQty = Math.min(50, Math.max(1, modalQty + delta));
   const el = document.getElementById('modalQtyDisplay');
   if (el) el.innerText = modalQty;
+  const buttons = el?.parentElement?.querySelectorAll('button');
+  if (buttons?.length === 2) {
+    buttons[0].disabled = modalQty <= 1;
+    buttons[1].disabled = modalQty >= 50;
+  }
 }
 
 function modalLine() {
@@ -826,13 +831,13 @@ async function updateCheckoutSummary() {
   summaryCount.innerText = totalCount + ' sản phẩm';
   summarySubtotal.innerText = formatPrice(subtotal);
   const province = provinceSelect.value;
+  const seq = ++quoteSeq;
   if (!province) {
     summaryShipping.innerText = 'Chọn tỉnh/thành để tính';
     summaryShippingNote.innerText = '';
     summaryTotal.innerText = formatPrice(subtotal);
     return;
   }
-  const seq = ++quoteSeq;
   summaryShipping.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang hỏi phí ship từ kho...';
   try {
     const json = await (await fetch('/api/shipping/quote', {
@@ -847,6 +852,7 @@ async function updateCheckoutSummary() {
     summaryShippingNote.innerText = q.source === 'dropbuy' ? `Phí thật từ kho: ${q.detail}` : q.detail;
     summaryTotal.innerText = formatPrice(subtotal + q.fee);
   } catch (e) {
+    if (seq !== quoteSeq) return;
     summaryShipping.innerText = 'Không tính được';
     summaryShippingNote.innerText = e.message;
     summaryTotal.innerText = formatPrice(subtotal);
