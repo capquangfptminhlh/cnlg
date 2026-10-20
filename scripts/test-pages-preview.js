@@ -170,6 +170,12 @@ const puppeteer=require('puppeteer-core');
     await page.setViewport({width:390,height:844,deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await new Promise(resolve=>setTimeout(resolve,400));
     await revealAll(page);
+    const overlayHealth=await page.evaluate(()=>[...document.querySelectorAll('.modal-backdrop')].map(el=>({
+      id:el.id,classes:el.className,display:getComputedStyle(el).display,
+      visible:el.getBoundingClientRect().height>0&&getComputedStyle(el).visibility!=='hidden'
+    })));
+    console.log('Mobile overlays:',JSON.stringify(overlayHealth));
+    assert.ok(overlayHealth.every(x=>!x.visible),'modal remained visible behind mobile catalog: '+JSON.stringify(overlayHealth));
     await page.screenshot({path:join(screenshots,'mobile.png'),fullPage:true});
     const mobile=await page.evaluate(()=>({
       width:window.innerWidth,scroll:document.documentElement.scrollWidth,
