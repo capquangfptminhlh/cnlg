@@ -1,0 +1,400 @@
+/* Hoàng Minh Store — purchase journey, storefront-only.
+   Designed for desktop + iOS/Android touch without altering checkout logic. */
+:root {
+  --purchase-orange:#f04e32;
+  --purchase-orange-strong:#db3d27;
+  --purchase-ink:#273141;
+  --purchase-muted:#667383;
+  --purchase-border:#e8edf3;
+  --purchase-shade:#f6f8fb;
+}
+#productDetailModal,#checkoutModal,#trackModal,#qrModal {
+  padding:18px;
+  background:rgba(25,32,46,.53);
+  backdrop-filter:blur(4px);
+}
+#productDetailModal .product-modal-dialog {
+  max-width:1050px;
+  border:1px solid rgba(255,255,255,.92);
+  border-radius:16px;
+  background:white;
+  box-shadow:0 26px 90px rgba(17,27,46,.26);
+  max-height:calc(100dvh - 36px);
+  overscroll-behavior:contain;
+  scroll-behavior:smooth;
+}
+#productDetailModal .detail-modal-content { padding:0; }
+#productDetailModal .modal-close-icon,
+#checkoutModal .modal-close-icon,
+#trackModal .modal-close-icon {
+  width:38px;height:38px;min-height:38px;
+  display:grid;place-items:center;cursor:pointer;
+  color:#536071;background:#fff;border:1px solid #e7eaf0;
+  box-shadow:0 4px 12px rgba(25,31,44,.06);
+  z-index:20;
+}
+#productDetailModal .modal-close-icon {
+  position:sticky;float:right;top:12px;margin:12px 12px -50px 0;
+}
+#productDetailModal .modal-close-icon:hover,
+#checkoutModal .modal-close-icon:hover,
+#trackModal .modal-close-icon:hover { background:#fff0e8;color:#e84a2d;border-color:#ffcaaf; }
+#productDetailModal .product-detail-grid {
+  grid-template-columns:minmax(0,.96fr) minmax(0,1.04fr);
+  gap:30px;padding:29px;align-items:start;
+}
+#productDetailModal .detail-gallery {min-width:0;position:sticky;top:12px;}
+#productDetailModal .main-preview-box {
+  background:#f7f9fb;border:1px solid #ecedf1;
+  border-radius:13px;
+  aspect-ratio:1/1;
+  margin-bottom:11px;
+}
+#productDetailModal .main-preview-box img,
+#productDetailModal .main-preview-box video {
+  width:100%;height:100%;object-fit:contain;
+  background:#fff;
+}
+#productDetailModal .thumbs-strip {
+  gap:9px;scroll-snap-type:x proximity;scrollbar-width:thin;
+  padding:2px 0 8px;
+}
+#productDetailModal .thumb-item {
+  appearance:none;
+  width:62px;height:62px;
+  border:1px solid #e6eaf0;
+  background:#f8fafc;padding:3px;
+  border-radius:9px;scroll-snap-align:start;
+  transition:border-color .16s,transform .16s,box-shadow .16s;
+}
+#productDetailModal .thumb-item img {width:100%;height:100%;object-fit:contain;}
+#productDetailModal .thumb-item.active,
+#productDetailModal .thumb-item[aria-pressed="true"] {
+  border:2px solid #ee5435;
+  box-shadow:0 2px 12px rgba(239,76,46,.11);
+}
+#productDetailModal .thumb-item:focus-visible,
+#productDetailModal .variant-chip:focus-visible,
+#productDetailModal .qty-stepper button:focus-visible {
+  outline:3px solid #ffc1a6;outline-offset:2px;
+}
+#productDetailModal .detail-info {min-width:0;padding-top:9px;}
+#productDetailModal .detail-brand-badge {
+  background:#fff3ee;color:#d85136;
+  border:1px solid #ffded0;margin-bottom:10px;font-size:10px;
+}
+#productDetailModal .detail-title {
+  margin:0 0 15px;
+  color:var(--purchase-ink);
+  font-size:22px;font-weight:850;line-height:1.45;letter-spacing:-.55px;
+  overflow-wrap:anywhere;
+}
+#productDetailModal .detail-meta-row {
+  color:#8a95a4;font-size:11px;margin-bottom:14px;gap:10px;
+}
+#productDetailModal .detail-meta-row strong {color:#4e5a69;}
+#productDetailModal .stock-status-pill {
+  color:#15865d;background:#eaf8f0;border:1px solid #d1eddb;
+  font-size:11px;padding:5px 9px;
+}
+#productDetailModal .detail-pricing-box {
+  border:0;
+  background:linear-gradient(102deg,#fff4ef,#fff8f4);
+  padding:15px 17px;border-radius:10px;
+  margin-bottom:18px;flex-wrap:wrap;gap:10px;
+}
+#productDetailModal .detail-price-main {
+  font-size:28px;color:#ed4d2f;letter-spacing:-.9px;
+}
+#productDetailModal .detail-price-sub {font-size:12px;color:#949dab;}
+#productDetailModal .saving-tag {
+  margin-left:0;color:#ed4a30;background:#fff;border:1px solid #ffd9c7;
+  font-size:10px;
+}
+#productDetailModal .variant-group {margin:0 0 12px;}
+#productDetailModal .variant-group-label {font-size:12px;font-weight:800;color:#394656;margin-bottom:8px;}
+#productDetailModal .variant-chips {display:flex;flex-wrap:wrap;gap:8px;}
+#productDetailModal .variant-chip {
+  background:#fff;color:#516071;
+  border:1px solid #e5eaf0;box-shadow:none;
+  padding:9px 12px;border-radius:7px;
+  font-size:11px;font-weight:750;min-height:38px;
+  transition:border-color .16s,background .16s,color .16s;
+}
+#productDetailModal .variant-chip:hover:not(:disabled) {background:#fff5f0;color:#ed4d2f;border-color:#f8a789;}
+#productDetailModal .variant-chip.active,
+#productDetailModal .variant-chip[aria-pressed="true"] {
+  background:#fff0e9;color:#ed4d2f;border-color:#f46c48;
+}
+#productDetailModal .variant-chip:disabled,#productDetailModal .variant-chip.disabled {
+  opacity:.42;background:#f8f9fa;cursor:not-allowed;
+}
+#productDetailModal .variant-hint {color:#d6673e;font-size:11px;margin:0 0 12px;}
+#productDetailModal .detail-features-list {
+  gap:8px;padding:13px 0;
+  margin-bottom:12px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;
+  font-size:11px;color:#6b7584;line-height:1.55;
+}
+#productDetailModal .detail-features-list i {color:#f07755;font-size:13px;}
+#productDetailModal .detail-qty-row{margin:10px 0 17px;}
+#productDetailModal .detail-qty-row>span {color:#637084 !important;}
+#productDetailModal .qty-stepper {
+  height:39px;border-color:#e3e7ed;border-radius:8px;
+  background:#fff;
+}
+#productDetailModal .qty-stepper button{
+  height:39px;width:40px;background:#fff;color:#344053;
+  font-weight:800;font-size:17px;
+}
+#productDetailModal .qty-stepper button:disabled{
+  opacity:.32;cursor:not-allowed;background:#f5f6f8;
+}
+#productDetailModal .qty-stepper span{font-size:13px;color:#283546;}
+#productDetailModal .detail-actions-row {gap:9px;}
+#productDetailModal .detail-actions-row button {
+  border-radius:8px;font-size:12px;font-weight:850;
+  min-height:45px;box-shadow:none;
+}
+#productDetailModal .btn-order-now-large{
+  background:var(--purchase-orange);color:white;
+  border:1px solid var(--purchase-orange);flex:1.1;
+}
+#productDetailModal .btn-order-now-large:hover:not(:disabled){
+  background:var(--purchase-orange-strong);
+}
+#productDetailModal .btn-add-cart-large{
+  background:#fff5f0;border:1px solid #ffb99d;color:#e84c30;flex:1;
+}
+#productDetailModal .detail-actions-row button:disabled{
+  background:#e9edf1;border-color:#e9edf1;color:#9da5af;cursor:not-allowed;
+}
+#productDetailModal .detail-tabs-section {
+  padding:0 29px 26px;border-top:1px solid #eef0f4;
+}
+#productDetailModal .detail-tabs-header {margin-top:7px;border-bottom:1px solid #e7ebf0;}
+#productDetailModal .tab-btn {
+  font-size:13px;color:#303b4a;font-weight:800;
+  white-space:normal;text-align:left;
+}
+#productDetailModal .detail-desc-body {
+  font-size:12px;color:#4e5a69;
+  line-height:1.85;max-height:none;
+  overflow:visible;overflow-wrap:anywhere;
+}
+#productDetailModal .detail-desc-body img {
+  max-width:100%;height:auto;object-fit:contain;
+}
+#productDetailModal .detail-desc-body table {
+  display:block;width:max-content;max-width:100%;overflow-x:auto;
+}
+
+/* Cart: strong visual hierarchy, stable sticky footer, touch-friendly +/- */
+#cartDrawer{
+  background:white;border-left:1px solid #e7ebf0;
+  width:min(440px,100vw);max-width:100vw;
+}
+#cartDrawer .drawer-header{
+  padding:20px 20px 16px;min-height:72px;background:white;
+  border-color:#edf0f3;
+}
+#cartDrawer .drawer-title {font-size:17px;color:#293645;font-weight:850;}
+#cartDrawer .drawer-title i {color:#e64e33;font-size:17px;}
+#cartDrawer .drawer-close-btn{
+  background:#f8f9fb;color:#657184;border:1px solid #e8ecf1;
+}
+#cartDrawer .drawer-items{padding:9px 18px;overscroll-behavior:contain;}
+#cartDrawer .cart-drawer-item {padding:14px 0;gap:11px;align-items:start;border-color:#eef1f5;}
+#cartDrawer .cart-drawer-item img {
+  width:74px;height:74px;object-fit:contain;
+  border:1px solid #edf0f4;border-radius:8px;background:#fafbfd;
+}
+#cartDrawer .cart-drawer-item-info{min-width:0;}
+#cartDrawer .drawer-item-title {
+  font-size:12px;line-height:1.5;font-weight:700;color:#384251;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+#cartDrawer .drawer-item-variant{color:#8993a1;font-size:10px;margin:4px 0;}
+#cartDrawer .drawer-item-price {color:#ed4d30;font-size:16px;letter-spacing:-.3px;}
+#cartDrawer .qty-stepper {
+  height:33px;border-color:#e7ebf0;border-radius:7px;
+}
+#cartDrawer .qty-stepper button {color:#455367;background:#f9fafc;}
+#cartDrawer .qty-stepper span {color:#303b4a;}
+#cartDrawer .drawer-footer{
+  background:#fff;border-color:#edf0f4;padding:18px 19px 20px;
+  box-shadow:0 -8px 30px rgba(22,35,55,.04);
+}
+#cartDrawer .drawer-subtotal .sub-label {font-size:12px;color:#707b8a;}
+#cartDrawer .drawer-subtotal .sub-amount {font-size:22px;color:#ed4e30;}
+#cartDrawer .drawer-note {color:#8793a2;font-size:10px;line-height:1.5;}
+#cartDrawer .drawer-note i{color:#e76a4b;}
+#cartDrawer .btn-checkout-primary{
+  background:#f04d31;color:#fff;min-height:48px;border-radius:9px;
+  font-size:13px;box-shadow:none;
+}
+#cartDrawer .btn-checkout-primary:hover:not(:disabled){background:#d63b27;}
+#cartDrawer .btn-checkout-primary:disabled{background:#ebedf0;color:#a4afbd;opacity:1;}
+
+/* Checkout: simple, labeled form, readable cost and payment selection */
+#checkoutModal .checkout-dialog {
+  width:100%;max-width:640px;
+  max-height:calc(100dvh - 36px);
+  overflow-y:auto;overscroll-behavior:contain;
+  padding:24px 27px;
+  background:#fff;border:1px solid #f0f2f5;border-radius:14px;
+  box-shadow:0 26px 90px rgba(17,27,46,.26);
+}
+#checkoutModal .modal-top {margin-bottom:16px;padding-bottom:15px;border-bottom:1px solid #edf0f4;}
+#checkoutModal .modal-top h3{font-size:18px;font-weight:850;color:#273344;letter-spacing:-.4px;}
+#checkoutModal .modal-top h3 i{color:#ee5135;}
+#checkoutModal .modal-close-icon {position:static;flex-shrink:0;}
+#checkoutModal .checkout-form {gap:14px;}
+#checkoutModal .form-row{gap:12px;}
+#checkoutModal .form-field {gap:7px;}
+#checkoutModal .form-field label {color:#4d5a6b;font-size:12px;font-weight:750;}
+#checkoutModal .form-field input,
+#checkoutModal .form-field select,
+#checkoutModal .form-field textarea{
+  background:#fff;color:#303b4a;
+  border:1px solid #dfe6ee;
+  border-radius:8px;min-height:43px;
+  font-size:13px;
+  padding:11px 12px;
+  width:100%;
+}
+#checkoutModal .form-field input:focus,
+#checkoutModal .form-field textarea:focus,
+#checkoutModal .form-field select:focus{
+  outline:2px solid rgba(239,93,59,.2);outline-offset:0;
+  border-color:#ee845f;box-shadow:none;
+}
+#checkoutModal .form-field input:disabled,
+#checkoutModal .form-field select:disabled{
+  background:#f4f6f8;color:#98a0af;cursor:not-allowed;
+}
+#checkoutModal .pay-options{grid-template-columns:1fr 1fr;gap:10px;}
+#checkoutModal .pay-option{
+  border:1px solid #e2e7ed;
+  background:#fff;border-radius:9px;
+  padding:13px 11px;gap:9px;min-height:95px;
+  transition:background .15s,border-color .15s;
+}
+#checkoutModal .pay-option:has(input:checked){
+  background:#fff2eb;border-color:#f47a55;
+}
+#checkoutModal .pay-option strong{font-size:11px;font-weight:800;color:#394554;line-height:1.5;}
+#checkoutModal .pay-option:has(input:checked) strong{color:#d74a30;}
+#checkoutModal .pay-option small{font-size:10px;color:#788596;line-height:1.55;}
+#checkoutModal .pay-option input{accent-color:#f04e32;flex:0 0 auto;}
+#checkoutModal #payMethodNote{font-size:11px;color:#7b8494 !important;}
+#checkoutModal .checkout-order-summary{
+  background:#f8fafc;border:1px solid #e8edf2;
+  border-radius:9px;padding:15px 16px;
+}
+#checkoutModal .summary-line{font-size:12px;color:#6b7889;line-height:1.6;margin:5px 0;}
+#checkoutModal .summary-line > span:last-child{color:#354253;font-weight:750;}
+#checkoutModal .summary-total-line {
+  border-top:1px solid #e5eaf1;margin-top:12px;
+  padding-top:14px;color:#293547;font-size:13px;font-weight:800;
+}
+#checkoutModal #summaryTotal{font-size:23px;font-weight:900;color:#ed5033;letter-spacing:-.4px;}
+#checkoutModal .checkout-actions{
+  display:flex;gap:12px;margin-top:2px;
+  padding-top:12px;border-top:1px solid #edf0f4;
+}
+#checkoutModal .checkout-actions .btn-ghost {
+  border:1px solid #e2e7ee;color:#657183;background:#fff;
+  border-radius:8px;min-height:44px;padding:10px 14px;font-weight:750;
+}
+#checkoutModal .checkout-actions .btn-primary {
+  flex:1;min-height:44px;border-radius:8px;
+  color:white;background:#ef4d31;
+  font-size:12px;font-weight:850;
+}
+#checkoutModal .checkout-actions .btn-primary:disabled{opacity:.55;cursor:wait;}
+#trackModal .checkout-dialog {
+  max-width:600px;border-radius:13px;background:white;
+  padding:24px;box-shadow:0 22px 80px rgba(25,36,52,.23);
+}
+#trackModal .modal-top h3{font-size:18px;color:#2d3645;}
+#trackModal .modal-top h3 i{color:#e95132;}
+
+/* Standalone overlays never compete with the mobile bottom navigation */
+body.is-overlay-open .mobile-bottom-nav {pointer-events:none;}
+body.is-overlay-open .store-to-top {visibility:hidden !important;}
+@media(max-width:760px){
+  #productDetailModal,#checkoutModal,#trackModal,#qrModal{
+    padding:8px 0 0;align-items:flex-end;
+    backdrop-filter:blur(2px);
+  }
+  #productDetailModal .product-modal-dialog,
+  #checkoutModal .checkout-dialog,#trackModal .checkout-dialog{
+    width:100vw;max-width:100vw;max-height:calc(100dvh - 8px);
+    height:auto;min-height:0;
+    border:0;border-radius:16px 16px 0 0;
+    box-shadow:0 -12px 50px rgba(24,37,56,.19);
+  }
+  #productDetailModal .product-detail-grid{
+    grid-template-columns:minmax(0,1fr);
+    padding:0;gap:0;
+  }
+  #productDetailModal .detail-gallery{position:static;padding:12px 12px 0;}
+  #productDetailModal .main-preview-box{
+    aspect-ratio:1.17/1;border-radius:11px;margin-bottom:9px;
+  }
+  #productDetailModal .thumb-item{height:54px;width:54px;}
+  #productDetailModal .detail-info{padding:12px 16px 0;}
+  #productDetailModal .detail-title{
+    font-size:17px;line-height:1.4;margin-bottom:9px;
+  }
+  #productDetailModal .detail-brand-badge{font-size:9px;margin-bottom:6px;}
+  #productDetailModal .detail-meta-row{margin-bottom:10px;}
+  #productDetailModal .detail-pricing-box{padding:11px 12px;margin-bottom:12px;}
+  #productDetailModal .detail-price-main{font-size:24px;}
+  #productDetailModal .variant-chip{min-height:38px;padding:8px 12px;font-size:11px;}
+  #productDetailModal .detail-features-list{padding:11px 0;margin-bottom:10px;font-size:10px;}
+  #productDetailModal .detail-qty-row{margin-bottom:13px;}
+  #productDetailModal .detail-actions-row{
+    position:sticky;bottom:0;z-index:4;
+    padding:11px 0 calc(12px + env(safe-area-inset-bottom));
+    background:#fff;border-top:1px solid #edf0f4;
+    box-shadow:0 -6px 16px rgba(27,35,51,.04);
+  }
+  #productDetailModal .detail-actions-row button{min-height:44px;padding:11px 8px;}
+  #productDetailModal .detail-tabs-section{padding:8px 16px 20px;}
+  #productDetailModal .modal-close-icon{
+    top:8px;margin:8px 8px -42px 0;width:36px;height:36px;
+  }
+  #cartDrawer .drawer-header{padding:17px 16px 13px;}
+  #cartDrawer .drawer-items{padding:9px 13px;}
+  #cartDrawer .drawer-footer{
+    padding:15px 15px calc(16px + env(safe-area-inset-bottom));
+  }
+  #checkoutModal .checkout-dialog,#trackModal .checkout-dialog {
+    padding:20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  #checkoutModal .modal-top h3{font-size:16px;}
+  #checkoutModal .form-row{grid-template-columns:1fr;}
+  #checkoutModal .form-field input,
+  #checkoutModal .form-field textarea,
+  #checkoutModal .form-field select{font-size:16px;}
+  #checkoutModal .pay-options{grid-template-columns:1fr;}
+  #checkoutModal .pay-option{min-height:70px;}
+  #checkoutModal .checkout-actions{
+    position:sticky;bottom:0;z-index:5;
+    margin:0 -16px calc(-20px - env(safe-area-inset-bottom));
+    padding:11px 16px calc(13px + env(safe-area-inset-bottom));
+    background:#fff;border-top:1px solid #edf0f4;
+    box-shadow:0 -8px 22px rgba(35,40,60,.05);
+  }
+  #checkoutModal .checkout-actions .btn-primary {min-width:0;}
+  #checkoutModal #summaryTotal{font-size:21px;}
+}
+@media(max-width:380px){
+  #productDetailModal .detail-actions-row button{font-size:11px;}
+  #checkoutModal .pay-option small{font-size:10px;}
+}
+@media(prefers-reduced-motion:reduce){
+  #productDetailModal .thumb-item,
+  #checkoutModal .pay-option{transition:none !important;}
+}
