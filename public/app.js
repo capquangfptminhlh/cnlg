@@ -318,7 +318,9 @@ function changePage(page) {
 }
 
 // --- FULL PRODUCT DETAIL MODAL (Gallery + Video + Specs + Phân loại) ---
+let detailRequestVersion = 0;
 async function openProductDetail(productId) {
+  const requestVersion = ++detailRequestVersion;
   searchDropdown.classList.add('hidden');
   productDetailModal.classList.add('open');
   modalQty = 1;
@@ -331,6 +333,8 @@ async function openProductDetail(productId) {
   try {
     const res = await fetch(`/api/products/${productId}`);
     const json = await res.json();
+    // User may have already closed the dialog before the product response arrives.
+    if (requestVersion !== detailRequestVersion || !productDetailModal.classList.contains('open')) return;
     if (!json.success || !json.data) {
       detailModalBody.innerHTML = `<p style="text-align: center; color: #ef4444;">Không thể tải chi tiết sản phẩm.</p>`;
       return;
@@ -347,6 +351,7 @@ async function openProductDetail(productId) {
     state.selectedVariantId = vs.length === 1 ? vs[0].id : vs.length > 1 ? (def ? def.id : null) : null;
     renderDetailModal(prod);
   } catch (err) {
+    if (requestVersion !== detailRequestVersion || !productDetailModal.classList.contains('open')) return;
     detailModalBody.innerHTML = `<p style="text-align: center; color: #ef4444;">Lỗi kết nối máy chủ.</p>`;
   }
 }
@@ -451,7 +456,7 @@ function renderDetailModal(prod) {
       <div class="detail-info">
         <div class="flex-between" style="gap:8px; flex-wrap:wrap;">
           <div class="detail-brand-badge">
-            <i class="fa-solid fa-certificate"></i> Phân phối chính hãng Hoàng Minh Store${prod.is_mall ? ' · Mall Chính Hãng' : ''}
+            <i class="fa-solid fa-store"></i> Hoàng Minh Store${prod.is_mall ? ' · Sản phẩm Mall' : ''}
           </div>
           <button type="button" class="variant-chip" onclick="copyProductLink()"><i class="fa-solid fa-link"></i> Sao chép link</button>
         </div>
@@ -477,7 +482,7 @@ function renderDetailModal(prod) {
         ${needsChoice && !v ? '<div class="variant-hint"><i class="fa-solid fa-hand-pointer"></i> Vui lòng chọn phân loại</div>' : ''}
 
         <div class="detail-features-list">
-          <div><i class="fa-solid fa-shield-halved"></i> Bảo hành: ${esc(prod.warranty || 'Bảo hành chính hãng')}</div>
+          <div><i class="fa-solid fa-shield-halved"></i> Bảo hành: ${esc(prod.warranty || 'Xem thông tin bảo hành')}</div>
           <div><i class="fa-solid fa-truck-fast"></i> Giao hàng toàn quốc, được đồng kiểm khi nhận${v?.weight_gram ? ` · ${(v.weight_gram / 1000).toLocaleString('vi-VN')} kg` : ''}</div>
           <div><i class="fa-solid fa-truck-fast"></i> Thanh toán khi nhận hàng (COD) hoặc chuyển khoản</div>
         </div>
@@ -560,12 +565,13 @@ function buyFromModalNow() {
 }
 
 closeDetailModalBtn.addEventListener('click', () => {
+  detailRequestVersion++;
   productDetailModal.classList.remove('open');
   clearProductHash();
 });
 
 // --- Link sản phẩm thật: /sp/<id>-<slug> (server trả sẵn tiêu đề, ảnh xem trước, dữ liệu cho Google) ---
-const HOME_TITLE = 'HOÀNG MINH STORE - Tổng Kho Công Nghệ & Tiện Ích Chính Hãng';
+const HOME_TITLE = 'HOÀNG MINH STORE - Phụ Kiện, Công Nghệ & Tiện Ích';
 function setProductHash(prod) {
   const url = `/sp/${prod.id}-${String(prod.slug || '').slice(0, 80)}`;
   if (location.pathname !== url) history.pushState({ productId: prod.id }, '', url);
