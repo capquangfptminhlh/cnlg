@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/marketplace.css">
   <link rel="stylesheet" href="/marketplace-v3.css">
   <link rel="stylesheet" href="/motion.css">
+  <link rel="stylesheet" href="/storefront-premium.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -84,27 +85,28 @@
       </nav>
       <section class="market-hero" aria-label="Giới thiệu cửa hàng">
         <div class="market-main-banner">
-          <div class="hero-confetti confetti-1"></div><div class="hero-confetti confetti-2"></div>
+          <div class="premium-orbit orbit-one" aria-hidden="true"></div><div class="premium-orbit orbit-two" aria-hidden="true"></div>
           <div class="market-banner-copy">
             <div class="market-banner-label"><i class="fa-solid fa-star"></i> HOÀNG MINH STORE</div>
-            <span class="banner-overline">MUA SẮM THẢ GA</span>
-            <h1>THẾ GIỚI <em>TIỆN ÍCH</em><span>TRONG TẦM TAY</span></h1>
-            <p>Phụ kiện • Công nghệ • Gia dụng</p>
-            <a href="#catalog" class="banner-shop-btn">KHÁM PHÁ NGAY <i class="fa-solid fa-arrow-right"></i></a>
+            <span class="banner-overline">KHÁM PHÁ ĐIỀU HAY</span>
+            <h1>Mọi thứ bạn cần,<span><em>ở ngay đây.</em></span></h1>
+            <p>Phụ kiện, công nghệ và tiện ích cho mỗi ngày.</p>
+            <a href="#catalog" class="banner-shop-btn">Xem sản phẩm <i class="fa-solid fa-arrow-right"></i></a>
             <div class="banner-catalog-count">Đang có <strong id="heroTotalProd">—</strong> sản phẩm trong danh mục</div>
             <div class="banner-slides" aria-hidden="true"><span class="active"></span><span></span><span></span></div>
           </div>
-          <div class="market-banner-art" aria-hidden="true">
-            <div class="banner-glow"></div><div class="banner-tag tag-one"><i class="fa-solid fa-star"></i></div><div class="banner-tag tag-two"><i class="fa-solid fa-heart"></i></div>
-            <div class="banner-bag bag-one"><i class="fa-solid fa-bag-shopping"></i></div><div class="banner-bag bag-two"><i class="fa-solid fa-headphones"></i></div>
-            <div class="banner-device"><div class="device-notch"></div><i class="fa-solid fa-mobile-screen-button"></i></div>
-            <div class="banner-cart"><i class="fa-solid fa-truck-fast"></i></div>
+          <div class="market-banner-art premium-gallery" aria-hidden="true">
+            <div class="premium-gallery-backdrop"></div>
+            <div class="premium-product-shot primary"><span class="premium-shot-glow"></span><span class="premium-fallback-icon"><i class="fa-solid fa-headphones-simple"></i></span><img class="premium-product-image" id="heroProductImageA" alt="" loading="eager"></div>
+            <div class="premium-product-shot secondary"><span class="premium-fallback-icon"><i class="fa-solid fa-mobile-screen-button"></i></span><img class="premium-product-image" id="heroProductImageB" alt="" loading="eager"></div>
+            <div class="premium-product-shot tertiary"><span class="premium-fallback-icon"><i class="fa-solid fa-gift"></i></span><img class="premium-product-image" id="heroProductImageC" alt="" loading="eager"></div>
+            <div class="premium-float-label"><i class="fa-solid fa-sparkles"></i> GỢI Ý CHO BẠN</div>
           </div>
         </div>
         <div class="market-banner-side">
-          <a class="market-mini-promo promo-blue" href="#catalog"><span>THANH TOÁN</span><strong>VIETQR</strong><small>Tiện lợi, dễ dàng <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-qrcode" aria-hidden="true"></i></a>
-          <a class="market-mini-promo promo-coral" href="#catalog"><span>DANH MỤC ĐA DẠNG</span><strong>THỎA SỨC CHỌN</strong><small>Khám phá ngay <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-gift" aria-hidden="true"></i></a>
-          <button type="button" class="market-mini-promo promo-apricot" data-store-action="track"><span>ĐẶT HÀNG DỄ DÀNG</span><strong>THEO DÕI ĐƠN</strong><small>Kiểm tra tại đây <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-box-open" aria-hidden="true"></i></button>
+          <a class="market-mini-promo promo-blue" href="#catalog"><span>CHỌN ĐÚNG NHU CẦU</span><strong>Phụ kiện & công nghệ</strong><small>Xem danh mục <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i></a>
+          <a class="market-mini-promo promo-coral" href="#catalog"><span>MUA SẮM DỄ DÀNG</span><strong>Giá rõ ràng, dễ chọn</strong><small>Lọc theo giá <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-tags" aria-hidden="true"></i></a>
+          <button type="button" class="market-mini-promo promo-apricot" data-store-action="track"><span>ĐÃ ĐẶT HÀNG?</span><strong>Tra cứu đơn hàng</strong><small>Xem tình trạng đơn <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-box-open" aria-hidden="true"></i></button>
         </div>
       </section>
     </div>
@@ -120,7 +122,7 @@
     <button type="button" class="market-shortcut" data-store-action="favorites"><span class="shortcut-icon shortcut-more"><i class="fa-regular fa-heart"></i></span><span>Yêu thích</span></button>
   </section>
   <section class="container featured-section" id="featuredSection" hidden>
-    <div class="featured-header"><h2><i class="fa-solid fa-fire-flame-curved"></i> SẢN PHẨM NỔI BẬT</h2><a href="#catalog">Xem tất cả <i class="fa-solid fa-chevron-right"></i></a></div>
+    <div class="featured-header"><div class="premium-section-heading"><span class="premium-heading-kicker">DÀNH CHO BẠN</span><h2>Gợi ý khám phá <i class="fa-solid fa-arrow-trend-up"></i></h2><p>Tuyển chọn từ danh mục hiện có của cửa hàng</p></div><a href="#catalog">Xem toàn bộ <i class="fa-solid fa-arrow-right"></i></a></div>
     <div class="featured-grid" id="featuredProducts"></div>
   </section>
 
@@ -130,7 +132,7 @@
     <!-- Filter & Sort Bar -->
     <div class="filter-bar">
       <div class="filter-left">
-        <h2 class="catalog-title" id="catalogTitle">Tất Cả Sản Phẩm</h2>
+        <div class="premium-catalog-heading"><span class="premium-heading-kicker">KHÁM PHÁ CỬA HÀNG</span><h2 class="catalog-title" id="catalogTitle">Tất Cả Sản Phẩm</h2></div>
         <span class="catalog-badge" id="catalogCount">Đang tải...</span>
       </div>
 
@@ -483,5 +485,6 @@
   <script src="/marketplace-home.js"></script>
   <script src="/favorites.js"></script>
   <script src="/motion.js"></script>
+  <script src="/storefront-premium.js"></script>
 </body>
 </html>
