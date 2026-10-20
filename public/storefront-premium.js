@@ -46,7 +46,17 @@
       placeholder?.remove();
     };
     const onError=()=>{
-      // Keep the identified placeholder but remove a broken image icon.
+      const card=img.closest('.luxury-card,.featured-card');
+      const id=Number(card?.dataset.id||card?.dataset.productId);
+      // Live storefront: retry once through the store's own public image endpoint.
+      // In static Pages demo the image is already mirrored, so no backend is used.
+      if(!window.HM_DEMO_MODE && !img.dataset.proxyRetry &&
+         Number.isSafeInteger(id) && id>0){
+        img.dataset.proxyRetry='1';
+        img.addEventListener('error',onError,{once:true});
+        img.src='/api/catalog-image/'+id;
+        return;
+      }
       img.remove();
       if(placeholder)placeholder.querySelector('small').textContent='Ảnh chưa khả dụng';
     };
