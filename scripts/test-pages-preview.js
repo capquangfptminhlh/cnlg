@@ -81,6 +81,24 @@ const puppeteer=require('puppeteer-core');
     assert.equal(snapshot.demo,'true','DEMO must be visible');
     assert.ok(snapshot.disabledPayment,'payment must be disabled');
     await revealAll(page);
+    const galleryHealth=await page.evaluate(()=>{
+      const cards=[...document.querySelectorAll('#productGrid .luxury-card')];
+      const imgs=[...document.querySelectorAll('#productGrid .card-media img')];
+      const last=cards.at(-1)?.getBoundingClientRect();
+      const gridBottom=document.getElementById('productGrid')?.getBoundingClientRect().bottom;
+      return {
+        visible:cards.filter(card=>Number.parseFloat(getComputedStyle(card).opacity)>.94).length,
+        loaded:imgs.filter(img=>img.complete&&img.naturalWidth>0).length,
+        total:cards.length,
+        bottomGap:last&&gridBottom?Math.round(gridBottom-last.bottom):9999
+      };
+    });
+    assert.ok(galleryHealth.visible===galleryHealth.total,
+      'some product cards are invisible after scroll: '+JSON.stringify(galleryHealth));
+    assert.ok(galleryHealth.loaded>=Math.min(18,galleryHealth.total-2),
+      'real product image thumbnails not loaded: '+JSON.stringify(galleryHealth));
+    assert.ok(galleryHealth.bottomGap<110,'empty space under product grid: '+JSON.stringify(galleryHealth));
+    console.log('Gallery visual quality:',JSON.stringify(galleryHealth));
     await page.screenshot({path:join(screenshots,'desktop.png'),fullPage:true});
     console.log('Desktop initial:',JSON.stringify(snapshot));
     console.log('Full retail snapshot:',JSON.stringify({items:snapshotData.products.length,categories:snapshotData.categories.length}));
