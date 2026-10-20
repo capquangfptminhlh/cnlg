@@ -28,6 +28,7 @@ const dropbuyOrderFulfillment = require('./services/dropbuyOrderFulfillment');
 const vnAddress = require('./services/vnAddress');
 const dropbuySession = require('./services/dropbuySession');
 const shippingLive = require('./services/shippingLive');
+const catalogImage = require('./services/catalogImage');
 
 const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
 /**
@@ -207,6 +208,26 @@ app.get('/api/categories', (req, res) => {
     res.json({ success: true, data: withCount });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Image fallback for browsers that cannot hotlink DropBuy's CDN.
+// Strictly public catalog images; never proxies arbitrary URLs or account headers.
+app.get('/api/catalog-image/:id', async (req, res) => {
+  const id=Number(req.params.id);
+  if(!Number.isSafeInteger(id)||id<1)return res.sendStatus(404);
+  const product=scraper.getProducts().find(p=>Number(p.id)===id);
+  if(!product)return res.sendStatus(404);
+  try {
+    const result=await catalogImage.imageForProduct(product);
+    if(!result)return res.sendStatus(404);
+    res.set('Content-Type',result.mime);
+    res.set('Cache-Control','public, max-age=43200');
+    res.set('X-Content-Type-Options','nosniff');
+    return res.send(result.buffer);
+  }catch(error){
+    res.set('Cache-Control','no-store');
+    return res.status(503).type('text/plain').send('Ảnh tạm thời không tải được');
   }
 });
 
