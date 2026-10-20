@@ -28,6 +28,7 @@ const dropbuyOrderFulfillment = require('./services/dropbuyOrderFulfillment');
 const vnAddress = require('./services/vnAddress');
 const dropbuySession = require('./services/dropbuySession');
 const shippingLive = require('./services/shippingLive');
+const watchdog = require('./services/dropbuyWatchdog');
 const catalogImage = require('./services/catalogImage');
 
 const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
@@ -639,6 +640,7 @@ app.get('/api/admin/auto-order', requireAdmin, async (req, res) => {
     paymentsSaved: cfg.payments || null,
     bankReady: bankReady(cfg),
     spentToday: dropbuyOrderFulfillment.spentToday(),
+    watchdog: watchdog.getState(),
     session: null,
     balance: null
   };
@@ -804,6 +806,7 @@ app.post('/api/dropbuy/login', requireAdmin, async (req, res) => {
     }
     const result = await dropbuyAuth.loginDropbuy(username, password, totp_code);
     realtimeSync.runFullSync5Min(io).catch(err => console.error('[Sync after login]:', err.message));
+    watchdog.tick(io).catch(err => console.error('[Watchdog after login]:', err.message));
     io.emit('DROPBUY_AUTH_CHANGED', { authenticated: true });
     res.json({ success: true, message: 'Đăng nhập DropBuy thành công! Đang đồng bộ lại giá sỉ.', data: { username: result.username, method: result.method } });
   } catch (err) {
@@ -815,6 +818,7 @@ app.post('/api/dropbuy/set-cookie', requireAdmin, async (req, res) => {
   try {
     const result = await dropbuyAuth.setManualCookie(req.body?.cookie);
     realtimeSync.runFullSync5Min(io).catch(err => console.error('[Sync after set-cookie]:', err.message));
+    watchdog.tick(io).catch(err => console.error('[Watchdog after set-cookie]:', err.message));
     io.emit('DROPBUY_AUTH_CHANGED', { authenticated: true });
     res.json({ success: true, message: result.message });
   } catch (err) {
@@ -979,6 +983,7 @@ server.listen(PORT, () => {
   realtimeSync.startRealtimeSync(io);
   orderExpiry.startOrderExpiry(io, readConfig);
   backup.startBackups();
+  watchdog.startWatchdog(io);
 
   // Định kỳ mỗi 2 phút đồng bộ trạng thái đơn hàng từ DropBuy đến khi hoàn tất
   setInterval(() => {

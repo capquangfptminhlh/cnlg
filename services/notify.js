@@ -32,7 +32,9 @@ const notify = {
   newOrder: o => sendTelegram(`🛒 <b>Đơn mới</b>\n${orderSummary(o)}`),
   paymentReported: o => sendTelegram(`💬 <b>Khách báo đã chuyển khoản</b> – cần đối soát\n${orderSummary(o)}`),
   paymentConfirmed: (o, via) => sendTelegram(`✅ <b>Đã nhận tiền</b> (${escHtml(via)}) – đặt hàng bên DropBuy\n${orderSummary(o)}`),
-  paymentIssue: (text) => sendTelegram(`⚠️ <b>Giao dịch cần kiểm tra</b>\n${escHtml(text)}`)
+  paymentIssue: (text) => sendTelegram(`⚠️ <b>Giao dịch cần kiểm tra</b>\n${escHtml(text)}`),
+  alert: (text) => sendTelegram(`🔔 <b>Cần xử lý</b>\n${escHtml(text)}`),
+  info: (text) => sendTelegram(`ℹ️ ${escHtml(text)}`)
 };
 
 module.exports = { sendTelegram, notify };

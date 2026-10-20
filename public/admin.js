@@ -888,6 +888,13 @@ async function loadAutoOrder() {
     document.getElementById('aoMinBalance').value = a.minBalance;
     document.getElementById('aoShipping').value = a.shippingMethod;
     document.getElementById('aoRequireProfit').checked = a.requireProfit;
+    document.getElementById('aoLowBalance').value = a.lowBalanceAlert;
+    const w = d.watchdog || {};
+    const alerts = [...(w.alerts || [])];
+    if (w.waiting) alerts.push(`${w.waiting} đơn đang chờ đặt sang DropBuy (sẽ tự đặt khi phiên còn hiệu lực).`);
+    const box = document.getElementById('autoOrderAlerts');
+    box.style.display = alerts.length ? 'block' : 'none';
+    box.innerHTML = alerts.map(x => `<div><i class="fa-solid fa-triangle-exclamation"></i> ${esc(x)}</div>`).join('');
     const saved = d.paymentsSaved || {};
     document.getElementById('payCod').checked = saved.cod?.enabled !== false;
     document.getElementById('payCodMax').value = d.payments.cod.maxTotal;
@@ -919,7 +926,8 @@ document.getElementById('saveAutoOrderBtn').addEventListener('click', async () =
       maxDailySpend: Number(document.getElementById('aoMaxDaily').value),
       minBalance: Number(document.getElementById('aoMinBalance').value),
       shippingMethod: document.getElementById('aoShipping').value,
-      requireProfit: document.getElementById('aoRequireProfit').checked
+      requireProfit: document.getElementById('aoRequireProfit').checked,
+      lowBalanceAlert: Number(document.getElementById('aoLowBalance').value)
     },
     payments: {
       cod: { enabled: document.getElementById('payCod').checked, maxTotal: Number(document.getElementById('payCodMax').value) },

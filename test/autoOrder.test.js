@@ -54,6 +54,10 @@ function fakeDropbuy({ balance = 5000000, cart = [], submit = 'ok', fee = 17000 
       return ok({});
     }
     if (u.endsWith('/carts/get-shipping-fee')) return ok({ shipping_method: body.shipping_method, shipping_amount: body.shipping_method === 'S' ? fee - 6000 : fee });
+    if (u.endsWith('/orders/history')) {
+      const h = (state.history || {})[body.order_code];
+      return ok({ orders: h ? [{ code: body.order_code, ...h }] : [], order_details: [], total_records: h ? 1 : 0 });
+    }
     if (u.endsWith('/balance/my-balance')) return ok({ avail_balance_current: balance });
     if (u.includes('/normal-submit')) {
       if (!u.includes(`/orders/${'s'.repeat(32)}/normal-submit`)) return { ok: true, status: 200, json: async () => ({ success: false, error_code: 400, message: 'fx_hash không hợp lệ' }) };
@@ -258,4 +262,64 @@ test('Hạn mức ngày không tính đơn đã huỷ (đã hoàn quỹ)', () =>
     { status: 'CANCELLED', dropbuy_sync: { status: 'ORDERED', ordered_at: now, spend: 28000, current_status: 'C' } }
   ];
   assert.equal(fulfillment.spentToday(orders), 100000);
+});
+
+test('Canh chừng: đơn chờ đăng nhập được tự đặt lại khi phiên còn hiệu lực; đơn cũ đã xử lý không bị đụng', async () => {
+  const watchdog = require('../services/dropbuyWatchdog');
+  const db = fakeDropbuy();
+  const waiting = makeOrder();
+  orderStore.updateOrder(waiting.id, { dropbuy_sync: { status: 'WAITING_DROPBUY_LOGIN' } });
+  const fresh = makeOrder(); // vừa tạo, đang INITIATING < 3 phút → để handOff gốc lo
+  const done = makeOrder();
+  orderStore.updateOrder(done.id, { status: 'PROCESSING', dropbuy_sync: { status: 'ORDERED', order_code: 'D-1' } });
+  const ids = watchdog.waitingOrders().map(o => o.id);
+  assert.ok(ids.includes(waiting.id));
+  assert.ok(!ids.includes(fresh.id));
+  assert.ok(!ids.includes(done.id));
+  const r = await watchdog.retryWaiting(null);
+  assert.ok(r.placed >= 1);
+  assert.equal(orderStore.getOrderById(waiting.id).status, 'PROCESSING');
+  assert.equal(orderStore.getOrderById(fresh.id).status, 'CONFIRMED');
+  assert.ok(db.submits.length >= 1);
+});
+
+test('Canh chừng: tắt tự đặt thì không đặt lại', async () => {
+  const watchdog = require('../services/dropbuyWatchdog');
+  const db = fakeDropbuy();
+  config.autoOrder.enabled = false;
+  const o = makeOrder();
+  orderStore.updateOrder(o.id, { dropbuy_sync: { status: 'WAITING_DROPBUY_LOGIN' } });
+  const r = await watchdog.retryWaiting(null);
+  assert.equal(r.skipped, 'AUTO_OFF');
+  assert.equal(db.submits.length, 0);
+});
+
+test('Đồng bộ trạng thái: giao xong → COMPLETED + mã vận đơn; COD bị huỷ/bom → huỷ; chuyển khoản bị huỷ → báo hoàn tiền', async () => {
+  const db = fakeDropbuy();
+  const mk = (method, code) => {
+    const o = makeOrder({ method });
+    return orderStore.updateOrder(o.id, { status: 'PROCESSING', dropbuy_sync: { status: 'ORDERED', order_code: code, orders: [{ id: 1, code }] } });
+  };
+  const shipping = mk('COD', 'D-S');
+  const done = mk('COD', 'D-F');
+  const bom = mk('COD', 'D-B');
+  const paidCancelled = mk('BANK', 'D-C');
+  db.history = {
+    'D-S': { order_status: 'S', shipping_ref_code: 'SPXVN123', total_amount: 69000, profit_amount: 0 },
+    'D-F': { order_status: 'F', shipping_ref_code: 'SPXVN456', total_amount: 69000, profit_amount: 40000 },
+    'D-B': { order_status: 'B', total_amount: 69000 },
+    'D-C': { order_status: 'C', total_amount: 69000 }
+  };
+  await fulfillment.syncDropbuyOrdersStatus(null);
+  const g = id => orderStore.getOrderById(id);
+  assert.equal(g(shipping.id).status, 'PROCESSING');
+  assert.equal(g(shipping.id).dropbuy_sync.shipping_ref_code, 'SPXVN123');
+  assert.equal(g(shipping.id).dropbuy_sync.current_label, 'Đang giao');
+  assert.equal(g(done.id).status, 'COMPLETED');
+  assert.ok(g(done.id).paid_at); // COD giao xong = đã thu tiền
+  assert.equal(g(bom.id).status, 'CANCELLED');
+  assert.equal(g(bom.id).needs_attention, true);
+  assert.equal(g(paidCancelled.id).status, 'PROCESSING'); // khách đã CK → không tự huỷ
+  assert.equal(g(paidCancelled.id).needs_attention, true);
+  assert.match(g(paidCancelled.id).dropbuy_sync.problem, /huỷ/);
 });

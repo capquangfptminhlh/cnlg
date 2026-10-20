@@ -26,7 +26,7 @@ const FAILED = { C: 'DropBuy đã huỷ đơn', B: 'Khách bom hàng', X: 'Hàng
 const STATUS_LABEL = { U: 'Nháp', P: 'Chờ thanh toán', O: 'Đã thanh toán', W: 'Chờ đóng hàng', G: 'Đã đóng hàng', Q: 'Chờ lấy hàng', S: 'Đang giao', F: 'Đã giao', D: 'Hoàn thành', K: 'Đang khiếu nại', C: 'Đã huỷ', B: 'Bom hàng', X: 'Hoàn hàng', N: 'Giao không thành công' };
 const LOCKED_SYNC = new Set(['SUBMITTING', 'ORDERED', 'SUBMIT_UNKNOWN']);
 
-const AUTO_DEFAULTS = { enabled: false, maxOrderSpend: 3000000, maxDailySpend: 10000000, minBalance: 0, shippingMethod: 'cheapest', requireProfit: true };
+const AUTO_DEFAULTS = { enabled: false, maxOrderSpend: 3000000, maxDailySpend: 10000000, minBalance: 0, shippingMethod: 'cheapest', requireProfit: true, lowBalanceAlert: 500000 };
 
 function num(v, def, min = 0) {
   const x = Number(v);
@@ -41,7 +41,8 @@ function normalizeAutoOrder(raw = {}) {
     maxDailySpend: num(r.maxDailySpend, AUTO_DEFAULTS.maxDailySpend),
     minBalance: num(r.minBalance, AUTO_DEFAULTS.minBalance),
     shippingMethod: ['cheapest', 'V', 'S'].includes(r.shippingMethod) ? r.shippingMethod : 'cheapest',
-    requireProfit: r.requireProfit !== false
+    requireProfit: r.requireProfit !== false,
+    lowBalanceAlert: num(r.lowBalanceAlert, AUTO_DEFAULTS.lowBalanceAlert)
   };
 }
 
@@ -189,7 +190,7 @@ async function placeOrderOnDropbuy(orderId, io, { manual = false } = {}) {
         problem: unpaid.length ? `Đơn DropBuy chưa thanh toán (${unpaid.map(x => x.code).join(', ')}) – vào DropBuy thanh toán.` : null
       }, { status: 'PROCESSING', processing_at: now, needs_attention: unpaid.length > 0 });
       emit(io, updated, 'PROCESSING', 'Kho đã nhận đơn và đang chuẩn bị hàng.');
-      notify.paymentIssue(`✅ Đã đặt DropBuy cho đơn ${orderId}: ${list.map(x => x.code).join(', ')} – trừ quỹ ${spend.toLocaleString('vi-VN')} đ${order.payment_method === 'COD' ? `, thu hộ ${(order.total_amount || 0).toLocaleString('vi-VN')} đ` : ''}.`);
+      notify.info(`✅ Đã đặt DropBuy cho đơn ${orderId}: ${list.map(x => x.code).join(', ')} – trừ quỹ ${spend.toLocaleString('vi-VN')} đ${order.payment_method === 'COD' ? `, thu hộ ${(order.total_amount || 0).toLocaleString('vi-VN')} đ` : ''}.`);
       return { success: true, orders: list, spend, goods_cost: goods, ship_cost: shipCost };
     } catch (err) {
       // Đã gửi mà không rõ kết quả (mạng/timeout) → không đoán, bắt admin kiểm tra trên DropBuy

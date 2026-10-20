@@ -223,6 +223,7 @@
         <h3 style="margin:0;"><i class="fa-solid fa-robot" style="color:#c9a84c;"></i> Tự Đặt Đơn DropBuy & Hình Thức Thanh Toán</h3>
         <div id="autoOrderStatus" style="font-size:13px;"></div>
       </div>
+      <div id="autoOrderAlerts" style="display:none; margin-top:10px; padding:10px; border-radius:6px; background:rgba(239,68,68,.15); color:#ef4444; border:1px solid rgba(239,68,68,.35); font-size:13px;"></div>
       <p style="font-size:13px; color:#94a3b8; margin:8px 0 12px;">
         Bật tự đặt: đơn COD vừa đặt / đơn chuyển khoản vừa nhận tiền sẽ được tạo ngay trên DropBuy dưới dạng <strong>dropship</strong>,
         <strong>trừ quỹ DropBuy</strong> của bạn (vốn + ship). Đơn COD: shipper thu đúng tổng tiền khách phải trả, DropBuy trả về quỹ khi giao xong.
@@ -237,6 +238,7 @@
           <select id="aoShipping"><option value="cheapest">Rẻ nhất</option><option value="V">Viettel Post</option><option value="S">SPX Express</option></select>
         </label>
         <label class="pricing-field"><span><input type="checkbox" id="aoRequireProfit"> Không đặt nếu lỗ</span></label>
+        <label class="pricing-field"><span>Báo khi quỹ dưới (đ)</span><input type="number" id="aoLowBalance" min="0" step="100000"></label>
       </div>
       <h4 style="margin:14px 0 6px;">Khách được chọn</h4>
       <div class="pricing-grid">
