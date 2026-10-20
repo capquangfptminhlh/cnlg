@@ -167,6 +167,28 @@ const puppeteer=require('puppeteer-core');
     assert.equal(mobile.nav,'grid','mobile bottom navigation must be visible');
     console.log('Mobile:',JSON.stringify(mobile));
 
+    // Catch narrow-phone clipping and tablet sidebar/banner overflow.
+    for(const width of [360,768]){
+      await page.setViewport({width,height:800,deviceScaleFactor:1,isMobile:false,hasTouch:false});
+      await new Promise(resolve=>setTimeout(resolve,220));
+      const geometry=await page.evaluate(()=>{
+        const hero=document.querySelector('.market-main-banner').getBoundingClientRect();
+        const section=document.getElementById('featuredSection').getBoundingClientRect();
+        const imgs=[...document.querySelectorAll('#featuredProducts .featured-media img')];
+        return {
+          width:innerWidth,scrollWidth:document.documentElement.scrollWidth,
+          heroLeft:Math.round(hero.left),heroRight:Math.round(hero.right),
+          firstProductTop:Math.round(document.querySelector('#featuredProducts .featured-card').getBoundingClientRect().top+window.scrollY),
+          featuredTop:Math.round(section.top+window.scrollY),
+          photos:imgs.filter(x=>x.complete&&x.naturalWidth>0).length
+        };
+      });
+      assert.ok(geometry.scrollWidth<=width+5,'horizontal overflow at '+width+': '+JSON.stringify(geometry));
+      assert.ok(geometry.heroLeft>=-1&&geometry.heroRight<=width+1,'hero clipped at '+width+': '+JSON.stringify(geometry));
+      if(width===360)assert.ok(geometry.firstProductTop<670,'products too far down on small phones: '+JSON.stringify(geometry));
+      console.log('Responsive '+width+'px:',JSON.stringify(geometry));
+    }
+
     assert.deepEqual(pageErrors,[],'browser must not emit unhandled exceptions');
     console.log('UI SMOKE TEST PASSED. Artifacts: desktop.png, cart.png, favorites.png, mobile.png');
   } finally {
