@@ -119,6 +119,7 @@ async function fetchCategories() {
 }
 
 async function fetchProducts(append = false) {
+  window.dispatchEvent(new Event('storefront:loading'));
   if (!append) {
     catalogCount.innerText = 'Đang tải danh mục sản phẩm...';
   }
@@ -158,7 +159,8 @@ async function fetchProducts(append = false) {
     }
   } catch (err) {
     console.error('Lỗi tải sản phẩm:', err);
-    catalogCount.innerText = 'Lỗi kết nối!';
+    catalogCount.innerText = 'Lỗi kết nối! Vui lòng thử lại.';
+    window.dispatchEvent(new Event('storefront:error'));
   }
 }
 
@@ -231,7 +233,7 @@ function renderProducts() {
     productGrid.innerHTML = `
       <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #64748b;">
         <i class="fa-solid fa-box-open" style="font-size: 54px; color: #cbd5e1; margin-bottom: 14px;"></i>
-        <h3 style="color: #e2e8f0; margin-bottom: 6px;">Không tìm thấy sản phẩm nào</h3>
+        <h3 style="color: #2f3747; margin-bottom: 6px;">Không tìm thấy sản phẩm nào</h3>
         <p>Vui lòng thử tìm kiếm với từ khóa khác hoặc bỏ chọn bộ lọc giá.</p>
       </div>`;
     return;
@@ -615,6 +617,7 @@ function addLineToCart(line) {
     state.cart.push(line);
   }
   updateCartUI();
+  window.dispatchEvent(new CustomEvent('storefront:cart-add', { detail: { id:line.id, quantity:line.quantity } }));
 }
 
 function saveCart() {
@@ -710,7 +713,7 @@ function updateCartUI() {
     cartItemsContainer.innerHTML = `
       <div style="text-align: center; padding: 60px 20px; color: #94a3b8;">
         <i class="fa-solid fa-basket-shopping" style="font-size: 48px; color: #475569; margin-bottom: 12px;"></i>
-        <h4 style="color: #e2e8f0; margin-bottom: 4px;">Giỏ hàng của bạn đang trống</h4>
+        <h4 style="color: #2f3747; margin-bottom: 4px;">Giỏ hàng của bạn đang trống</h4>
         <p style="font-size: 13px;">Hãy khám phá các sản phẩm công nghệ giá tốt nhé!</p>
       </div>`;
     return;
@@ -998,7 +1001,10 @@ function applyProductPatches(patches) {
     }
   }
   state.cart = state.cart.filter(i => i.quantity > 0);
-  if (gridDirty) renderProducts();
+  if (gridDirty) {
+    renderProducts();
+    window.dispatchEvent(new CustomEvent('storefront:products', { detail: { products: state.products } }));
+  }
   if (cartNotes.length) {
     updateCartUI();
     showToast(esc(cartNotes.join(' · ').slice(0, 160)));
