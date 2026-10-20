@@ -45,12 +45,10 @@ async function verifySession(cookieHeader) {
     const session = await res.json();
     
     // Nếu NextAuth trả về user hoặc object session có dữ liệu
-    if (session && (session.user || (typeof session === 'object' && Object.keys(session).length > 0))) {
-      return {
-        valid: true,
-        user: session.user || { name: 'Thành viên DropBuy' },
-        expires: session.expires
-      };
+    // Phiên dùng được phải có sid (BFF xác thực bằng header x-foxing-sid) – không lưu sid xuống file
+    if (session?.user?.sid) {
+      const { sid, ...user } = session.user;
+      return { valid: true, user, expires: session.user.expired_at || session.expires };
     }
     return { valid: false, session };
   } catch (err) {
@@ -288,12 +286,18 @@ async function setManualCookie(cookieString) {
   }
 
   let cleanCookie = cookieString.trim();
-  // Nếu người dùng chỉ dán mỗi giá trị token (không có prefix next-auth.session-token=)
+  // Nếu người dùng chỉ dán mỗi giá trị token: thử cả tên cookie https (__Secure-) và thường
+  let sessionCheck;
   if (!cleanCookie.includes('=')) {
-    cleanCookie = `next-auth.session-token=${cleanCookie}`;
+    const token = cleanCookie;
+    for (const name of ['__Secure-next-auth.session-token', 'next-auth.session-token']) {
+      cleanCookie = `${name}=${token}`;
+      sessionCheck = await verifySession(cleanCookie);
+      if (sessionCheck.valid) break;
+    }
+  } else {
+    sessionCheck = await verifySession(cleanCookie);
   }
-
-  const sessionCheck = await verifySession(cleanCookie);
 
   if (!sessionCheck.valid) {
     throw new Error('Cookie DropBuy không hợp lệ hoặc đã hết hạn. Vui lòng lấy cookie mới trên trình duyệt.');

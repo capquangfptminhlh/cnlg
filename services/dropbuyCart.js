@@ -8,30 +8,9 @@ const scraper = require('./dropbuyScraper');
  * Lưu ý: set-quantity đặt SỐ LƯỢNG TUYỆT ĐỐI cho từng phân loại trong giỏ DropBuy.
  * Nếu giỏ DropBuy đang có sẵn cùng phân loại, số lượng đó sẽ được cộng dồn trước khi gửi.
  */
-const BFF = 'https://dropbuy.vn/api/proxy/bff';
+const { bff } = require('./dropbuySession');
 
-function headers(config) {
-  return {
-    'content-type': 'application/json',
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    origin: 'https://dropbuy.vn',
-    referer: 'https://dropbuy.vn/gio-hang',
-    cookie: config.dropbuy?.cookieHeader || ''
-  };
-}
-
-async function call(path, method, body, config) {
-  const res = await fetch(`${BFF}${path}`, { method, headers: headers(config), body: body ? JSON.stringify(body) : undefined });
-  const text = await res.text();
-  let json;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new Error(`DropBuy trả về HTTP ${res.status} không phải JSON`);
-  }
-  if (!json.success) throw new Error(json.message || `DropBuy lỗi HTTP ${res.status}`);
-  return json.data;
-}
+const call = (path, method, body, config) => bff(path, { method, body, config });
 
 async function pushOrderToCart(order, config = scraper.getConfig()) {
   if (!config.dropbuy?.cookieHeader) throw new Error('Chưa đăng nhập DropBuy – đăng nhập ở mục DropBuy trong admin trước.');

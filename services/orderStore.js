@@ -5,7 +5,8 @@ const crypto = require('crypto');
 const ORDERS_FILE = process.env.HM_ORDERS_FILE || path.join(__dirname, '..', 'data', 'orders.json');
 
 // Trạng thái: PENDING_PAYMENT → PAYMENT_REPORTED (khách báo đã CK) → PAID (admin xác nhận) → COMPLETED / CANCELLED
-const STATUSES = ['PENDING_PAYMENT', 'PAYMENT_REPORTED', 'PAID', 'PROCESSING', 'COMPLETED', 'CANCELLED'];
+// CONFIRMED = đơn COD đã xác nhận, chờ đặt kho (khách trả tiền khi nhận hàng)
+const STATUSES = ['PENDING_PAYMENT', 'PAYMENT_REPORTED', 'CONFIRMED', 'PAID', 'PROCESSING', 'COMPLETED', 'CANCELLED'];
 
 function getOrders() {
   try {
@@ -39,11 +40,16 @@ function createOrder(orderData) {
   const newOrder = {
     id: orderId,
     created_at: new Date().toISOString(),
-    status: 'PENDING_PAYMENT',
+    status: orderData.payment_method === 'COD' ? 'CONFIRMED' : 'PENDING_PAYMENT',
+    payment_method: orderData.payment_method === 'COD' ? 'COD' : 'BANK',
     customer: {
       name: orderData.customer.name || '',
       phone: orderData.customer.phone || '',
       province: orderData.customer.province || '',
+      province_id: orderData.customer.province_id || null,
+      province_name: orderData.customer.province_name || '',
+      ward_id: orderData.customer.ward_id || null,
+      ward_name: orderData.customer.ward_name || '',
       address: orderData.customer.address || '',
       note: orderData.customer.note || ''
     },

@@ -17,3 +17,4 @@ data/*.tmp
 data/payments.json
 data/products_detail/
 data/backups/
+data/address-v2.json

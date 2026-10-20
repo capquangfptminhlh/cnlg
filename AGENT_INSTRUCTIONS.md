@@ -116,3 +116,10 @@ Server chạy mặc định tại cổng `3000` (URL: `http://localhost:3000`).
 - **Thông báo**: `services/notify.js` (Telegram, tuỳ chọn).
 - **Tra cứu đơn**: `GET /api/orders/:id/track?phone=` (bắt buộc đúng SĐT).
 - **Test**: `npm test` (node:test, dùng file tạm qua `HM_ORDERS_FILE` / `HM_PAYMENTS_FILE`, không đụng dữ liệu thật). Không chạy `test_relay.js` cũ – nó ghi đơn test vào `data/orders.json` thật.
+
+## 🚚 9. DROPSHIP COD & TỰ ĐẶT ĐƠN DROPBUY (cập nhật 20/10/2026 – KHÔNG ĐƯỢC HOÀN TÁC)
+- **Mô hình**: hoangminh.com là vỏ; mọi đơn là đơn **dropship** trên DropBuy. Khách chọn **COD** (shipper thu, `cod_amount` = tổng khách trả) hoặc **chuyển khoản** (`cod_amount` = 0, cần tài khoản ngân hàng thật). Cả hai đều **trừ quỹ DropBuy** của shop (vốn + ship) với `payment_method: "P"`.
+- **Xác thực BFF**: cookie KHÔNG đủ. Mọi `/api/proxy/bff/*` cần header `x-foxing-sid` = `user.sid` của `/api/auth/session` → `services/dropbuySession.js` (`ensureSession`, `bff`). Không lưu sid xuống file.
+- **Request đặt đơn** (`services/dropbuyOrderFulfillment.js` → `orders/4aa251685a7b4feb90eb8177bbbb7267/normal-submit`) được chép từ 1 đơn thật đặt trên giao diện DropBuy. Không đoán/đổi trường khi chưa bắt lại request thật. Địa chỉ dùng danh mục 2 cấp của DropBuy (`provinces-v2.json`, `wards-v2.json`, `receiver_district_id = 0`) qua `services/vnAddress.js`.
+- **Chốt chặn bắt buộc**: tắt mặc định (`config.autoOrder.enabled`), chặn lỗ, hạn mức/đơn, hạn mức/ngày, số dư quỹ; ghi `SUBMITTING` trước khi gửi; mất mạng sau khi gửi → `SUBMIT_UNKNOWN`, **không tự gửi lại**. Giỏ DropBuy dùng chung → đặt tuần tự, chỉ chọn món của đơn, trả lại giỏ cũ.
+- **Test**: `test/autoOrder.test.js` dùng DropBuy giả. Tuyệt đối không test bằng đơn thật trừ khi chủ shop đồng ý và huỷ ngay sau đó.

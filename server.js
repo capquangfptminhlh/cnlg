@@ -25,6 +25,8 @@ const seo = require('./services/seo');
 const backup = require('./services/backup');
 const reports = require('./services/reports');
 const dropbuyOrderFulfillment = require('./services/dropbuyOrderFulfillment');
+const vnAddress = require('./services/vnAddress');
+const dropbuySession = require('./services/dropbuySession');
 
 const app = express();
 const server = http.createServer(app);
@@ -122,8 +124,10 @@ function publicOrder(o) {
     shipping_detail: o.shipping_detail || null,
     cancel_reason: o.cancel_reason || null,
     items: (o.items || []).map(i => ({ id: i.id, name: i.name, variant_name: i.variant_name || null, price: i.price, quantity: i.quantity, image: i.image })),
-    customer: { name: o.customer?.name, phone: maskPhone(o.customer?.phone), province: o.customer?.province || null },
+    customer: { name: o.customer?.name, phone: maskPhone(o.customer?.phone), province: o.customer?.province || null, ward_name: o.customer?.ward_name || null },
     payment: o.payment,
+    payment_method: o.payment_method || 'BANK',
+    shipping_ref_code: o.dropbuy_sync?.shipping_ref_code || null,
     paid_at: o.paid_at || null
   };
 }
@@ -132,7 +136,23 @@ const SECRET_KEYS = ['password', 'cookieHeader', 'sessionToken', 'cookies'];
 function redactConfig(cfg) {
   const out = JSON.parse(JSON.stringify(cfg || {}));
   if (out.dropbuy) for (const k of SECRET_KEYS) if (k in out.dropbuy) out.dropbuy[k] = out.dropbuy[k] ? '***' : '';
+  if (out.dropbuy?.user?.sid) out.dropbuy.user.sid = '***';
   return out;
+}
+
+/** Hình thức thanh toán khách được chọn. COD: shipper thu hộ, DropBuy trả lại quỹ. BANK: khách chuyển khoản cho shop. */
+const PAYMENT_DEFAULTS = { cod: { enabled: true, maxTotal: 5000000 }, bank: { enabled: true } };
+function bankReady(cfg) {
+  const b = cfg.bank || {};
+  return /^\d{6}$/.test(String(b.bankId || '')) && /^\d{4,20}$/.test(String(b.accountNo || '')) && !!b.accountName;
+}
+function paymentOptions(cfg = readConfig()) {
+  const p = cfg.payments || {};
+  const codMax = Number(p.cod?.maxTotal);
+  return {
+    cod: { enabled: p.cod?.enabled !== false, maxTotal: Number.isFinite(codMax) && codMax > 0 ? codMax : PAYMENT_DEFAULTS.cod.maxTotal },
+    bank: { enabled: p.bank?.enabled !== false && bankReady(cfg) }
+  };
 }
 
 // --- PUBLIC API ---
@@ -237,6 +257,21 @@ app.get('/api/products/:id', async (req, res) => {
 });
 
 // --- Vận chuyển ---
+// Phường/xã mới (2 cấp) theo mã DropBuy – cần cho đơn dropship tự động
+app.get('/api/address/wards', async (req, res) => {
+  try {
+    const r = await vnAddress.wardsOfProvince(String(req.query.province || ''));
+    if (!r) return res.status(404).json({ success: false, error: 'Không tìm thấy tỉnh/thành' });
+    res.set('Cache-Control', 'public, max-age=3600').json({ success: true, data: { province: r.province, wards: r.wards.map(w => ({ id: w.id, name: w.name })) } });
+  } catch (e) {
+    res.status(503).json({ success: false, error: 'Chưa tải được danh mục phường/xã' });
+  }
+});
+
+app.get('/api/checkout/options', (req, res) => {
+  res.json({ success: true, data: paymentOptions() });
+});
+
 app.get('/api/shipping/provinces', (req, res) => {
   res.json({ success: true, data: shipping.PROVINCES.map(([name, region]) => ({ name, region, region_label: shipping.REGION_LABEL[region] })) });
 });
@@ -282,6 +317,10 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     const phone = String(customer?.phone || '').replace(/[\s.-]/g, '');
     const address = String(customer?.address || '').trim();
     const province = String(customer?.province || '').trim();
+    const paymentMethod = req.body?.payment_method === 'COD' ? 'COD' : 'BANK';
+    const payOpts = paymentOptions();
+    if (paymentMethod === 'COD' && !payOpts.cod.enabled) return res.status(400).json({ success: false, error: 'Cửa hàng chưa nhận thanh toán khi nhận hàng (COD).' });
+    if (paymentMethod === 'BANK' && !payOpts.bank.enabled) return res.status(400).json({ success: false, error: 'Cửa hàng chưa nhận chuyển khoản – vui lòng chọn thanh toán khi nhận hàng.' });
     if (!name || !address || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, error: 'Vui lòng cung cấp đầy đủ họ tên, số điện thoại, địa chỉ và sản phẩm.' });
     }
@@ -290,6 +329,14 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     }
     if (!shipping.regionOf(province)) return res.status(400).json({ success: false, error: 'Vui lòng chọn Tỉnh/Thành phố nhận hàng.' });
     if (items.length > 30) return res.status(400).json({ success: false, error: 'Tối đa 30 mặt hàng mỗi đơn.' });
+    // Phường/xã phải đúng danh mục DropBuy để kho giao đúng địa chỉ
+    let addr = null;
+    try {
+      addr = await vnAddress.resolve(province, customer?.ward_id);
+    } catch (e) {
+      console.warn('[Checkout] Không tải được danh mục phường/xã:', e.message);
+    }
+    if (!addr) return res.status(400).json({ success: false, error: 'Vui lòng chọn Phường/Xã nhận hàng.' });
 
     const known = new Map(scraper.getProducts().map(p => [p.id, p]));
     // Gộp theo SP + phân loại
@@ -331,17 +378,42 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     const subtotal = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
     const ship = shipping.quote({ province, subtotal, lines: orderItems }, readConfig().shipping);
     const total_amount = subtotal + ship.fee;
+    if (paymentMethod === 'COD' && total_amount > payOpts.cod.maxTotal) {
+      return res.status(400).json({ success: false, error: `Đơn trên ${payOpts.cod.maxTotal.toLocaleString('vi-VN')} đ vui lòng chọn chuyển khoản.` });
+    }
 
     const order = orderStore.createOrder({
-      customer: { name: name.slice(0, 100), phone, province, address: address.slice(0, 300), note: String(customer?.note || '').slice(0, 500) },
+      customer: {
+        name: name.slice(0, 100), phone, province, address: address.slice(0, 300), note: String(customer?.note || '').slice(0, 500),
+        province_id: addr.province.id, province_name: addr.province.name, ward_id: addr.ward.id, ward_name: addr.ward.name
+      },
       items: orderItems,
-      total_amount
+      total_amount,
+      payment_method: paymentMethod
     });
     orderStore.updateOrder(order.id, { subtotal, shipping_fee: ship.fee, shipping_detail: ship.detail, weight_gram: ship.weight_gram, live_verified: orderItems.every(i => i.live_verified) });
     order.subtotal = subtotal;
     order.shipping_fee = ship.fee;
     console.log(`[Order] Đã tiếp nhận đơn hàng #${order.id}: ${subtotal.toLocaleString('vi-VN')} đ + ship ${ship.fee.toLocaleString('vi-VN')} đ`);
     notify.newOrder({ ...order, items: orderItems });
+
+    if (paymentMethod === 'COD') {
+      // Không cần chờ tiền: đặt kho ngay (hoặc đưa vào giỏ nếu chưa bật tự đặt)
+      setImmediate(() => {
+        dropbuyOrderFulfillment.handOff(order.id, io).catch(err => console.error(`[DropBuy] Đơn COD ${order.id} chưa đặt được:`, err.message));
+      });
+      return res.json({
+        success: true,
+        orderId: order.id,
+        payment_method: 'COD',
+        subtotal,
+        shipping_fee: ship.fee,
+        shipping_detail: ship.detail,
+        total_amount,
+        items: orderItems.map(i => ({ id: i.id, variation_id: i.variation_id, variant_name: i.variant_name, name: i.name, price: i.price, quantity: i.quantity })),
+        message: `Đặt hàng thành công! Bạn thanh toán ${total_amount.toLocaleString('vi-VN')} đ khi nhận hàng.`
+      });
+    }
 
     setImmediate(() => {
       relay.processOrderFulfillment(order, io).catch(err => {
@@ -359,6 +431,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       shipping_fee: ship.fee,
       shipping_detail: ship.detail,
       total_amount,
+      payment_method: 'BANK',
       payment_timeout_minutes: timeout,
       items: orderItems.map(i => ({ id: i.id, variation_id: i.variation_id, variant_name: i.variant_name, name: i.name, price: i.price, quantity: i.quantity })),
       message: 'Đơn hàng đã được tạo. Đang khởi tạo mã thanh toán...'
@@ -395,10 +468,10 @@ app.get('/api/orders/:id/track', rateLimit('track', 10 * 60e3, 30), (req, res) =
     return res.status(404).json({ success: false, error: 'Không tìm thấy đơn với mã và số điện thoại này.' });
   }
   const timeline = [
-    { status: 'CREATED', at: order.created_at, label: 'Đặt hàng' },
+    { status: 'CREATED', at: order.created_at, label: order.payment_method === 'COD' ? 'Đặt hàng – thanh toán khi nhận' : 'Đặt hàng' },
     order.payment_reported_at && { status: 'PAYMENT_REPORTED', at: order.payment_reported_at, label: 'Đã báo chuyển khoản' },
     order.paid_at && { status: 'PAID', at: order.paid_at, label: 'Cửa hàng đã nhận tiền' },
-    order.processing_at && { status: 'PROCESSING', at: order.processing_at, label: 'Đã đặt hàng tại kho' },
+    order.processing_at && { status: 'PROCESSING', at: order.processing_at, label: order.dropbuy_sync?.shipping_ref_code ? `Đang giao – mã vận đơn ${order.dropbuy_sync.shipping_ref_code}` : 'Kho đang chuẩn bị hàng' },
     order.completed_at && { status: 'COMPLETED', at: order.completed_at, label: 'Giao hàng thành công' },
     order.cancelled_at && { status: 'CANCELLED', at: order.cancelled_at, label: order.cancel_reason || 'Đã huỷ' }
   ].filter(Boolean);
@@ -413,10 +486,10 @@ function confirmOrderPayment(orderId, meta = {}) {
   io.emit('ADMIN_ORDER_CHANGED', { orderId, status: 'PAID' });
   notify.paymentConfirmed(updated, meta.via === 'admin' ? 'admin xác nhận' : `tự động qua ${meta.via}`);
 
-  // Tự đưa các món vào giỏ DropBuy để admin đặt dropship (không tự đặt đơn / trừ tiền)
+  // Tự đặt đơn DropBuy (nếu bật) hoặc đưa vào giỏ cho admin đặt tay
   setImmediate(() => {
-    dropbuyOrderFulfillment.fulfillOrderOnDropbuy(orderId, io).catch(err => {
-      console.error(`[DropBuy] Không đưa được đơn #${orderId} vào giỏ DropBuy:`, err.message);
+    dropbuyOrderFulfillment.handOff(orderId, io).catch(err => {
+      console.error(`[DropBuy] Đơn #${orderId} chưa đặt được trên DropBuy:`, err.message);
     });
   });
 
@@ -474,6 +547,69 @@ app.post('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
   if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
   io.to(order.id).emit('ORDER_STATUS_UPDATE', { orderId: order.id, status, message: `Đơn hàng chuyển sang trạng thái ${status}` });
   res.json({ success: true, data: order });
+});
+
+// Đặt đơn dropship trên DropBuy ngay (trừ quỹ) – dùng khi tự đặt đang tắt hoặc lần tự đặt trước bị chặn
+app.post('/api/admin/orders/:id/place-dropbuy', requireAdmin, async (req, res) => {
+  try {
+    const r = await dropbuyOrderFulfillment.placeOrderOnDropbuy(req.params.id, io, { manual: true });
+    res.json({ success: true, message: `Đã đặt trên DropBuy: ${r.orders.map(x => x.code).join(', ')} – trừ quỹ ${r.spend.toLocaleString('vi-VN')} đ.`, data: r });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/admin/orders/:id/cancel-dropbuy', requireAdmin, async (req, res) => {
+  try {
+    const order = await dropbuyOrderFulfillment.cancelOnDropbuy(req.params.id, io);
+    res.json({ success: true, message: order.refund_needed ? 'Đã huỷ trên DropBuy. Khách đã chuyển khoản – nhớ hoàn tiền.' : 'Đã huỷ trên DropBuy.', data: order });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Cài đặt tự đặt đơn + hình thức thanh toán + tình trạng quỹ/phiên DropBuy
+app.get('/api/admin/auto-order', requireAdmin, async (req, res) => {
+  const cfg = readConfig();
+  const out = {
+    autoOrder: dropbuyOrderFulfillment.normalizeAutoOrder(cfg.autoOrder),
+    payments: paymentOptions(cfg),
+    paymentsSaved: cfg.payments || null,
+    bankReady: bankReady(cfg),
+    spentToday: dropbuyOrderFulfillment.spentToday(),
+    session: null,
+    balance: null
+  };
+  try {
+    const s = await dropbuySession.ensureSession(cfg);
+    if (s) {
+      out.session = { username: s.user?.username, name: s.user?.name, expiresAt: s.expiresAt, otpRequiredAbove: s.user?.otp_required_above || 0 };
+      const bal = await dropbuySession.bff('/balance/my-balance', { config: cfg });
+      out.balance = { available: bal?.avail_balance_current ?? null, deposit: bal?.deposit_balance_current ?? null };
+    }
+  } catch (e) {
+    out.sessionError = e.message;
+  }
+  res.json({ success: true, data: out });
+});
+
+app.post('/api/admin/auto-order', requireAdmin, (req, res) => {
+  const b = req.body || {};
+  const cfg = readConfig();
+  if (b.autoOrder) cfg.autoOrder = dropbuyOrderFulfillment.normalizeAutoOrder({ ...(cfg.autoOrder || {}), ...b.autoOrder });
+  if (b.payments) {
+    const cur = cfg.payments || {};
+    const maxTotal = Number(b.payments.cod?.maxTotal ?? cur.cod?.maxTotal);
+    cfg.payments = {
+      cod: { enabled: b.payments.cod?.enabled ?? cur.cod?.enabled ?? true, maxTotal: Number.isFinite(maxTotal) && maxTotal > 0 ? Math.round(maxTotal) : PAYMENT_DEFAULTS.cod.maxTotal },
+      bank: { enabled: b.payments.bank?.enabled ?? cur.bank?.enabled ?? true }
+    };
+    if (!cfg.payments.cod.enabled && !(cfg.payments.bank.enabled && bankReady(cfg))) {
+      return res.status(400).json({ success: false, error: 'Phải bật ít nhất 1 hình thức thanh toán (COD, hoặc chuyển khoản đã có tài khoản ngân hàng).' });
+    }
+  }
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
+  res.json({ success: true, data: { autoOrder: dropbuyOrderFulfillment.normalizeAutoOrder(cfg.autoOrder), payments: paymentOptions(cfg) } });
 });
 
 app.get('/api/admin/report', requireAdmin, (req, res) => {

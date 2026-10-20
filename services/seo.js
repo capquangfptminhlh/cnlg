@@ -41,7 +41,7 @@ function renderProductPage(req, product, detail, config) {
   const url = base + productPath(product);
   const name = storeName(config);
   const priceText = `${Number(product.price).toLocaleString('vi-VN')} đ`;
-  const desc = (stripHtml(detail?.description).slice(0, 155) || `${product.name} – ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, thanh toán VietQR.'}`);
+  const desc = (stripHtml(detail?.description).slice(0, 155) || `${product.name} – ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, thanh toán khi nhận hàng.'}`);
   const image = product.image_hd || product.image;
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -84,7 +84,7 @@ function renderProductPage(req, product, detail, config) {
 /** HTML trang chủ kèm meta mô tả cửa hàng */
 function renderHomePage(req, config, total) {
   const name = storeName(config);
-  const desc = `${config.store?.slogan || 'Tổng kho phân phối sỉ & lẻ chính hãng'} – Hơn ${total.toLocaleString('vi-VN')} sản phẩm công nghệ & gia dụng chính hãng, giao toàn quốc, thanh toán VietQR tự động.`;
+  const desc = `${config.store?.slogan || 'Tổng kho phân phối sỉ & lẻ chính hãng'} – Hơn ${total.toLocaleString('vi-VN')} sản phẩm công nghệ & gia dụng chính hãng, giao toàn quốc, kiểm tra hàng – trả tiền khi nhận.`;
   const head = `
   <meta name="description" content="${escAttr(desc)}">
   <link rel="canonical" href="${escAttr(baseUrl(req) + '/')}">

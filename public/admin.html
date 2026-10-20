@@ -213,6 +213,39 @@
       </div>
     </div>
 
+    <!-- ===================== TỰ ĐẶT ĐƠN DROPBUY (TRỪ QUỸ) ===================== -->
+    <div class="admin-card" id="autoOrderSection" style="margin-top: 24px;">
+      <div class="flex-between" style="flex-wrap: wrap; gap: 8px;">
+        <h3 style="margin:0;"><i class="fa-solid fa-robot" style="color:#c9a84c;"></i> Tự Đặt Đơn DropBuy & Hình Thức Thanh Toán</h3>
+        <div id="autoOrderStatus" style="font-size:13px;"></div>
+      </div>
+      <p style="font-size:13px; color:#94a3b8; margin:8px 0 12px;">
+        Bật tự đặt: đơn COD vừa đặt / đơn chuyển khoản vừa nhận tiền sẽ được tạo ngay trên DropBuy dưới dạng <strong>dropship</strong>,
+        <strong>trừ quỹ DropBuy</strong> của bạn (vốn + ship). Đơn COD: shipper thu đúng tổng tiền khách phải trả, DropBuy trả về quỹ khi giao xong.
+        Hệ thống chặn đơn nếu lỗ, vượt hạn mức hoặc quỹ không đủ.
+      </p>
+      <div class="pricing-grid">
+        <label class="pricing-field"><span><input type="checkbox" id="aoEnabled"> <strong>Bật tự đặt đơn</strong></span></label>
+        <label class="pricing-field"><span>Tối đa mỗi đơn (đ)</span><input type="number" id="aoMaxOrder" min="0" step="10000"></label>
+        <label class="pricing-field"><span>Tối đa mỗi ngày (đ)</span><input type="number" id="aoMaxDaily" min="0" step="100000"></label>
+        <label class="pricing-field"><span>Giữ lại trong quỹ (đ)</span><input type="number" id="aoMinBalance" min="0" step="10000"></label>
+        <label class="pricing-field"><span>Đơn vị vận chuyển</span>
+          <select id="aoShipping"><option value="cheapest">Rẻ nhất</option><option value="V">Viettel Post</option><option value="S">SPX Express</option></select>
+        </label>
+        <label class="pricing-field"><span><input type="checkbox" id="aoRequireProfit"> Không đặt nếu lỗ</span></label>
+      </div>
+      <h4 style="margin:14px 0 6px;">Khách được chọn</h4>
+      <div class="pricing-grid">
+        <label class="pricing-field"><span><input type="checkbox" id="payCod"> Thanh toán khi nhận hàng (COD)</span></label>
+        <label class="pricing-field"><span>COD tối đa mỗi đơn (đ)</span><input type="number" id="payCodMax" min="0" step="100000"></label>
+        <label class="pricing-field"><span><input type="checkbox" id="payBank"> Chuyển khoản VietQR</span><small id="payBankNote" style="color:#f59e0b;"></small></label>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+        <button class="btn btn-primary" id="saveAutoOrderBtn"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+        <small id="autoOrderMsg" style="color:#94a3b8;"></small>
+      </div>
+    </div>
+
     <!-- ===================== THANH TOÁN TỰ ĐỘNG (WEBHOOK NGÂN HÀNG) ===================== -->
     <div class="admin-card" id="paymentsSection" style="margin-top: 24px;">
       <div class="flex-between" style="flex-wrap: wrap; gap: 8px;">

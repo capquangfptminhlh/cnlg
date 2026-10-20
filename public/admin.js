@@ -43,6 +43,7 @@ async function adminFetch(url, opts = {}, retry = true) {
 }
 
 const STATUS_LABEL = {
+  CONFIRMED: ['pending', 'COD – CHỜ ĐẶT KHO'],
   PENDING_PAYMENT: ['pending', 'CHỜ THANH TOÁN'],
   PAYMENT_REPORTED: ['reported', 'KHÁCH BÁO ĐÃ CK'],
   PAID: ['paid', 'ĐÃ THANH TOÁN'],
@@ -107,7 +108,14 @@ function renderOrders(orders) {
   ordersTableBody.innerHTML = orders.map(o => {
     const [cls, label] = STATUS_LABEL[o.status] || ['pending', o.status];
     const cost = (o.items || []).reduce((s, i) => s + (i.dropbuy_cost || 0) * i.quantity, 0);
-    const canConfirm = ['PENDING_PAYMENT', 'PAYMENT_REPORTED'].includes(o.status);
+    const canConfirm = o.payment_method !== 'COD' && ['PENDING_PAYMENT', 'PAYMENT_REPORTED'].includes(o.status);
+    const ds = o.dropbuy_sync || {};
+    const dbNote = ds.status === 'WAITING_DROPBUY_LOGIN' ? '<br><small style="color:#ef4444;">⚠ Chưa đăng nhập DropBuy</small>'
+      : ds.status === 'FAILED' ? `<br><small style="color:#ef4444;">⚠ ${esc(ds.error || 'Lỗi DropBuy')}</small>`
+      : ds.status === 'SUBMIT_UNKNOWN' ? `<br><small style="color:#ef4444;">⚠ ${esc(ds.error)}</small>`
+      : ds.status === 'SUBMITTING' ? '<br><small style="color:#f59e0b;">Đang gửi sang DropBuy...</small>'
+      : ds.status === 'IN_DROPBUY_CART' ? '<br><small style="color:#10b981;">✓ Đã nằm trong giỏ DropBuy</small>' : '';
+    const readyForKho = (o.payment_method === 'COD' && o.status === 'CONFIRMED') || (o.payment_method !== 'COD' && o.status === 'PAID');
     const items = (o.items || []).map(i => {
       const name = i.dropbuy_url ? `<a href="${esc(i.dropbuy_url)}" target="_blank" rel="noopener" style="color:#c9a84c;">${esc(i.name)}</a>` : esc(i.name);
       return `${name}${i.variant_name ? ` <em style="color:#94a3b8;">[${esc(i.variant_name)}]</em>` : ''} × ${i.quantity}${i.sku ? ` <small style="color:#64748b;">${esc(i.sku)}</small>` : ''}${i.dropbuy_cost ? ` <span title="Giá vốn DropBuy">(${formatPrice(i.dropbuy_cost)})</span>` : ''}`;
@@ -116,30 +124,31 @@ function renderOrders(orders) {
     if (canConfirm) {
       actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="confirmOrder('${esc(o.id)}')">Xác Nhận Đã Nhận Tiền</button>
         <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="setOrderStatus('${esc(o.id)}', 'CANCELLED')">Huỷ đơn</button>`;
-    } else if (o.status === 'PAID') {
-      actions = `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="pushToDropbuyCart('${esc(o.id)}')"><i class="fa-solid fa-cart-arrow-down"></i> Đưa vào giỏ DropBuy</button>
+    } else if (readyForKho) {
+      const locked = ['SUBMITTING', 'SUBMIT_UNKNOWN'].includes(ds.status);
+      actions = `${locked ? '' : `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="placeOnDropbuy('${esc(o.id)}')"><i class="fa-solid fa-bolt"></i> Đặt DropBuy ngay (trừ quỹ)</button><br>`}
+        <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="pushToDropbuyCart('${esc(o.id)}')"><i class="fa-solid fa-cart-arrow-down"></i> Chỉ đưa vào giỏ</button>
+        ${o.payment_method === 'COD' ? `<button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="setOrderStatus('${esc(o.id)}', 'CANCELLED')">Huỷ đơn</button>` : ''}
         <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="copyReceiver('${esc(o.id)}')"><i class="fa-regular fa-copy"></i> Sao chép người nhận</button>
         <button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="attachDropbuyCode('${esc(o.id)}')">Đã đặt – nhập mã DropBuy</button>
-        ${o.dropbuy_sync?.status === 'IN_DROPBUY_CART' ? '<br><small style="color:#10b981;">✓ Đã nằm trong giỏ DropBuy</small>' : ''}
-        ${o.dropbuy_sync?.status === 'WAITING_DROPBUY_LOGIN' ? '<br><small style="color:#ef4444;">⚠ Chưa đăng nhập DropBuy</small>' : ''}
-        ${o.dropbuy_sync?.status === 'FAILED' ? `<br><small style="color:#ef4444;">⚠ ${esc(o.dropbuy_sync.error || 'Lỗi DropBuy')}</small>` : ''}`;
+        ${dbNote}`;
     } else if (o.status === 'PROCESSING') {
-      actions = `${o.dropbuy_sync?.problem ? `<small style="color:#ef4444;">⚠ ${esc(o.dropbuy_sync.problem)} – cần hoàn tiền / xử lý</small><br>` : ''}<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="setOrderStatus('${esc(o.id)}', 'COMPLETED')">Đã giao xong</button>`;
+      actions = `${o.dropbuy_sync?.problem ? `<small style="color:#ef4444;">⚠ ${esc(o.dropbuy_sync.problem)}</small><br>` : ''}${(ds.orders || []).length || ds.order_id ? `<button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-bottom: 4px;" onclick="cancelOnDropbuy('${esc(o.id)}')">Huỷ trên DropBuy</button><br>` : ''}<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="setOrderStatus('${esc(o.id)}', 'COMPLETED')">Đã giao xong</button>`;
     } else {
       actions = `<span style="color: #10b981; font-size: 12px;"><i class="fa-solid fa-check"></i> ${label}</span>`;
     }
     return `
     <tr>
       <td><strong>#${esc(o.id)}</strong><br><small style="color:#6b7280;">${new Date(o.created_at).toLocaleString('vi-VN')}</small></td>
-      <td><code>${esc(o.dropbuy_sync?.order_code || 'Chưa đặt')}</code>${o.dropbuy_sync?.current_label ? `<br><small style="color:#10b981;">${esc(o.dropbuy_sync.current_label)}</small>` : ''}${o.dropbuy_sync?.shipping_ref_code ? `<br><small style="color:#6b7280;">VĐ: ${esc(o.dropbuy_sync.shipping_ref_code)}</small>` : ''}</td>
+      <td><code>${esc((ds.orders || []).map(x => x.code).join(', ') || ds.order_code || 'Chưa đặt')}</code>${ds.spend ? `<br><small style="color:#94a3b8;">Trừ quỹ ${formatPrice(ds.spend)}</small>` : ''}${o.dropbuy_sync?.current_label ? `<br><small style="color:#10b981;">${esc(o.dropbuy_sync.current_label)}</small>` : ''}${o.dropbuy_sync?.shipping_ref_code ? `<br><small style="color:#6b7280;">VĐ: ${esc(o.dropbuy_sync.shipping_ref_code)}</small>` : ''}</td>
       <td>
         <strong>${esc(o.customer?.name)}</strong><br>
         <small style="color: #6b7280;">${esc(o.customer?.phone)}</small><br>
-        <small style="color: #6b7280;">${esc(o.customer?.address)}${o.customer?.province ? `, ${esc(o.customer.province)}` : ''}</small>
+        <small style="color: #6b7280;">${esc(o.customer?.address)}${o.customer?.ward_name ? `, ${esc(o.customer.ward_name)}` : ""}${o.customer?.province ? `, ${esc(o.customer.province)}` : ''}</small>
         ${o.customer?.note ? `<br><small style="color:#f59e0b;">Ghi chú: ${esc(o.customer.note)}</small>` : ''}
       </td>
       <td class="order-items-cell">${items}${o.shipping_fee != null ? `<br>Ship: ${o.shipping_fee ? formatPrice(o.shipping_fee) : 'miễn phí'}${o.customer?.province ? ` (${esc(o.customer.province)})` : ''}` : ''}${cost ? `<br><strong>Lãi gộp hàng: ${formatPrice((o.subtotal ?? o.total_amount) - cost)}</strong>` : ''}</td>
-      <td><strong style="color: #e11d48;">${formatPrice(o.total_amount)}</strong>${o.payment_via ? `<br><small style="color:#10b981;">${o.payment_via === 'admin' ? 'xác nhận tay' : `tự động: ${esc(o.payment_via)}`}</small>` : ''}${o.late_payment ? `<br><small style="color:#ef4444;">Tiền về sau khi huỷ: ${formatPrice(o.late_payment.amount)}</small>` : ''}</td>
+      <td><strong style="color: #e11d48;">${formatPrice(o.total_amount)}</strong><br><small style="color:${o.payment_method === 'COD' ? '#38bdf8' : '#94a3b8'};">${o.payment_method === 'COD' ? 'COD – thu khi giao' : 'Chuyển khoản'}</small>${ds.spend ? `<br><small style="color:#10b981;">Lãi ${formatPrice(o.total_amount - ds.spend)}</small>` : ''}${o.payment_via ? `<br><small style="color:#10b981;">${o.payment_via === 'admin' ? 'xác nhận tay' : `tự động: ${esc(o.payment_via)}`}</small>` : ''}${o.late_payment ? `<br><small style="color:#ef4444;">Tiền về sau khi huỷ: ${formatPrice(o.late_payment.amount)}</small>` : ''}</td>
       <td><span class="status-pill ${cls}">${label}</span>${o.needs_attention && o.status === 'PAYMENT_REPORTED' ? '<br><small style="color:#ef4444;">⚠ Khách báo CK đã lâu – cần đối soát</small>' : ''}${o.cancel_reason ? `<br><small style="color:#94a3b8;">${esc(o.cancel_reason)}</small>` : ''}</td>
       <td>${actions}</td>
     </tr>`;
@@ -161,6 +170,29 @@ async function pushToDropbuyCart(orderId) {
   }
 }
 
+async function placeOnDropbuy(orderId) {
+  if (!confirm(`Đặt đơn #${orderId} trên DropBuy ngay? Tiền vốn + ship sẽ bị trừ vào quỹ DropBuy của bạn.`)) return;
+  try {
+    const json = await (await adminFetch(`/api/admin/orders/${orderId}/place-dropbuy`, { method: 'POST', body: '{}' })).json();
+    alert(json.success ? json.message : 'Chưa đặt được: ' + json.error);
+  } catch (e) {
+    alert('Lỗi: ' + e.message);
+  }
+  loadData();
+  loadAutoOrder();
+}
+
+async function cancelOnDropbuy(orderId) {
+  if (!confirm(`Huỷ đơn #${orderId} trên DropBuy? (Chỉ huỷ được khi kho chưa đóng gói)`)) return;
+  try {
+    const json = await (await adminFetch(`/api/admin/orders/${orderId}/cancel-dropbuy`, { method: 'POST', body: '{}' })).json();
+    alert(json.success ? json.message : 'Không huỷ được: ' + json.error);
+  } catch (e) {
+    alert('Lỗi: ' + e.message);
+  }
+  loadData();
+}
+
 async function attachDropbuyCode(orderId) {
   const code = prompt(`Mã đơn trên DropBuy của đơn #${orderId} (xem ở dropbuy.vn → Đơn mua):`);
   if (!code) return;
@@ -176,7 +208,7 @@ async function attachDropbuyCode(orderId) {
 function copyReceiver(orderId, silent = false) {
   const o = lastOrders.find(x => x.id === orderId);
   if (!o) return;
-  const text = `${o.customer?.name}\n${o.customer?.phone}\n${o.customer?.address}${o.customer?.province ? `, ${o.customer.province}` : ''}${o.customer?.note ? `\nGhi chú: ${o.customer.note}` : ''}`;
+  const text = `${o.customer?.name}\n${o.customer?.phone}\n${o.customer?.address}${o.customer?.ward_name ? `, ${o.customer.ward_name}` : ""}${o.customer?.province ? `, ${o.customer.province}` : ''}${o.customer?.note ? `\nGhi chú: ${o.customer.note}` : ''}`;
   navigator.clipboard.writeText(text).then(() => { if (!silent) alert('Đã sao chép:\n\n' + text); }).catch(() => prompt('Sao chép:', text));
 }
 
@@ -811,3 +843,71 @@ document.getElementById('backupNowBtn').addEventListener('click', async () => {
 socket.on('ADMIN_ORDER_CHANGED', () => loadReport());
 loadReport();
 loadBackupInfo();
+
+
+// ============================ TỰ ĐẶT ĐƠN DROPBUY ============================
+async function loadAutoOrder() {
+  try {
+    const json = await (await adminFetch('/api/admin/auto-order')).json();
+    if (!json.success) throw new Error(json.error);
+    const d = json.data;
+    const a = d.autoOrder;
+    document.getElementById('aoEnabled').checked = a.enabled;
+    document.getElementById('aoMaxOrder').value = a.maxOrderSpend;
+    document.getElementById('aoMaxDaily').value = a.maxDailySpend;
+    document.getElementById('aoMinBalance').value = a.minBalance;
+    document.getElementById('aoShipping').value = a.shippingMethod;
+    document.getElementById('aoRequireProfit').checked = a.requireProfit;
+    const saved = d.paymentsSaved || {};
+    document.getElementById('payCod').checked = saved.cod?.enabled !== false;
+    document.getElementById('payCodMax').value = d.payments.cod.maxTotal;
+    document.getElementById('payBank').checked = saved.bank?.enabled !== false;
+    document.getElementById('payBankNote').innerText = d.bankReady ? '' : 'Chưa có số tài khoản – khách sẽ không thấy lựa chọn này.';
+    const st = document.getElementById('autoOrderStatus');
+    if (d.session) {
+      const exp = new Date(d.session.expiresAt);
+      const hours = Math.round((exp - Date.now()) / 3600e3);
+      st.innerHTML = `<span class="auth-badge badge-connected">✓ ${esc(d.session.username || d.session.name || 'DropBuy')}</span>
+        Quỹ khả dụng: <strong style="color:#10b981;">${d.balance?.available != null ? formatPrice(d.balance.available) : '?'}</strong>
+        · Hôm nay đã đặt: <strong>${formatPrice(d.spentToday)}</strong>
+        · Phiên hết hạn ${exp.toLocaleString('vi-VN')}${hours < 12 ? ' <span style="color:#ef4444;">(sắp hết – đăng nhập lại)</span>' : ''}`;
+    } else {
+      st.innerHTML = `<span class="auth-badge badge-disconnected">✗ Chưa đăng nhập DropBuy</span> <small style="color:#ef4444;">${esc(d.sessionError || 'Đăng nhập ở mục DropBuy phía trên để tự đặt đơn.')}</small>`;
+    }
+  } catch (e) {
+    document.getElementById('autoOrderStatus').innerText = 'Lỗi: ' + e.message;
+  }
+}
+
+document.getElementById('saveAutoOrderBtn').addEventListener('click', async () => {
+  const enabled = document.getElementById('aoEnabled').checked;
+  if (enabled && !confirm('Bật tự đặt đơn: mỗi đơn hợp lệ sẽ tự trừ quỹ DropBuy của bạn. Tiếp tục?')) return;
+  const body = {
+    autoOrder: {
+      enabled,
+      maxOrderSpend: Number(document.getElementById('aoMaxOrder').value),
+      maxDailySpend: Number(document.getElementById('aoMaxDaily').value),
+      minBalance: Number(document.getElementById('aoMinBalance').value),
+      shippingMethod: document.getElementById('aoShipping').value,
+      requireProfit: document.getElementById('aoRequireProfit').checked
+    },
+    payments: {
+      cod: { enabled: document.getElementById('payCod').checked, maxTotal: Number(document.getElementById('payCodMax').value) },
+      bank: { enabled: document.getElementById('payBank').checked }
+    }
+  };
+  const msg = document.getElementById('autoOrderMsg');
+  try {
+    const json = await (await adminFetch('/api/admin/auto-order', { method: 'POST', body: JSON.stringify(body) })).json();
+    if (!json.success) throw new Error(json.error);
+    msg.style.color = '#10b981';
+    msg.innerText = `Đã lưu. Tự đặt đơn: ${json.data.autoOrder.enabled ? 'BẬT' : 'tắt'}.`;
+    loadAutoOrder();
+  } catch (e) {
+    msg.style.color = '#ef4444';
+    msg.innerText = 'Lỗi: ' + e.message;
+  }
+});
+
+socket.on('ADMIN_ORDER_CHANGED', () => loadAutoOrder());
+loadAutoOrder();

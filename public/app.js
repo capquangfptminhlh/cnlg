@@ -479,7 +479,7 @@ function renderDetailModal(prod) {
         <div class="detail-features-list">
           <div><i class="fa-solid fa-shield-halved"></i> Bảo hành: ${esc(prod.warranty || 'Bảo hành chính hãng')}</div>
           <div><i class="fa-solid fa-truck-fast"></i> Giao hàng toàn quốc, được đồng kiểm khi nhận${v?.weight_gram ? ` · ${(v.weight_gram / 1000).toLocaleString('vi-VN')} kg` : ''}</div>
-          <div><i class="fa-solid fa-qrcode"></i> Thanh toán chuyển khoản VietQR</div>
+          <div><i class="fa-solid fa-truck-fast"></i> Thanh toán khi nhận hàng (COD) hoặc chuyển khoản</div>
         </div>
 
         <div class="detail-qty-row">
@@ -493,7 +493,7 @@ function renderDetailModal(prod) {
 
         <div class="detail-actions-row">
           <button class="btn-order-now-large" onclick="buyFromModalNow()" ${canBuy ? '' : 'disabled'}>
-            <i class="fa-solid fa-bolt"></i> ${soldOut ? 'Tạm Hết Hàng' : 'Đặt Hàng & Nhận VietQR Ngay'}
+            <i class="fa-solid fa-bolt"></i> ${soldOut ? 'Tạm Hết Hàng' : 'Mua Ngay'}
           </button>
           <button class="btn-add-cart-large" onclick="addFromModalToCart()" ${canBuy ? '' : 'disabled'}>
             <i class="fa-solid fa-cart-plus"></i> Thêm Vào Giỏ
@@ -752,6 +752,54 @@ const summarySubtotal = document.getElementById('summarySubtotal');
 const summaryShipping = document.getElementById('summaryShipping');
 const summaryShippingNote = document.getElementById('summaryShippingNote');
 const PROVINCE_KEY = 'hm_province';
+const wardSelect = document.getElementById('custWard');
+const submitOrderBtn = document.getElementById('submitOrderBtn');
+let payOptions = { cod: { enabled: true, maxTotal: 5000000 }, bank: { enabled: false } };
+
+async function loadWards(province, keep) {
+  if (!province) {
+    wardSelect.innerHTML = '<option value="">-- Chọn Tỉnh / Thành phố trước --</option>';
+    wardSelect.disabled = true;
+    return;
+  }
+  wardSelect.disabled = true;
+  wardSelect.innerHTML = '<option value="">Đang tải phường/xã...</option>';
+  try {
+    const json = await (await fetch(`/api/address/wards?province=${encodeURIComponent(province)}`)).json();
+    if (!json.success) throw new Error(json.error);
+    if (provinceSelect.value !== province) return;
+    wardSelect.innerHTML = '<option value="">-- Chọn Phường / Xã --</option>' + json.data.wards.map(w => `<option value="${w.id}">${esc(w.name)}</option>`).join('');
+    wardSelect.disabled = false;
+    if (keep) wardSelect.value = keep;
+  } catch (e) {
+    wardSelect.innerHTML = '<option value="">Không tải được phường/xã – thử lại</option>';
+  }
+}
+
+async function loadPayOptions() {
+  try {
+    const json = await (await fetch('/api/checkout/options')).json();
+    if (json.success) payOptions = json.data;
+  } catch (e) {}
+  document.getElementById('payOptCod').style.display = payOptions.cod.enabled ? '' : 'none';
+  document.getElementById('payOptBank').style.display = payOptions.bank.enabled ? '' : 'none';
+  const current = document.querySelector('input[name="payMethod"]:checked')?.value;
+  const pick = (current === 'BANK' && payOptions.bank.enabled) || !payOptions.cod.enabled ? 'BANK' : 'COD';
+  const radio = document.querySelector(`input[name="payMethod"][value="${pick}"]`);
+  if (radio) radio.checked = true;
+  updatePayButton();
+}
+
+function selectedPayMethod() {
+  return document.querySelector('input[name="payMethod"]:checked')?.value || 'COD';
+}
+
+function updatePayButton() {
+  const cod = selectedPayMethod() === 'COD';
+  submitOrderBtn.innerHTML = cod ? '<i class="fa-solid fa-check"></i> Đặt Hàng – Trả Tiền Khi Nhận' : '<i class="fa-solid fa-qrcode"></i> Đặt Hàng & Nhận Mã QR';
+  document.getElementById('payMethodNote').innerText = cod && payOptions.cod.maxTotal ? `COD áp dụng cho đơn đến ${formatPrice(payOptions.cod.maxTotal)}.` : '';
+}
+document.querySelectorAll('input[name="payMethod"]').forEach(r => r.addEventListener('change', updatePayButton));
 
 async function loadProvinces() {
   try {
@@ -801,12 +849,15 @@ async function updateCheckoutSummary() {
 
 provinceSelect.addEventListener('change', () => {
   try { localStorage.setItem(PROVINCE_KEY, provinceSelect.value); } catch (e) {}
+  loadWards(provinceSelect.value);
   updateCheckoutSummary();
 });
 
 function openCheckoutModal() {
   closeCartDrawer();
   checkoutModal.classList.add('open');
+  if (provinceSelect.value && wardSelect.disabled) loadWards(provinceSelect.value);
+  loadPayOptions();
   updateCheckoutSummary();
 }
 
@@ -820,6 +871,7 @@ checkoutForm.addEventListener('submit', async e => {
     name: document.getElementById('custName').value.trim(),
     phone: document.getElementById('custPhone').value.trim(),
     province: provinceSelect.value,
+    ward_id: Number(wardSelect.value) || null,
     address: document.getElementById('custAddress').value.trim(),
     note: document.getElementById('custNote').value.trim()
   };
@@ -831,7 +883,7 @@ checkoutForm.addEventListener('submit', async e => {
     const res = await fetch('/api/orders/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customer, items: state.cart.map(i => ({ id: i.id, variation_id: i.variation_id, quantity: i.quantity, price: i.price })) })
+      body: JSON.stringify({ customer, payment_method: selectedPayMethod(), items: state.cart.map(i => ({ id: i.id, variation_id: i.variation_id, quantity: i.quantity, price: i.price })) })
     });
     const json = await res.json();
     if (res.status === 409 && Array.isArray(json.lines)) {
@@ -856,6 +908,14 @@ checkoutForm.addEventListener('submit', async e => {
 
     checkoutModal.classList.remove('open');
     rememberOrder(json.orderId, customer.phone);
+    if (json.payment_method === 'COD') {
+      state.cart = [];
+      updateCartUI();
+      openTrackModal({ id: json.orderId, phone: customer.phone });
+      await trackOrder(json.orderId, customer.phone);
+      trackResult.insertAdjacentHTML('afterbegin', `<div class="cod-success"><i class="fa-solid fa-circle-check"></i><div><strong>Đặt hàng thành công!</strong><br>Bạn thanh toán <strong>${formatPrice(json.total_amount)}</strong> khi nhận hàng. Lưu mã đơn <strong>${esc(json.orderId)}</strong> để tra cứu.</div></div>`);
+      return;
+    }
     openRealtimeQrModal();
     state.activeOrder = json.orderId;
     socket.emit('join-order', json.orderId);
@@ -1174,6 +1234,7 @@ function rememberOrder(id, phone) {
 
 const STATUS_VI = {
   PENDING_PAYMENT: ['Chờ thanh toán', '#f59e0b'],
+  CONFIRMED: ['Đã xác nhận – thanh toán khi nhận hàng', '#10b981'],
   PAYMENT_REPORTED: ['Đã báo chuyển khoản – chờ cửa hàng xác nhận', '#f59e0b'],
   PAID: ['Đã thanh toán – chờ xuất kho', '#10b981'],
   PROCESSING: ['Đang xử lý tại kho', '#38bdf8'],
@@ -1211,7 +1272,8 @@ async function trackOrder(id, phone) {
         <div class="flex-between"><span>Tạm tính</span><span>${formatPrice(o.subtotal)}</span></div>
         <div class="flex-between"><span>Phí vận chuyển</span><span>${o.shipping_fee ? formatPrice(o.shipping_fee) : 'Miễn phí'}</span></div>
         <div class="flex-between" style="font-size:16px;"><strong>Tổng</strong><strong class="price-highlight">${formatPrice(o.total_amount)}</strong></div>
-        <div style="font-size:12px; color:#94a3b8; margin-top:6px;">Giao tới: ${esc(o.address || '')}${o.customer?.province ? `, ${esc(o.customer.province)}` : ''}</div>
+        <div style="font-size:12px; color:#94a3b8; margin-top:6px;">Giao tới: ${esc(o.address || '')}${o.customer?.ward_name ? `, ${esc(o.customer.ward_name)}` : ''}${o.customer?.province ? `, ${esc(o.customer.province)}` : ''}</div>
+        <div style="font-size:12px; color:#94a3b8;">Thanh toán: ${o.payment_method === 'COD' ? 'khi nhận hàng (COD)' : 'chuyển khoản'}${o.shipping_ref_code ? ` · Mã vận đơn: <strong>${esc(o.shipping_ref_code)}</strong>` : ''}</div>
         ${o.status === 'PENDING_PAYMENT' && o.payment ? `<button type="button" class="btn-primary-block" style="margin-top:12px;" onclick="resumePayment('${esc(o.id)}')"><i class="fa-solid fa-qrcode"></i> Mở Mã QR Để Thanh Toán</button>` : ''}
       </div>`;
     state.trackedOrder = o;

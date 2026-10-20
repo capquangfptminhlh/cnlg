@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const pricing = require('./pricing');
+const dropbuySession = require('./dropbuySession');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
@@ -40,6 +41,9 @@ function dropbuyHeaders(config = getConfig()) {
     'Referer': 'https://dropbuy.vn/'
   };
   if (config.dropbuy?.cookieHeader) headers['Cookie'] = config.dropbuy.cookieHeader;
+  // BFF xác thực bằng sid của phiên (cookie không đủ)
+  const sid = dropbuySession.currentSid(config);
+  if (sid) headers['x-foxing-sid'] = sid;
   return headers;
 }
 
@@ -130,6 +134,11 @@ async function fetchAllSearchItems(config = getConfig(), { maxPages = 20, pageSi
 async function fetchWholesalePrices(items, config = getConfig()) {
   const map = new Map();
   if (!config.dropbuy?.cookieHeader) return map;
+  const session = await dropbuySession.ensureSession(config).catch(() => null);
+  if (!session) {
+    console.warn('[Scraper] Phiên DropBuy hết hạn – dùng giá công khai cho tới khi đăng nhập lại.');
+    return map;
+  }
   const reqItems = items.filter(i => i.unique_id && i.product_id).map(i => ({ variation_id: i.unique_id, product_id: i.product_id }));
   for (let i = 0; i < reqItems.length; i += 50) {
     try {

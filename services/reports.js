@@ -2,11 +2,15 @@ const { vnDate } = require('./backup');
 
 /**
  * Báo cáo doanh thu & lãi gộp cho admin.
- * Chỉ tính đơn đã nhận tiền (PAID / PROCESSING / COMPLETED).
- * Lãi gộp = tiền hàng khách trả − giá vốn DropBuy lúc đặt (phí ship thu của khách tính riêng,
- * vì phí ship thật do kho DropBuy báo khi đặt đơn).
+ * Chỉ tính đơn đã có tiền: chuyển khoản đã nhận (PAID / PROCESSING / COMPLETED), COD đã giao xong (COMPLETED).
+ * Lãi gộp: nếu đơn đã đặt trên DropBuy → khách trả − số DropBuy trừ quỹ (hàng + ship thật);
+ * chưa đặt → tiền hàng − giá vốn lúc đặt (ship tính riêng).
  */
 const PAID_STATUSES = new Set(['PAID', 'PROCESSING', 'COMPLETED']);
+
+function isPaid(o) {
+  return o.payment_method === 'COD' ? o.status === 'COMPLETED' : PAID_STATUSES.has(o.status);
+}
 
 function orderMoney(o) {
   const items = o.items || [];
@@ -14,7 +18,12 @@ function orderMoney(o) {
   const cost = items.reduce((s, i) => s + (i.dropbuy_cost || 0) * (i.quantity || 0), 0);
   const costKnown = items.every(i => Number.isFinite(i.dropbuy_cost) && i.dropbuy_cost > 0);
   const costWholesale = items.every(i => i.cost_is_wholesale);
-  return { goods, shipping: o.shipping_fee || 0, total: o.total_amount || goods, cost, costKnown, costWholesale };
+  const total = o.total_amount || goods;
+  const spend = o.dropbuy_sync?.spend;
+  if (Number.isFinite(spend) && spend > 0) {
+    return { goods, shipping: o.shipping_fee || 0, total, cost: spend, costKnown: true, costWholesale: true, profit: total - spend };
+  }
+  return { goods, shipping: o.shipping_fee || 0, total, cost, costKnown, costWholesale, profit: goods - cost };
 }
 
 function emptyBucket() {
@@ -27,7 +36,7 @@ function add(bucket, m, o) {
   bucket.goods += m.goods;
   bucket.shipping += m.shipping;
   bucket.cost += m.cost;
-  bucket.profit += m.goods - m.cost;
+  bucket.profit += m.profit;
   bucket.items += (o.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
   if (!m.costKnown) bucket.cost_unknown_orders += 1;
   else if (!m.costWholesale) bucket.cost_public_orders += 1;
@@ -41,14 +50,14 @@ function salesReport(orders, { days = 30, now = new Date() } = {}) {
   const totals = { today: emptyBucket(), last7: emptyBucket(), last30: emptyBucket(), all: emptyBucket() };
   const last7 = new Set(dayKeys.slice(-7));
   const products = new Map();
-  const pipeline = { PENDING_PAYMENT: 0, PAYMENT_REPORTED: 0, PAID: 0, PROCESSING: 0, COMPLETED: 0, CANCELLED: 0 };
+  const pipeline = { PENDING_PAYMENT: 0, PAYMENT_REPORTED: 0, CONFIRMED: 0, PAID: 0, PROCESSING: 0, COMPLETED: 0, CANCELLED: 0 };
 
   for (const o of orders) {
     if (o.status in pipeline) pipeline[o.status] += 1;
-    if (!PAID_STATUSES.has(o.status)) continue;
+    if (!isPaid(o)) continue;
     const m = orderMoney(o);
     // Ngày bán = lúc nhận tiền (nếu có), không phải lúc tạo đơn
-    const day = vnDate(new Date(o.paid_at || o.created_at));
+    const day = vnDate(new Date(o.paid_at || o.completed_at || o.created_at));
     add(totals.all, m, o);
     if (byDay[day]) { add(byDay[day], m, o); add(totals.last30, m, o); }
     if (last7.has(day)) add(totals.last7, m, o);
@@ -74,4 +83,4 @@ function salesReport(orders, { days = 30, now = new Date() } = {}) {
   };
 }
 
-module.exports = { salesReport, orderMoney, PAID_STATUSES };
+module.exports = { salesReport, orderMoney, isPaid, PAID_STATUSES };
