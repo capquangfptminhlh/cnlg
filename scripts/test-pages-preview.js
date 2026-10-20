@@ -176,6 +176,15 @@ const puppeteer=require('puppeteer-core');
     await page.click('#productGrid .btn-add-mini:not([disabled])');
     await page.waitForFunction(()=>document.getElementById('cartDrawer').classList.contains('open'));
     assert.equal(await page.evaluate(()=>state.cart.length),1,'cart should have an item');
+    const cartToastOverlap=await page.evaluate(()=>{
+      const note=document.querySelector('#toastNotification');
+      const footer=document.querySelector('#cartDrawer .drawer-footer');
+      if(!note||note.classList.contains('hidden'))return null;
+      return {toastBottom:note.getBoundingClientRect().bottom,footerTop:footer.getBoundingClientRect().top};
+    });
+    if(cartToastOverlap)assert.ok(cartToastOverlap.toastBottom<=cartToastOverlap.footerTop+1,
+      'cart notification blocks checkout button: '+JSON.stringify(cartToastOverlap));
+
     await page.screenshot({path:join(screenshots,'cart.png')});
     await page.keyboard.press('Escape');
     await page.waitForFunction(()=>!document.getElementById('cartDrawer').classList.contains('open'));
