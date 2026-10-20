@@ -43,7 +43,7 @@ jobs:
       - name: Cache safe public thumbnails
         run: node scripts/cache-preview-images.js
         env:
-          CATALOG_IMAGE_LIMIT: "60"
+          CATALOG_IMAGE_LIMIT: "1321"
       - name: Run headless Chrome smoke tests
         run: node scripts/test-pages-preview.js
       - name: Upload desktop and mobile screenshots
