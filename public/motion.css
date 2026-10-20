@@ -1,0 +1,175 @@
+/* Hoang Minh Store — motion system (storefront only)
+   GPU-friendly opacity/transform motion, with full reduced-motion support. */
+:root{
+  --motion-fast: 160ms;
+  --motion-normal: 280ms;
+  --motion-slow: 560ms;
+  --motion-ease: cubic-bezier(.2,.8,.2,1);
+}
+html { scroll-behavior:smooth; }
+body { overflow-x:hidden; }
+body.is-overlay-open { overflow:hidden; }
+#cartBackdrop{
+  display:none;
+  opacity:0;
+  background:rgba(19,23,34,.55);
+  backdrop-filter:blur(2px);
+  transition:opacity var(--motion-normal) ease;
+}
+#cartBackdrop.is-visible { display:block !important; opacity:1; animation:marketBackdropIn .2s ease both; }
+#cartDrawer{
+  right:0 !important;
+  transform:translate3d(100%,0,0);
+  visibility:hidden;
+  transition:transform .34s var(--motion-ease), visibility 0s linear .34s;
+  box-shadow:-18px 0 50px rgba(19,24,34,.13);
+  will-change:transform;
+}
+#cartDrawer.open { transform:translate3d(0,0,0); visibility:visible; transition:transform .34s var(--motion-ease), visibility 0s; }
+#cartDrawer .cart-drawer-item { animation:marketRowIn .32s var(--motion-ease) both; }
+#cartDrawer .cart-drawer-item:nth-child(2) { animation-delay:40ms; }
+#cartDrawer .cart-drawer-item:nth-child(3) { animation-delay:80ms; }
+#cartDrawer .cart-drawer-item:nth-child(4) { animation-delay:120ms; }
+.main-header { transition:padding var(--motion-normal) ease,box-shadow var(--motion-normal) ease; }
+body.shop-scrolled .main-header { padding-top:10px; padding-bottom:10px; box-shadow:0 4px 16px rgba(154,38,23,.13); }
+.market-main-banner { isolation:isolate; }
+.market-main-banner .banner-glow { animation:marketFloatGlow 7s ease-in-out infinite; }
+.market-main-banner .bag-one { animation:marketFloatBag 5.2s ease-in-out infinite; }
+.market-main-banner .bag-two { animation:marketFloatBag 6.1s ease-in-out -2.4s infinite; }
+.market-main-banner .banner-device { animation:marketFloatPhone 6s ease-in-out -1.6s infinite; }
+.market-main-banner .banner-tag { animation:marketFloatBadge 4.7s ease-in-out infinite; }
+.market-main-banner .tag-two { animation-delay:-2s; }
+.market-main-banner .hero-confetti { animation:marketTwinkle 3.5s ease-in-out infinite; }
+.market-main-banner .confetti-2 { animation-delay:-1.7s; }
+.market-banner-copy { transition:opacity .22s ease,transform .22s ease; }
+.market-main-banner.is-switching .market-banner-copy { opacity:.07; transform:translate3d(0,10px,0); }
+.market-main-banner.is-switching .market-banner-art { opacity:.48; }
+.banner-slides { z-index:5; left:50%; bottom:11px; gap:8px; }
+.banner-slides button {
+  width:8px; height:8px; border:0; border-radius:50%;
+  background:rgba(255,255,255,.51); transition:width .23s ease,background .23s ease;
+  padding:0; cursor:pointer;
+}
+.banner-slides button.active { width:21px; background:#fff; border-radius:8px; }
+.banner-slides button:focus-visible { outline:2px solid white; outline-offset:3px; }
+.banner-carousel-control {
+  position:absolute; top:50%; transform:translateY(-50%);
+  z-index:5; border:0; border-radius:50%; width:30px; height:30px;
+  color:white; background:rgba(39,31,33,.18); display:grid; place-items:center;
+  opacity:0; transition:opacity .2s ease,background .2s ease; cursor:pointer;
+}
+.banner-carousel-control.previous { left:8px; }
+.banner-carousel-control.next { right:8px; }
+.market-main-banner:hover .banner-carousel-control,
+.market-main-banner:focus-within .banner-carousel-control { opacity:1; }
+.banner-carousel-control:hover { background:rgba(39,31,33,.4); }
+.market-main-banner[data-slide="1"] { background:radial-gradient(ellipse at 24% 80%,#fce1a0 0%,transparent 29%),linear-gradient(111deg,#f96c44,#ed4c33 49%,#e62f44); }
+.market-main-banner[data-slide="2"] { background:radial-gradient(ellipse at 24% 80%,#a7d5ff 0%,transparent 27%),linear-gradient(111deg,#368ccf,#3b7ad5 48%,#7354c7); }
+.market-main-banner[data-slide="2"] .banner-shop-btn { color:#345ac5; }
+.market-main-banner[data-slide="2"] .market-banner-copy h1 em { color:#fff2a5; }
+.market-main-banner[data-slide="2"] .banner-bag.bag-one { background:linear-gradient(120deg,#fff1ac,#ffa844); }
+.market-main-banner[data-slide="0"] .banner-shop-btn { color:#ed4029; }
+.hero-animated-in .market-banner-copy > *:not(.banner-slides) { animation:marketBannerTextIn .65s var(--motion-ease) both; }
+.hero-animated-in .market-banner-copy > *:nth-child(2) { animation-delay:90ms; }
+.hero-animated-in .market-banner-copy > *:nth-child(3) { animation-delay:150ms; }
+.hero-animated-in .market-banner-copy > *:nth-child(4) { animation-delay:220ms; }
+.hero-animated-in .market-banner-copy > *:nth-child(5) { animation-delay:280ms; }
+
+/* Progressive reveals. Content never becomes invisible if JS fails. */
+.motion-ready .reveal-target { transition:opacity .65s var(--motion-ease),transform .65s var(--motion-ease); }
+.motion-ready .reveal-target:not(.is-inview) { opacity:0; transform:translate3d(0,22px,0); }
+.motion-ready .reveal-target.is-inview { opacity:1; transform:translate3d(0,0,0); }
+.motion-ready .reveal-target:nth-child(2n) { transition-delay:35ms; }
+.motion-ready .reveal-target:nth-child(3n) { transition-delay:70ms; }
+.motion-ready .reveal-target:nth-child(4n) { transition-delay:105ms; }
+
+/* A gentle, purposeful cart experience. */
+.btn-add-mini, .btn-buy-instant, .featured-buy, .btn-checkout-primary, .banner-shop-btn, .market-shortcut, .btn-load-more, .btn-primary {
+  transition:transform var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) ease, background var(--motion-fast) ease,opacity var(--motion-fast) ease;
+}
+.btn-add-mini:not(:disabled):active, .btn-buy-instant:not(:disabled):active,
+.featured-buy:not(:disabled):active,.btn-checkout-primary:not(:disabled):active,
+.btn-primary:not(:disabled):active,.market-shortcut:active { transform:scale(.966); }
+.cart-trigger-btn.is-cart-bumping .cart-icon-wrap { animation:marketCartPop .55s var(--motion-ease) both; }
+.mobile-bottom-nav button.is-cart-bumping { animation:marketCartPop .55s var(--motion-ease) both; }
+.card-heart.is-heart-popping i { animation:marketHeartPop .42s var(--motion-ease) both; }
+.price-pill.active { animation:marketChipSelect .2s var(--motion-ease); }
+.cat-btn.active i { animation:marketChipSelect .23s var(--motion-ease); }
+.quick-fly-dot{
+  position:fixed; z-index:1600; pointer-events:none;
+  width:30px; height:30px; border-radius:50%;
+  background:#ff4a2f; color:#fff; display:grid; place-items:center;
+  font-size:15px; box-shadow:0 6px 19px rgba(249,59,35,.23);
+  transform:translate(-50%,-50%);
+}
+#toastNotification:not(.hidden) { animation:marketToastIn .32s var(--motion-ease) both; }
+#toastNotification { border-radius:9px; box-shadow:0 11px 32px rgba(40,44,60,.13); }
+.modal-backdrop.open { animation:marketBackdropIn .22s ease both; }
+.modal-backdrop.open .modal-dialog { animation:marketModalIn .33s var(--motion-ease) both; }
+.modal-backdrop.open .modal-close-icon { transition:background .18s ease,transform .18s ease; }
+.modal-backdrop.open .modal-close-icon:hover { transform:rotate(90deg); }
+.qr-stage:not(.hidden) { animation:marketRowIn .4s var(--motion-ease) both; }
+#qrStageSuccess .check-circle-icon { animation:marketSuccessIn .65s cubic-bezier(.2,1.3,.25,1) both; }
+#qrStageSuccess .success-title { animation:marketBannerTextIn .55s var(--motion-ease) both .11s; }
+
+/* Cards gently brighten without expensive shadows when on touch devices. */
+@media (hover:hover) and (pointer:fine){
+  .luxury-card,.featured-card { transition:transform .22s var(--motion-ease),box-shadow .22s ease,border-color .22s ease; }
+  .luxury-card:hover,.featured-card:hover { transform:translate3d(0,-4px,0); }
+  .market-mini-promo:hover { transform:translateY(-3px); }
+  .market-shortcut:hover .shortcut-icon { transform:translateY(-3px) scale(1.05); }
+}
+#productGrid.is-fetching,#featuredProducts.is-fetching { cursor:progress; }
+#productGrid.is-fetching .luxury-card { opacity:.73; }
+#catalogCount[aria-busy="true"] { opacity:.6; }
+.store-skeleton {
+  aspect-ratio:4/5.8; border-radius:8px; border:1px solid #edf0f4; background:#fff;
+  overflow:hidden;
+}
+.store-skeleton::before{
+  content:"";display:block;width:100%;height:100%;
+  background:linear-gradient(100deg,#f2f4f7 24%,#f8f9fc 38%,#f2f4f7 56%);
+  background-size:220% 100%; animation:marketShimmer 1.45s ease-in-out infinite;
+}
+.store-to-top {
+  position:fixed; bottom:22px; right:20px; z-index:960;
+  border:1px solid #ffd5c6; border-radius:50%; width:42px; height:42px;
+  background:#fff; color:#f0472d; box-shadow:0 6px 22px rgba(43,52,68,.12);
+  display:grid;place-items:center;font-size:16px;cursor:pointer;
+  opacity:0;visibility:hidden;transform:translateY(12px);
+  transition:opacity .22s,visibility .22s,transform .22s;
+}
+.store-to-top.is-visible { opacity:1;visibility:visible;transform:translateY(0); }
+.store-to-top:hover { background:#fff1eb; }
+.market-main-banner:focus-within .banner-slides button,.market-main-banner:hover .banner-slides button{box-shadow:0 0 0 2px rgba(0,0,0,.07);}
+@keyframes marketBannerTextIn{from{opacity:0;transform:translate3d(0,18px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@keyframes marketFloatGlow{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+@keyframes marketFloatBag{0%,100%{translate:0 0}50%{translate:0 -12px}}
+@keyframes marketFloatPhone{0%,100%{translate:0 0}50%{translate:0 -10px}}
+@keyframes marketFloatBadge{0%,100%{translate:0 0}50%{translate:0 -8px}}
+@keyframes marketTwinkle{0%,100%{opacity:.8;transform:scale(1) rotate(15deg)}50%{opacity:1;transform:scale(1.3) rotate(45deg)}}
+@keyframes marketCartPop{0%{transform:scale(1)}35%{transform:scale(1.25) rotate(-8deg)}70%{transform:scale(.92) rotate(4deg)}100%{transform:scale(1)}}
+@keyframes marketHeartPop{0%{transform:scale(1)}40%{transform:scale(1.44)}100%{transform:scale(1)}}
+@keyframes marketChipSelect{from{transform:scale(.94)}to{transform:scale(1)}}
+@keyframes marketBackdropIn{from{opacity:0}to{opacity:1}}
+@keyframes marketModalIn{from{opacity:0;transform:translate3d(0,18px,0) scale(.985)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+@keyframes marketRowIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes marketToastIn{from{opacity:0;transform:translate3d(0,18px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@keyframes marketSuccessIn{0%{opacity:0;transform:scale(.6) rotate(-18deg)}65%{transform:scale(1.1) rotate(4deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes marketShimmer{0%{background-position:160% 0}100%{background-position:-160% 0}}
+@media (max-width:700px){
+  body.shop-scrolled .main-header { padding-top:8px; padding-bottom:8px; }
+  .banner-carousel-control { opacity:.8; width:25px; height:25px; background:rgba(45,28,28,.12); }
+  .banner-carousel-control.previous { left:3px; }
+  .banner-carousel-control.next { right:3px; }
+  .banner-slides { bottom:5px; }
+  .store-to-top { bottom:calc(75px + env(safe-area-inset-bottom)); right:13px; width:36px; height:36px; z-index:940; }
+  #cartDrawer { max-width:100vw; height:100dvh; }
+  .modal-backdrop.open .modal-dialog { animation-duration:.28s; }
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto !important;animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;transition-delay:0ms !important;}
+  .motion-ready .reveal-target:not(.is-inview){opacity:1 !important;transform:none !important;}
+  .market-main-banner .banner-bag,.market-main-banner .banner-device,.market-main-banner .banner-glow,.market-main-banner .banner-tag{translate:0 0 !important;}
+  .quick-fly-dot{display:none !important;}
+}
