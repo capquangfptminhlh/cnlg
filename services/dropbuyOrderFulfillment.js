@@ -1,7 +1,7 @@
 const scraper = require('./dropbuyScraper');
 const orderStore = require('./orderStore');
 const dropbuyCart = require('./dropbuyCart');
-const { bff, DropbuyError } = require('./dropbuySession');
+const { bff, ensureSession, DropbuyError } = require('./dropbuySession');
 const { notify } = require('./notify');
 const { vnDate } = require('./backup');
 
@@ -18,8 +18,9 @@ const { vnDate } = require('./backup');
  * Mỗi 2 phút đọc orders/history: D/F → COMPLETED; C/B/X/N → huỷ (COD) hoặc báo hoàn tiền (đã chuyển khoản).
  *
  * Request đặt đơn được đối chiếu với 1 đơn thật đặt từ giao diện DropBuy (20/10/2026).
+ * Đường dẫn là orders/{sid}/normal-submit – {sid} = mã phiên đăng nhập hiện tại (trang thanh toán DropBuy
+ * dùng `sid` của phiên), KHÔNG phải mã cố định. Không bao giờ ghi sid vào mã nguồn / log.
  */
-const DEFAULT_TENANT_FX = '4aa251685a7b4feb90eb8177bbbb7267';
 const DONE = new Set(['D', 'F']);
 const FAILED = { C: 'DropBuy đã huỷ đơn', B: 'Khách bom hàng', X: 'Hàng hoàn về kho', N: 'Giao không thành công' };
 const STATUS_LABEL = { U: 'Nháp', P: 'Chờ thanh toán', O: 'Đã thanh toán', W: 'Chờ đóng hàng', G: 'Đã đóng hàng', Q: 'Chờ lấy hàng', S: 'Đang giao', F: 'Đã giao', D: 'Hoàn thành', K: 'Đang khiếu nại', C: 'Đã huỷ', B: 'Bom hàng', X: 'Hoàn hàng', N: 'Giao không thành công' };
@@ -101,7 +102,6 @@ async function placeOrderOnDropbuy(orderId, io, { manual = false } = {}) {
 
   const config = scraper.getConfig();
   const rules = normalizeAutoOrder(config.autoOrder);
-  const fx = config.dropbuy?.tenantFx || DEFAULT_TENANT_FX;
 
   inFlight.add(orderId);
   return withCartLock(async () => {
@@ -172,7 +172,9 @@ async function placeOrderOnDropbuy(orderId, io, { manual = false } = {}) {
         },
         is_dirty: true
       };
-      const created = await bff(`/orders/${fx}/normal-submit`, { method: 'POST', config, body, timeoutMs: 45000 });
+      const sess = await ensureSession(config);
+      if (!sess) throw new DropbuyError('Phiên DropBuy vừa hết hạn – đăng nhập lại trong admin.', 401);
+      const created = await bff(`/orders/${sess.sid}/normal-submit`, { method: 'POST', config, body, timeoutMs: 45000 });
       const list = (Array.isArray(created) ? created : [created]).filter(Boolean).map(x => ({ id: x.id, code: x.code, status: x.status }));
       if (!list.length || !list[0].code) throw Object.assign(new Error('DropBuy không trả về mã đơn.'), { unknown: true });
       const unpaid = list.filter(x => x.status !== 'O');
@@ -359,6 +361,5 @@ module.exports = {
   normalizeAutoOrder,
   codPerDepot,
   spentToday,
-  STATUS_LABEL,
-  DEFAULT_TENANT_FX
+  STATUS_LABEL
 };

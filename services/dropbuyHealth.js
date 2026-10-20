@@ -1,7 +1,6 @@
 const scraper = require('./dropbuyScraper');
 
 const BFF = 'https://dropbuy.vn/api/proxy/bff';
-const TENANT_FX = 'afa4cf0301eb4a75882dd5df30cc54a5';
 
 function headers(config, withCookie = true) {
   const h = { 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', origin: 'https://dropbuy.vn', referer: 'https://dropbuy.vn/' };
@@ -113,4 +112,4 @@ async function checkDropbuy() {
   return { ok: checks.filter(c => c.required).every(c => c.ok), authenticated, checked_at: new Date().toISOString(), checks };
 }
 
-module.exports = { checkDropbuy, TENANT_FX };
+module.exports = { checkDropbuy };

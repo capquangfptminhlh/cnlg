@@ -56,6 +56,7 @@ function fakeDropbuy({ balance = 5000000, cart = [], submit = 'ok', fee = 17000 
     if (u.endsWith('/carts/get-shipping-fee')) return ok({ shipping_method: body.shipping_method, shipping_amount: body.shipping_method === 'S' ? fee - 6000 : fee });
     if (u.endsWith('/balance/my-balance')) return ok({ avail_balance_current: balance });
     if (u.includes('/normal-submit')) {
+      if (!u.includes(`/orders/${'s'.repeat(32)}/normal-submit`)) return { ok: true, status: 200, json: async () => ({ success: false, error_code: 400, message: 'fx_hash không hợp lệ' }) };
       state.submits.push(body);
       if (submit === 'timeout') throw new Error('network timeout');
       if (submit === 'reject') return { ok: true, status: 200, json: async () => ({ success: false, error_code: 400, message: 'Sản phẩm hết hàng' }) };
