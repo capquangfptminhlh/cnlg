@@ -96,7 +96,7 @@ function copyText(elementId) {
   navigator.clipboard.writeText(text).then(() => {
     showToast(`Đã sao chép: <strong>${esc(text)}</strong>`);
   }).catch(() => {
-    prompt('Sao chép thủ công:', text);
+    uiPrompt('Sao chép thủ công:', { value: text, readOnly: true });
   });
 }
 
@@ -589,7 +589,7 @@ window.addEventListener('popstate', openFromHash);
 window.addEventListener('hashchange', openFromHash);
 function copyProductLink() {
   const url = location.href;
-  navigator.clipboard.writeText(url).then(() => showToast('Đã sao chép link sản phẩm')).catch(() => prompt('Sao chép link:', url));
+  navigator.clipboard.writeText(url).then(() => showToast('Đã sao chép link sản phẩm')).catch(() => uiPrompt('Sao chép link:', { value: url, readOnly: true }));
 }
 
 // --- Cart Operations (mỗi dòng = sản phẩm + phân loại) ---
@@ -898,12 +898,12 @@ checkoutForm.addEventListener('submit', async e => {
       state.cart = state.cart.filter(i => i.quantity > 0);
       updateCartUI();
       updateCheckoutSummary();
-      alert(json.error + '\n\nGiỏ hàng đã được cập nhật theo dữ liệu mới nhất, vui lòng kiểm tra lại tổng tiền và bấm đặt hàng lần nữa.');
+      uiAlert(json.error + '\n\nGiỏ hàng đã được cập nhật theo dữ liệu mới nhất, vui lòng kiểm tra lại tổng tiền và bấm đặt hàng lần nữa.');
       if (state.cart.length === 0) checkoutModal.classList.remove('open');
       return;
     }
     if (!json.success) {
-      alert('Không tạo được đơn: ' + json.error);
+      uiAlert('Không tạo được đơn: ' + json.error);
       return;
     }
 
@@ -923,7 +923,7 @@ checkoutForm.addEventListener('submit', async e => {
     // Đề phòng QR được tạo trước khi socket kịp vào phòng: hỏi lại trạng thái đơn
     setTimeout(() => pollOrderOnce(json.orderId), 2500);
   } catch (err) {
-    alert('Không thể kết nối máy chủ: ' + err.message);
+    uiAlert('Không thể kết nối máy chủ: ' + err.message);
   } finally {
     if (submitBtn) submitBtn.disabled = false;
   }
@@ -1109,7 +1109,7 @@ reportPaidBtn.addEventListener('click', async () => {
     state.cart = [];
     updateCartUI();
   } catch (e) {
-    alert('Lỗi: ' + e.message);
+    uiAlert('Lỗi: ' + e.message);
     reportPaidBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Tôi Đã Chuyển Khoản';
     reportPaidBtn.disabled = false;
   }

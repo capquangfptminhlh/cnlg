@@ -24,15 +24,41 @@ function esc(value) {
 // API quản trị cần mật khẩu (header x-admin-key). Mật khẩu: biến ADMIN_PASSWORD trong .env,
 // hoặc mật khẩu server tự sinh ở data/admin-secret.json (in ra console khi khởi động).
 const ADMIN_KEY_STORE = 'hm_admin_key';
+// Hỏi mật khẩu quản trị 1 lần cho mọi request đang chờ; kiểm tra với server trước khi lưu, sai thì hỏi lại.
+let adminKeyAsk = null;
+function askAdminKey() {
+  if (!adminKeyAsk) {
+    adminKeyAsk = (async () => {
+      let note = '';
+      for (;;) {
+        const entered = await uiPrompt(`${note}Nhập mật khẩu quản trị (biến ADMIN_PASSWORD trong .env, hoặc mật khẩu tự sinh trong data/admin-secret.json):`, { type: 'password', ok: 'Đăng nhập' });
+        if (!entered) return null;
+        const r = await fetch('/api/admin/session', { headers: { 'x-admin-key': entered.trim() } });
+        if (r.ok) {
+          sessionStorage.setItem(ADMIN_KEY_STORE, entered.trim());
+          return entered.trim();
+        }
+        if (r.status === 429) {
+          const j = await r.json().catch(() => ({}));
+          await uiAlert(j.error || 'Sai mật khẩu quá nhiều lần, thử lại sau.');
+          return null;
+        }
+        note = 'Sai mật khẩu quản trị. ';
+      }
+    })().finally(() => setTimeout(() => { adminKeyAsk = null; }, 0));
+  }
+  return adminKeyAsk;
+}
+
 async function adminFetch(url, opts = {}, retry = true) {
   const key = sessionStorage.getItem(ADMIN_KEY_STORE) || '';
   const headers = { ...(opts.headers || {}), 'x-admin-key': key };
   if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
   const res = await fetch(url, { ...opts, headers });
   if (res.status === 401 && retry) {
-    const entered = prompt('Nhập mật khẩu quản trị (ADMIN_PASSWORD hoặc trong data/admin-secret.json):');
+    sessionStorage.removeItem(ADMIN_KEY_STORE);
+    const entered = await askAdminKey();
     if (!entered) throw new Error('Chưa đăng nhập quản trị');
-    sessionStorage.setItem(ADMIN_KEY_STORE, entered.trim());
     return adminFetch(url, opts, false);
   }
   if (res.status === 401) {
@@ -157,51 +183,51 @@ function renderOrders(orders) {
 
 let lastOrders = [];
 async function pushToDropbuyCart(orderId) {
-  if (!confirm(`Đưa các sản phẩm của đơn #${orderId} vào giỏ hàng DropBuy của bạn?`)) return;
+  if (!await uiConfirm(`Đưa các sản phẩm của đơn #${orderId} vào giỏ hàng DropBuy của bạn?`)) return;
   try {
     const json = await (await adminFetch(`/api/admin/orders/${orderId}/push-dropbuy-cart`, { method: 'POST', body: '{}' })).json();
     if (!json.success) throw new Error(json.error);
     const lines = json.data.pushed.map(p => `• ${p.name}${p.variant_name ? ` [${p.variant_name}]` : ''} × ${p.quantity}${p.in_cart ? '' : ' (KHÔNG thấy trong giỏ!)'}`).join('\n');
     copyReceiver(orderId, true);
-    if (confirm(`${json.message}\n\n${lines}\n\nThông tin người nhận đã được sao chép. Mở giỏ DropBuy ngay?`)) window.open(json.data.cart_url, '_blank', 'noopener');
+    if (await uiConfirm(`${json.message}\n\n${lines}\n\nThông tin người nhận đã được sao chép. Mở giỏ DropBuy ngay?`)) window.open(json.data.cart_url, '_blank', 'noopener');
     loadData();
   } catch (e) {
-    alert('Lỗi: ' + e.message);
+    uiAlert('Lỗi: ' + e.message);
   }
 }
 
 async function placeOnDropbuy(orderId) {
-  if (!confirm(`Đặt đơn #${orderId} trên DropBuy ngay? Tiền vốn + ship sẽ bị trừ vào quỹ DropBuy của bạn.`)) return;
+  if (!await uiConfirm(`Đặt đơn #${orderId} trên DropBuy ngay? Tiền vốn + ship sẽ bị trừ vào quỹ DropBuy của bạn.`)) return;
   try {
     const json = await (await adminFetch(`/api/admin/orders/${orderId}/place-dropbuy`, { method: 'POST', body: '{}' })).json();
-    alert(json.success ? json.message : 'Chưa đặt được: ' + json.error);
+    uiAlert(json.success ? json.message : 'Chưa đặt được: ' + json.error);
   } catch (e) {
-    alert('Lỗi: ' + e.message);
+    uiAlert('Lỗi: ' + e.message);
   }
   loadData();
   loadAutoOrder();
 }
 
 async function cancelOnDropbuy(orderId) {
-  if (!confirm(`Huỷ đơn #${orderId} trên DropBuy? (Chỉ huỷ được khi kho chưa đóng gói)`)) return;
+  if (!await uiConfirm(`Huỷ đơn #${orderId} trên DropBuy? (Chỉ huỷ được khi kho chưa đóng gói)`)) return;
   try {
     const json = await (await adminFetch(`/api/admin/orders/${orderId}/cancel-dropbuy`, { method: 'POST', body: '{}' })).json();
-    alert(json.success ? json.message : 'Không huỷ được: ' + json.error);
+    uiAlert(json.success ? json.message : 'Không huỷ được: ' + json.error);
   } catch (e) {
-    alert('Lỗi: ' + e.message);
+    uiAlert('Lỗi: ' + e.message);
   }
   loadData();
 }
 
 async function attachDropbuyCode(orderId) {
-  const code = prompt(`Mã đơn trên DropBuy của đơn #${orderId} (xem ở dropbuy.vn → Đơn mua):`);
+  const code = await uiPrompt(`Mã đơn trên DropBuy của đơn #${orderId} (xem ở dropbuy.vn → Đơn mua):`, { placeholder: 'Ví dụ: D-261020-1657154' });
   if (!code) return;
   try {
     const json = await (await adminFetch(`/api/admin/orders/${orderId}/dropbuy-code`, { method: 'POST', body: JSON.stringify({ code }) })).json();
     if (!json.success) throw new Error(json.error);
     loadData();
   } catch (e) {
-    alert('Lỗi: ' + e.message);
+    uiAlert('Lỗi: ' + e.message);
   }
 }
 
@@ -209,33 +235,33 @@ function copyReceiver(orderId, silent = false) {
   const o = lastOrders.find(x => x.id === orderId);
   if (!o) return;
   const text = `${o.customer?.name}\n${o.customer?.phone}\n${o.customer?.address}${o.customer?.ward_name ? `, ${o.customer.ward_name}` : ""}${o.customer?.province ? `, ${o.customer.province}` : ''}${o.customer?.note ? `\nGhi chú: ${o.customer.note}` : ''}`;
-  navigator.clipboard.writeText(text).then(() => { if (!silent) alert('Đã sao chép:\n\n' + text); }).catch(() => prompt('Sao chép:', text));
+  navigator.clipboard.writeText(text).then(() => { if (!silent) uiAlert('Đã sao chép:\n\n' + text); }).catch(() => uiPrompt('Sao chép thông tin người nhận:', { value: text, readOnly: true }));
 }
 
 async function setOrderStatus(orderId, status) {
-  if (status === 'CANCELLED' && !confirm(`Huỷ đơn #${orderId}?`)) return;
+  if (status === 'CANCELLED' && !await uiConfirm(`Huỷ đơn #${orderId}?`)) return;
   try {
     const json = await (await adminFetch(`/api/admin/orders/${orderId}/status`, { method: 'POST', body: JSON.stringify({ status }) })).json();
     if (!json.success) throw new Error(json.error);
     loadData();
   } catch (e) {
-    alert('Lỗi: ' + e.message);
+    uiAlert('Lỗi: ' + e.message);
   }
 }
 
 async function confirmOrder(orderId) {
   try {
-    if (!confirm(`Xác nhận đã nhận đủ tiền cho đơn #${orderId}? (kiểm tra sao kê ngân hàng trước)`)) return;
+    if (!await uiConfirm(`Xác nhận đã nhận đủ tiền cho đơn #${orderId}? (kiểm tra sao kê ngân hàng trước)`)) return;
     const res = await adminFetch(`/api/orders/${orderId}/confirm-payment`, { method: 'POST' });
     const json = await res.json();
     if (json.success) {
-      alert(`Đã xác nhận thanh toán đơn #${orderId}! Sự kiện realtime đã được bắn tới khách hàng.`);
+      uiAlert(`Đã xác nhận thanh toán đơn #${orderId}! Sự kiện realtime đã được bắn tới khách hàng.`);
       loadData();
     } else {
-      alert('Lỗi: ' + json.error);
+      uiAlert('Lỗi: ' + json.error);
     }
   } catch (e) {
-    alert('Lỗi: ' + e.message);
+    uiAlert('Lỗi: ' + e.message);
   }
 }
 
@@ -265,15 +291,15 @@ configForm.addEventListener('submit', async e => {
       body: JSON.stringify(newConfig)
     });
     const json = await res.json();
-    alert(json.success ? json.message : 'Lỗi: ' + json.error);
+    uiAlert(json.success ? json.message : 'Lỗi: ' + json.error);
   } catch (err) {
-    alert('Lỗi lưu cấu hình: ' + err.message);
+    uiAlert('Lỗi lưu cấu hình: ' + err.message);
   }
 });
 
 // Trigger full sync
 syncNowBtn.addEventListener('click', async () => {
-  if (!confirm('Bạn có muốn đồng bộ lại 100% toàn bộ kho hàng từ DropBuy.vn ngay bây giờ?')) return;
+  if (!await uiConfirm('Bạn có muốn đồng bộ lại 100% toàn bộ kho hàng từ DropBuy.vn ngay bây giờ?')) return;
 
   syncNowBtn.disabled = true;
   syncNowBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đồng bộ từ DropBuy...';
@@ -281,9 +307,9 @@ syncNowBtn.addEventListener('click', async () => {
   try {
     const res = await adminFetch('/api/admin/sync', { method: 'POST', body: JSON.stringify({ maxPages: 20 }) });
     const json = await res.json();
-    alert(json.message);
+    uiAlert(json.message);
   } catch (err) {
-    alert('Lỗi khởi động đồng bộ: ' + err.message);
+    uiAlert('Lỗi khởi động đồng bộ: ' + err.message);
     syncNowBtn.disabled = false;
     syncNowBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Đồng Bộ Lại Toàn Bộ Kho DropBuy';
   }
@@ -293,7 +319,7 @@ syncNowBtn.addEventListener('click', async () => {
 const downloadAllImagesBtn = document.getElementById('downloadAllImagesBtn');
 if (downloadAllImagesBtn) {
   downloadAllImagesBtn.addEventListener('click', async () => {
-    if (!confirm('Tải chi tiết & toàn bộ album ảnh của tất cả sản phẩm về ổ đĩa server? (chạy nền, mất nhiều thời gian)')) return;
+    if (!await uiConfirm('Tải chi tiết & toàn bộ album ảnh của tất cả sản phẩm về ổ đĩa server? (chạy nền, mất nhiều thời gian)')) return;
 
     downloadAllImagesBtn.disabled = true;
     downloadAllImagesBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải album ảnh ngầm...';
@@ -301,9 +327,9 @@ if (downloadAllImagesBtn) {
     try {
       const res = await adminFetch('/api/admin/download-all-images', { method: 'POST' });
       const json = await res.json();
-      alert(json.message);
+      uiAlert(json.message);
     } catch (err) {
-      alert('Lỗi: ' + err.message);
+      uiAlert('Lỗi: ' + err.message);
       downloadAllImagesBtn.disabled = false;
       downloadAllImagesBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Tải Full Album Ảnh Về Ổ Đĩa Server';
     }
@@ -317,7 +343,7 @@ socket.on('DOWNLOAD_PROGRESS', data => {
 });
 
 socket.on('DOWNLOAD_COMPLETED', data => {
-  alert(`Đã hoàn tất tải 100% album ảnh của toàn bộ ${data.total} sản phẩm về lưu trữ trên máy chủ!`);
+  uiAlert(`Đã hoàn tất tải 100% album ảnh của toàn bộ ${data.total} sản phẩm về lưu trữ trên máy chủ!`);
   if (downloadAllImagesBtn) {
     downloadAllImagesBtn.disabled = false;
     downloadAllImagesBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Tải Full Album Ảnh Về Ổ Đĩa Server';
@@ -327,7 +353,7 @@ socket.on('DOWNLOAD_COMPLETED', data => {
 // Realtime listeners
 socket.on('CATALOG_SYNC_COMPLETED', data => {
   const msg = data.wholesale ? `Đã đồng bộ xong ${data.total} sản phẩm kèm GIÁ SỈ ĐẠI LÝ F1!` : `Đã đồng bộ xong toàn bộ ${data.total} sản phẩm từ kho DropBuy!`;
-  alert(msg);
+  uiAlert(msg);
   syncNowBtn.disabled = false;
   syncNowBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Đồng Bộ Lại Toàn Bộ Kho DropBuy';
   loadData();
@@ -429,7 +455,7 @@ if (btnDropbuyLogin) {
     const username = dropbuyLoginUser.value.trim();
     const password = dropbuyLoginPass.value;
     if (!username || !password) {
-      alert('Vui lòng nhập đầy đủ tài khoản và mật khẩu DropBuy!');
+      uiAlert('Vui lòng nhập đầy đủ tài khoản và mật khẩu DropBuy!');
       return;
     }
 
@@ -451,11 +477,11 @@ if (btnDropbuyLogin) {
         throw new Error(data.error || 'Đăng nhập DropBuy thất bại');
       }
 
-      alert('Đăng nhập DropBuy thành công! Hệ thống đang tự động đồng bộ lại 100% kho hàng theo GIÁ SỈ ĐẠI LÝ F1.');
+      uiAlert('Đăng nhập DropBuy thành công! Hệ thống đang tự động đồng bộ lại 100% kho hàng theo GIÁ SỈ ĐẠI LÝ F1.');
       updateAuthStatusUI();
       loadData();
     } catch (err) {
-      alert('Lỗi: ' + err.message);
+      uiAlert('Lỗi: ' + err.message);
       dropbuyAuthMsg.style.background = 'rgba(239, 68, 68, 0.15)';
       dropbuyAuthMsg.style.color = '#ef4444';
       dropbuyAuthMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
@@ -469,13 +495,13 @@ if (btnDropbuyLogin) {
 
 if (btnDropbuyLogout) {
   btnDropbuyLogout.addEventListener('click', async () => {
-    if (!confirm('Bạn có chắc muốn đăng xuất DropBuy? Hệ thống sẽ quay về giá bán lẻ công khai.')) return;
+    if (!await uiConfirm('Bạn có chắc muốn đăng xuất DropBuy? Hệ thống sẽ quay về giá bán lẻ công khai.')) return;
     try {
       await adminFetch('/api/dropbuy/logout', { method: 'POST' });
-      alert('Đã đăng xuất tài khoản DropBuy.');
+      uiAlert('Đã đăng xuất tài khoản DropBuy.');
       updateAuthStatusUI();
     } catch (e) {
-      alert('Lỗi: ' + e.message);
+      uiAlert('Lỗi: ' + e.message);
     }
   });
 }
@@ -484,7 +510,7 @@ if (btnSaveCookie) {
   btnSaveCookie.addEventListener('click', async () => {
     const cookie = dropbuyManualCookie.value.trim();
     if (!cookie) {
-      alert('Vui lòng dán chuỗi cookie!');
+      uiAlert('Vui lòng dán chuỗi cookie!');
       return;
     }
     btnSaveCookie.disabled = true;
@@ -496,12 +522,12 @@ if (btnSaveCookie) {
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Cookie không hợp lệ');
-      alert('Lưu cookie thành công! Đã kích hoạt giá sỉ đại lý.');
+      uiAlert('Lưu cookie thành công! Đã kích hoạt giá sỉ đại lý.');
       dropbuyManualCookie.value = '';
       updateAuthStatusUI();
       loadData();
     } catch (err) {
-      alert('Lỗi: ' + err.message);
+      uiAlert('Lỗi: ' + err.message);
     } finally {
       btnSaveCookie.disabled = false;
       btnSaveCookie.innerText = 'Lưu Cookie';
@@ -669,7 +695,7 @@ document.getElementById('pricingTableBody').addEventListener('click', async e =>
     loadPricingTable();
     loadPricing();
   } catch (err) {
-    alert('Lỗi: ' + err.message);
+    uiAlert('Lỗi: ' + err.message);
   }
 });
 
@@ -840,7 +866,7 @@ async function loadBackupInfo() {
 
 document.getElementById('backupNowBtn').addEventListener('click', async () => {
   const json = await (await adminFetch('/api/admin/backups', { method: 'POST' })).json();
-  alert(json.success ? `Đã sao lưu: ${json.data.files.join(', ')} → data/backups/${json.data.day}` : 'Lỗi: ' + json.error);
+  uiAlert(json.success ? `Đã sao lưu: ${json.data.files.join(', ')} → data/backups/${json.data.day}` : 'Lỗi: ' + json.error);
   loadBackupInfo();
 });
 
@@ -885,7 +911,7 @@ async function loadAutoOrder() {
 
 document.getElementById('saveAutoOrderBtn').addEventListener('click', async () => {
   const enabled = document.getElementById('aoEnabled').checked;
-  if (enabled && !confirm('Bật tự đặt đơn: mỗi đơn hợp lệ sẽ tự trừ quỹ DropBuy của bạn. Tiếp tục?')) return;
+  if (enabled && !await uiConfirm('Bật tự đặt đơn: mỗi đơn hợp lệ sẽ tự trừ quỹ DropBuy của bạn. Tiếp tục?')) return;
   const body = {
     autoOrder: {
       enabled,

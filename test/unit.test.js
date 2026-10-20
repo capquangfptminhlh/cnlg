@@ -150,3 +150,19 @@ describe('Tự huỷ đơn quá hạn', () => {
     assert.ok(events.includes('ORDER_EXPIRED'));
   });
 });
+
+test('Admin: cùng 1 mật khẩu sai gửi nhiều lần chỉ tính 1 lần; 10 mật khẩu sai khác nhau mới khoá', () => {
+  const { requireAdmin } = require('../services/security');
+  const call = (key, ip = '10.9.8.7') => {
+    let status = 200;
+    const res = { status(c) { status = c; return this; }, json() { return this; } };
+    let passed = false;
+    requireAdmin({ ip, get: h => (h.toLowerCase() === 'x-admin-key' ? key : '') }, res, () => { passed = true; });
+    return passed ? 200 : status;
+  };
+  for (let i = 0; i < 30; i++) assert.equal(call('sai-1'), 401); // 30 request song song cùng mật khẩu sai
+  for (let i = 2; i <= 9; i++) assert.equal(call(`sai-${i}`), 401);
+  assert.equal(call('sai-10'), 401);
+  assert.equal(call('sai-11'), 429);
+  assert.equal(call('sai-1', '10.9.8.8'), 401); // IP khác không bị ảnh hưởng
+});

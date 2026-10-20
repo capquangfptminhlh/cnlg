@@ -60,15 +60,28 @@ function rateLimit(name, windowMs, max) {
 }
 
 /** Middleware bảo vệ API quản trị: header `x-admin-key: <mật khẩu>`. Sai quá 10 lần / 15 phút / IP → khoá tạm. */
+// Khoá theo số MẬT KHẨU SAI KHÁC NHAU (không theo số request): trang admin gửi nhiều request song song
+// với cùng 1 mật khẩu, nhập sai 1 lần không được tính thành nhiều lần.
+const adminFails = new Map(); // ip -> { keys: Set<hash>, reset }
+const ADMIN_LOCK_MS = 15 * 60 * 1000;
+const ADMIN_MAX_WRONG = 10;
+
 function requireAdmin(req, res, next) {
-  const lockKey = `admin-fail:${req.ip}`;
-  const lock = buckets.get(lockKey);
-  if (lock && lock.count >= 10 && lock.reset > Date.now()) {
-    return res.status(429).json({ success: false, error: 'Sai mật khẩu quá nhiều lần, thử lại sau 15 phút.' });
+  const now = Date.now();
+  let f = adminFails.get(req.ip);
+  if (f && f.reset < now) {
+    adminFails.delete(req.ip);
+    f = null;
+  }
+  if (f && f.keys.size >= ADMIN_MAX_WRONG) {
+    return res.status(429).json({ success: false, error: `Sai mật khẩu quá nhiều lần, thử lại sau ${Math.ceil((f.reset - now) / 60000)} phút.` });
   }
   const key = req.get('x-admin-key') || (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
   if (key && safeEqual(key, getAdminPassword())) return next();
-  if (key) hit(lockKey, 15 * 60 * 1000, 10);
+  if (key) {
+    if (!f) adminFails.set(req.ip, (f = { keys: new Set(), reset: now + ADMIN_LOCK_MS }));
+    f.keys.add(crypto.createHash('sha256').update(key).digest('hex'));
+  }
   return res.status(401).json({ success: false, error: 'Cần đăng nhập quản trị (sai hoặc thiếu mật khẩu admin).' });
 }
 
