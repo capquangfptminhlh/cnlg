@@ -95,7 +95,7 @@ const puppeteer=require('puppeteer-core');
     console.log('Favorites: PASS');
 
     await page.setViewport({width:390,height:844,deviceScaleFactor:2,isMobile:true,hasTouch:true});
-    await page.waitForTimeout(400);
+    await new Promise(resolve=>setTimeout(resolve,400));
     await page.screenshot({path:join(screenshots,'mobile.png'),fullPage:true});
     const mobile=await page.evaluate(()=>({
       width:window.innerWidth,scroll:document.documentElement.scrollWidth,
