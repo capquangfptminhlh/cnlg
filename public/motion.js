@@ -11,7 +11,7 @@
   const cartBackdrop = document.getElementById('cartBackdrop');
   const cartCount = document.getElementById('cartCount');
   const cartTrigger = document.getElementById('openCartBtn');
-  const overlayIds = ['productDetailModal','checkoutModal','qrModal','trackModal'];
+  const overlayIds = ['productDetailModal','checkoutModal','qrModal','trackModal','favoritesModal'];
   const overlays = overlayIds.map(id => document.getElementById(id)).filter(Boolean);
   let revealObserver = null;
   let lastCartCount = Number.parseInt(cartCount?.textContent || '0',10) || 0;
@@ -279,6 +279,7 @@
         checkoutModal:'closeCheckoutBtn',
         qrModal:'closeQrModalBtn',
         trackModal:'closeTrackBtn',
+        favoritesModal:'closeFavoritesBtn',
         cartDrawer:'closeCartBtn'
       };
       document.getElementById(closeMap[top.id])?.click();
@@ -298,7 +299,7 @@
     if(el.id==='qrModal')continue; // Avoid an accidental close while payment is pending.
     el.addEventListener('click',e=>{
       if(e.target!==el)return;
-      const closeMap={productDetailModal:'closeDetailModalBtn',checkoutModal:'closeCheckoutBtn',trackModal:'closeTrackBtn'};
+      const closeMap={productDetailModal:'closeDetailModalBtn',checkoutModal:'closeCheckoutBtn',trackModal:'closeTrackBtn',favoritesModal:'closeFavoritesBtn'};
       document.getElementById(closeMap[el.id])?.click();
     });
   }
