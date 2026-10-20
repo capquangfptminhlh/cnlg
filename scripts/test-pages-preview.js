@@ -29,6 +29,21 @@ const puppeteer=require('puppeteer-core');
   const chrome=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/opt/google/chrome/chrome'].find(existsSync);
   if(!chrome)throw new Error('Chrome not available in runner');
   let browser;
+  async function revealAll(page){
+    await page.evaluate(async()=>{
+      const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+      const step=Math.max(320,Math.floor(window.innerHeight*.72));
+      const bottom=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
+      for(let position=0;position<=bottom;position+=step){
+        window.scrollTo(0,position);
+        await pause(85);
+      }
+      window.scrollTo(0,bottom);
+      await pause(250);
+      window.scrollTo(0,0);
+      await pause(500);
+    });
+  }
   try{
     browser=await puppeteer.launch({headless:true,executablePath:chrome,args:['--no-sandbox','--disable-dev-shm-usage']});
     const page=await browser.newPage();
@@ -49,6 +64,7 @@ const puppeteer=require('puppeteer-core');
     assert.equal(snapshot.featured,6,'featured section should display real API-shaped mock data');
     assert.equal(snapshot.demo,'true','DEMO must be visible');
     assert.ok(snapshot.disabledPayment,'payment must be disabled');
+    await revealAll(page);
     await page.screenshot({path:join(screenshots,'desktop.png'),fullPage:true});
     console.log('Desktop initial:',JSON.stringify(snapshot));
 
@@ -96,6 +112,7 @@ const puppeteer=require('puppeteer-core');
 
     await page.setViewport({width:390,height:844,deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await new Promise(resolve=>setTimeout(resolve,400));
+    await revealAll(page);
     await page.screenshot({path:join(screenshots,'mobile.png'),fullPage:true});
     const mobile=await page.evaluate(()=>({
       width:window.innerWidth,scroll:document.documentElement.scrollWidth,
