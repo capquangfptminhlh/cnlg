@@ -75,13 +75,17 @@ body.shop-scrolled .main-header { padding-top:10px; padding-bottom:10px; box-sha
 .hero-animated-in .market-banner-copy > *:nth-child(4) { animation-delay:220ms; }
 .hero-animated-in .market-banner-copy > *:nth-child(5) { animation-delay:280ms; }
 
-/* Progressive reveals. Content never becomes invisible if JS fails. */
-.motion-ready .reveal-target { transition:opacity .65s var(--motion-ease),transform .65s var(--motion-ease); }
-.motion-ready .reveal-target:not(.is-inview) { opacity:0; transform:translate3d(0,22px,0); }
-.motion-ready .reveal-target.is-inview { opacity:1; transform:translate3d(0,0,0); }
-.motion-ready .reveal-target:nth-child(2n) { transition-delay:35ms; }
-.motion-ready .reveal-target:nth-child(3n) { transition-delay:70ms; }
-.motion-ready .reveal-target:nth-child(4n) { transition-delay:105ms; }
+/* Accessible entrance motion: NEVER hide product cards before IntersectionObserver
+   fires. Long catalogs and full-page capture must not show blank rows. */
+.motion-ready .reveal-target { opacity:1; transform:none; }
+.motion-ready .reveal-target.is-inview { animation:marketRevealIn .45s var(--motion-ease); }
+.motion-ready .reveal-target:nth-child(2n).is-inview { animation-delay:25ms; }
+.motion-ready .reveal-target:nth-child(3n).is-inview { animation-delay:50ms; }
+.motion-ready .reveal-target:nth-child(4n).is-inview { animation-delay:75ms; }
+@keyframes marketRevealIn {
+  from { opacity:.75; transform:translate3d(0,9px,0); }
+  to { opacity:1; transform:translate3d(0,0,0); }
+}
 
 /* A gentle, purposeful cart experience. */
 .btn-add-mini, .btn-buy-instant, .featured-buy, .btn-checkout-primary, .banner-shop-btn, .market-shortcut, .btn-load-more, .btn-primary {
