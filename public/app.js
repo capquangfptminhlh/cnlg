@@ -1120,68 +1120,109 @@ finishOrderBtn.addEventListener('click', () => {
   state.activeOrder = null;
 });
 
-// --- Search Autocomplete Logic ---
+// --- Accessible search suggestions; no stale async results ---
 let searchDebounceTimer = null;
-searchInput.addEventListener('input', e => {
-  const q = e.target.value.trim();
-  searchClearBtn.classList.toggle('hidden', q.length === 0);
+let searchRequestSeq = 0;
+searchDropdown.setAttribute('role', 'listbox');
+searchDropdown.setAttribute('aria-label', 'Gợi ý sản phẩm');
+searchInput.setAttribute('aria-controls', 'searchDropdown');
+searchInput.setAttribute('aria-expanded', 'false');
+searchInput.setAttribute('aria-autocomplete', 'list');
+searchClearBtn.setAttribute('aria-label', 'Xóa tìm kiếm');
 
+function hideSearchSuggestions(){
+  searchDropdown.classList.add('hidden');
+  searchInput.setAttribute('aria-expanded', 'false');
+}
+function showSearchSuggestions(){
+  searchDropdown.classList.remove('hidden');
+  searchInput.setAttribute('aria-expanded', 'true');
+}
+searchInput.addEventListener('input',e=>{
+  const q=e.target.value.trim();
+  searchClearBtn.classList.toggle('hidden',q.length===0);
+  const seq=++searchRequestSeq;
   clearTimeout(searchDebounceTimer);
-  if (q.length < 2) {
-    searchDropdown.classList.add('hidden');
-    return;
-  }
-
-  searchDebounceTimer = setTimeout(async () => {
-    try {
-      const res = await fetch(`/api/products?search=${encodeURIComponent(q)}&limit=6`);
-      const json = await res.json();
-      if (json.success && json.data.length > 0) {
+  if(q.length<2){hideSearchSuggestions();return;}
+  searchDebounceTimer=setTimeout(async()=>{
+    try{
+      const res=await fetch('/api/products?search='+encodeURIComponent(q)+'&limit=6');
+      const json=await res.json();
+      if(seq!==searchRequestSeq || searchInput.value.trim()!==q)return;
+      if(json.success&&Array.isArray(json.data)&&json.data.length){
         rememberProducts(json.data);
-        searchDropdown.innerHTML = json.data.map(item => `
-          <div class="search-item-preview" onclick="openProductDetail(${item.id})">
-            <img src="${esc(item.image)}" alt="${esc(item.name)}">
-            <div class="search-item-info">
-              <div class="search-item-title">${esc(item.name)}</div>
-              <div class="search-item-price">${formatPrice(item.price)}${item.in_stock === false ? ' · Hết hàng' : ''}</div>
-            </div>
-          </div>
-        `).join('');
-        searchDropdown.classList.remove('hidden');
-      } else {
-        searchDropdown.innerHTML = `<div style="padding: 14px; text-align: center; color: #94a3b8; font-size: 13px;">Không tìm thấy sản phẩm nào</div>`;
-        searchDropdown.classList.remove('hidden');
+        searchDropdown.innerHTML=json.data.map(item=>{
+          const id=Number(item.id);
+          if(!Number.isSafeInteger(id)||id<1)return '';
+          return '<button type="button" role="option" class="search-item-preview" data-preview-id="'+id+
+            '" aria-label="Xem '+esc(item.name)+'"><img src="'+esc(item.image)+'" alt="" loading="lazy">'+
+            '<span class="search-item-info"><span class="search-item-title">'+esc(item.name)+
+            '</span><span class="search-item-price">'+formatPrice(item.price)+(item.in_stock===false?' · Hết hàng':'')+
+            '</span></span><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button>';
+        }).join('');
+      }else{
+        searchDropdown.innerHTML='<div class="search-empty-state">Không tìm thấy sản phẩm phù hợp</div>';
       }
-    } catch (e) {}
-  }, 250);
+      showSearchSuggestions();
+    }catch(_){if(seq===searchRequestSeq)hideSearchSuggestions();}
+  },250);
 });
-
-searchClearBtn.addEventListener('click', () => {
-  searchInput.value = '';
-  searchClearBtn.classList.add('hidden');
-  searchDropdown.classList.add('hidden');
-  state.searchQuery = '';
-  state.currentPage = 1;
-  fetchProducts();
+searchDropdown.addEventListener('click',e=>{
+  const btn=e.target.closest('[data-preview-id]');
+  const id=Number(btn?.dataset.previewId);
+  if(!Number.isSafeInteger(id)||id<1)return;
+  searchRequestSeq++;
+  hideSearchSuggestions();
+  openProductDetail(id);
 });
-
-document.addEventListener('click', e => {
-  if (!e.target.closest('.search-wrapper')) {
-    searchDropdown.classList.add('hidden');
+searchInput.addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'&&!searchDropdown.classList.contains('hidden')){
+    const btn=searchDropdown.querySelector('[data-preview-id]');
+    if(btn){e.preventDefault();btn.focus();}
+  }
+  if(e.key==='Escape'){e.preventDefault();hideSearchSuggestions();}
+});
+searchDropdown.addEventListener('keydown',e=>{
+  const focused=e.target.closest('[data-preview-id]');
+  if(!focused)return;
+  const items=[...searchDropdown.querySelectorAll('[data-preview-id]')];
+  const at=items.indexOf(focused);
+  if(e.key==='Escape'){
+    e.preventDefault();hideSearchSuggestions();searchInput.focus();
+  }else if(e.key==='ArrowDown'){
+    e.preventDefault();items[Math.min(at+1,items.length-1)]?.focus();
+  }else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    if(at<=0)searchInput.focus(); else items[at-1]?.focus();
   }
 });
-
-function runSearch() {
-  searchDropdown.classList.add('hidden');
-  state.searchQuery = searchInput.value.trim();
-  state.currentPage = 1;
-  catalogTitle.innerText = state.searchQuery ? `Kết quả cho "${state.searchQuery}"` : 'Tất Cả Sản Phẩm';
+searchClearBtn.addEventListener('click',()=>{
+  searchRequestSeq++;
+  clearTimeout(searchDebounceTimer);
+  searchInput.value='';
+  searchClearBtn.classList.add('hidden');
+  hideSearchSuggestions();
+  state.searchQuery='';
+  state.currentPage=1;
+  catalogTitle.innerText='Tất Cả Sản Phẩm';
+  fetchProducts();
+  searchInput.focus();
+});
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.search-wrapper'))hideSearchSuggestions();
+});
+function runSearch(){
+  searchRequestSeq++;
+  clearTimeout(searchDebounceTimer);
+  hideSearchSuggestions();
+  state.searchQuery=searchInput.value.trim();
+  state.currentPage=1;
+  catalogTitle.innerText=state.searchQuery?'Kết quả cho "'+state.searchQuery+'"':'Tất Cả Sản Phẩm';
   fetchProducts();
 }
-
-searchBtn.addEventListener('click', runSearch);
-searchInput.addEventListener('keyup', e => {
-  if (e.key === 'Enter') runSearch();
+searchBtn.addEventListener('click',runSearch);
+searchInput.addEventListener('keyup',e=>{
+  if(e.key==='Enter')runSearch();
 });
 
 // --- Filter & Sorting Handlers ---
