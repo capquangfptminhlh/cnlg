@@ -8,6 +8,7 @@ on:
       - "scripts/pages-preview.js"
       - "scripts/build-pages-preview.js"
       - "scripts/test-pages-preview.js"
+      - "scripts/cache-preview-images.js"
       - ".github/workflows/pages-demo.yml"
   workflow_dispatch:
 
@@ -39,6 +40,10 @@ jobs:
         run: |
           node scripts/build-pages-preview.js
           for file in .pages-preview-dist/*.js; do node --check "$file"; done
+      - name: Cache safe public thumbnails
+        run: node scripts/cache-preview-images.js
+        env:
+          CATALOG_IMAGE_LIMIT: "60"
       - name: Run headless Chrome smoke tests
         run: node scripts/test-pages-preview.js
       - name: Upload desktop and mobile screenshots
