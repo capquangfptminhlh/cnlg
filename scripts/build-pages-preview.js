@@ -9,7 +9,8 @@ const dst=path.join(root,'.pages-preview-dist');
 const pub=path.join(root,'public');
 const allowed=[
   'styles.css','marketplace.css','marketplace-v3.css','motion.css',
-  'app.js','marketplace-home.js','favorites.js','motion.js'
+  'app.js','marketplace-home.js','favorites.js','motion.js',
+  'storefront-premium.css','storefront-premium.js'
 ];
 fs.rmSync(dst,{recursive:true,force:true});
 fs.mkdirSync(dst,{recursive:true});
