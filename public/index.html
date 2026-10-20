@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/marketplace.css">
   <link rel="stylesheet" href="/marketplace-v3.css">
+  <link rel="stylesheet" href="/motion.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -79,7 +80,7 @@
     </aside>
     <div class="market-discovery">
       <nav class="market-links" aria-label="Điều hướng cửa hàng">
-        <a class="active" href="/">Trang chủ</a><a href="#featuredSection">Gợi ý hôm nay</a><a href="#catalog">Sản phẩm</a><a href="#categoryPanel">Danh mục</a><button type="button" data-store-action="track">Tra cứu đơn hàng</button>
+        <a class="active" href="/">Trang chủ</a><a href="#featuredSection">Gợi ý hôm nay</a><button type="button" data-store-action="favorites"><i class="fa-regular fa-heart"></i> Yêu thích</button><a href="#catalog">Sản phẩm</a><a href="#categoryPanel">Danh mục</a><button type="button" data-store-action="track">Tra cứu đơn hàng</button>
       </nav>
       <section class="market-hero" aria-label="Giới thiệu cửa hàng">
         <div class="market-main-banner">
@@ -116,7 +117,7 @@
     <a href="#featuredSection" class="market-shortcut"><span class="shortcut-icon shortcut-cup"><i class="fa-solid fa-star"></i></span><span>Gợi ý</span></a>
     <button type="button" class="market-shortcut" data-store-action="track"><span class="shortcut-icon shortcut-brand"><i class="fa-solid fa-box"></i></span><span>Đơn hàng</span></button>
     <button type="button" class="market-shortcut" data-store-action="cart"><span class="shortcut-icon shortcut-combo"><i class="fa-solid fa-cart-shopping"></i></span><span>Giỏ hàng</span></button>
-    <button type="button" class="market-shortcut" data-store-action="search"><span class="shortcut-icon shortcut-more"><i class="fa-solid fa-magnifying-glass"></i></span><span>Tìm kiếm</span></button>
+    <button type="button" class="market-shortcut" data-store-action="favorites"><span class="shortcut-icon shortcut-more"><i class="fa-regular fa-heart"></i></span><span>Yêu thích</span></button>
   </section>
   <section class="container featured-section" id="featuredSection" hidden>
     <div class="featured-header"><h2><i class="fa-solid fa-fire-flame-curved"></i> SẢN PHẨM NỔI BẬT</h2><a href="#catalog">Xem tất cả <i class="fa-solid fa-chevron-right"></i></a></div>
@@ -476,9 +477,11 @@
     <a href="#categoryPanel" aria-label="Danh mục"><i class="fa-solid fa-border-all"></i><span>Danh mục</span></a>
     <button type="button" aria-label="Tra cứu đơn hàng" data-store-action="track"><i class="fa-solid fa-box"></i><span>Đơn hàng</span></button>
     <button type="button" aria-label="Mở giỏ hàng" data-store-action="cart"><i class="fa-solid fa-cart-shopping"></i><span>Giỏ hàng</span><b class="mobile-cart-count" id="mobileCartCount" hidden>0</b></button>
-    <button type="button" aria-label="Tìm kiếm" data-store-action="search"><i class="fa-solid fa-magnifying-glass"></i><span>Tìm kiếm</span></button>
+    <button type="button" aria-label="Sản phẩm yêu thích" data-store-action="favorites"><i class="fa-regular fa-heart"></i><span>Yêu thích</span></button>
   </nav>
   <script src="/app.js"></script>
   <script src="/marketplace-home.js"></script>
+  <script src="/favorites.js"></script>
+  <script src="/motion.js"></script>
 </body>
 </html>
