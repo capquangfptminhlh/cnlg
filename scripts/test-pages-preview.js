@@ -103,6 +103,10 @@ const puppeteer=require('puppeteer-core');
     await page.select('#sortSelect','price-asc');
     await page.waitForFunction(()=>state.sort==='price-asc'&&state.products.length>1&&state.products[0].price<=state.products[1].price);
     console.log('Price filter + sort: PASS');
+    // Search must use the full inventory, not the previous under-500K filter.
+    await page.click('.price-pill[data-min=""][data-max=""]');
+    await page.waitForFunction(()=>state.minPrice===''&&state.maxPrice===''&&
+      document.getElementById('catalogCount').getAttribute('aria-busy')==='false');
 
     await page.click('#searchInput');
     await page.type('#searchInput',searchTerm);
