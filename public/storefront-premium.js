@@ -82,7 +82,7 @@
       .filter(p=>p.source);
     if(!candidates.length||!gallery.length)return;
     const thisGeneration=++generation;
-    let next=0,success=0,processed=0;
+    let next=0,success=gallery[0]?.hasAttribute('src')?1:0;
     const claimed=new Set();
     const limit=Math.min(candidates.length,36);
 
