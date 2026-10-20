@@ -12,11 +12,12 @@ const homepage=read('public/marketplace-home.js');
 const favorites=read('public/favorites.js');
 const motion=read('public/motion.js');
 const motionCss=read('public/motion.css');
+const finishCss=read('public/storefront-finish.css');
 const marketCss=read('public/marketplace-v3.css');
 
 test('all storefront bundles are included in dependency order', () => {
   const scripts=['app.js','marketplace-home.js','favorites.js','motion.js'];
-  const styles=['styles.css','marketplace.css','marketplace-v3.css','motion.css'];
+  const styles=['styles.css','marketplace.css','marketplace-v3.css','motion.css','storefront-premium.css','storefront-finish.css'];
   const locations=scripts.map(x=>html.indexOf('src="/'+x+'"'));
   scripts.forEach((name,i)=>assert.notEqual(locations[i],-1,name+' missing'));
   for(let i=1;i<locations.length;i++)assert.ok(locations[i]>locations[i-1],'script order invalid');
@@ -73,7 +74,7 @@ test('storefront enhancements never modify admin-only page',()=>{
 });
 
 test('layout and motion CSS braces remain balanced',()=>{
-  for(const [name,css] of [['motion',motionCss],['marketplace-v3',marketCss]]){
+  for(const [name,css] of [['motion',motionCss],['marketplace-v3',marketCss],['finish',finishCss]]){
     const a=(css.match(/{/g)||[]).length,b=(css.match(/}/g)||[]).length;
     assert.equal(a,b,name+' CSS block mismatch');
   }
