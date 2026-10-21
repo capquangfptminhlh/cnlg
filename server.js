@@ -29,6 +29,7 @@ const vnAddress = require('./services/vnAddress');
 const dropbuySession = require('./services/dropbuySession');
 const shippingLive = require('./services/shippingLive');
 const watchdog = require('./services/dropbuyWatchdog');
+const vault = require('./services/credentialVault');
 const catalogImage = require('./services/catalogImage');
 
 const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
@@ -169,6 +170,7 @@ function publicOrder(o) {
     payment: o.payment,
     payment_method: o.payment_method || 'BANK',
     shipping_ref_code: o.dropbuy_sync?.shipping_ref_code || null,
+    shipping_carrier: o.dropbuy_sync?.carrier || null,
     paid_at: o.paid_at || null
   };
 }
@@ -800,11 +802,15 @@ app.post('/api/admin/download-all-images', requireAdmin, (req, res) => {
 
 app.post('/api/dropbuy/login', requireAdmin, async (req, res) => {
   try {
-    const { username, password, totp_code } = req.body || {};
+    const { username, password, totp_code, remember } = req.body || {};
     if (!username || !password) {
       return res.status(400).json({ success: false, error: 'Vui lòng nhập tài khoản và mật khẩu DropBuy' });
     }
     const result = await dropbuyAuth.loginDropbuy(username, password, totp_code);
+    // Ghi nhớ (mã hoá) để tự đăng nhập lại khi phiên hết hạn – chỉ khi chủ shop chọn, không áp dụng tài khoản có mã 2 bước
+    if (remember === true && !totp_code) vault.save(String(username).trim(), String(password).trim());
+    else if (remember === false) vault.clear();
+    watchdog.resetRelogin();
     realtimeSync.runFullSync5Min(io).catch(err => console.error('[Sync after login]:', err.message));
     watchdog.tick(io).catch(err => console.error('[Watchdog after login]:', err.message));
     io.emit('DROPBUY_AUTH_CHANGED', { authenticated: true });
@@ -826,9 +832,14 @@ app.post('/api/dropbuy/set-cookie', requireAdmin, async (req, res) => {
   }
 });
 
+app.post('/api/dropbuy/forget-credentials', requireAdmin, (req, res) => {
+  vault.clear();
+  res.json({ success: true, message: 'Đã xoá tài khoản DropBuy đã lưu – sẽ không tự đăng nhập lại.' });
+});
+
 app.get('/api/dropbuy/auth-status', requireAdmin, async (req, res) => {
   try {
-    res.json({ success: true, data: await dropbuyAuth.getAuthStatus() });
+    res.json({ success: true, data: { ...(await dropbuyAuth.getAuthStatus()), remember: vault.info() } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -836,6 +847,7 @@ app.get('/api/dropbuy/auth-status', requireAdmin, async (req, res) => {
 
 app.post('/api/dropbuy/logout', requireAdmin, (req, res) => {
   const result = dropbuyAuth.logout();
+  vault.clear(); // đăng xuất = không tự đăng nhập lại nữa
   io.emit('DROPBUY_AUTH_CHANGED', { authenticated: false });
   res.json(result);
 });

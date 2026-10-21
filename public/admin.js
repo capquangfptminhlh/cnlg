@@ -412,12 +412,26 @@ socket.on('REALTIME_HEARTBEAT', data => {
   updateDaemonStatusUI();
 });
 
+async function forgetDropbuyCredentials() {
+  if (!(await uiConfirm('Xoá tài khoản DropBuy đã lưu? Khi phiên hết hạn bạn sẽ phải đăng nhập tay.'))) return;
+  const json = await (await adminFetch('/api/dropbuy/forget-credentials', { method: 'POST', body: '{}' })).json();
+  uiAlert(json.message || json.error);
+  updateAuthStatusUI();
+}
+
 async function updateAuthStatusUI() {
   updateDaemonStatusUI();
   try {
     const res = await adminFetch('/api/dropbuy/auth-status').then(r => r.json());
     if (res.success && res.data) {
       const d = res.data;
+      const rem = document.getElementById('dropbuyRememberInfo');
+      if (rem) {
+        rem.style.display = d.remember?.saved ? 'block' : 'none';
+        rem.innerHTML = d.remember?.saved
+          ? `<i class="fa-solid fa-shield-halved"></i> Đã lưu tài khoản <strong>${esc(d.remember.username)}</strong> (mã hoá) để tự đăng nhập lại. <a href="#" onclick="forgetDropbuyCredentials(); return false;">Xoá</a>`
+          : '';
+      }
       if (d.authenticated) {
         dropbuyAuthBadge.className = 'auth-badge badge-connected';
         dropbuyAuthBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Đã kết nối: ${esc(d.username || 'Đại lý')}`;
@@ -470,7 +484,7 @@ if (btnDropbuyLogin) {
     try {
       const res = await adminFetch('/api/dropbuy/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password, totp_code: (document.getElementById('dropbuyLoginTotp')?.value || '').trim() || undefined })
+        body: JSON.stringify({ username, password, totp_code: (document.getElementById('dropbuyLoginTotp')?.value || '').trim() || undefined, remember: !!document.getElementById('dropbuyRemember')?.checked })
       });
       const data = await res.json();
       if (!res.ok || !data.success) {

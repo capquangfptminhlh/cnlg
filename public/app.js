@@ -1327,13 +1327,35 @@ async function trackOrder(id, phone) {
         <div class="flex-between"><span>Phí vận chuyển</span><span>${o.shipping_fee ? formatPrice(o.shipping_fee) : 'Miễn phí'}</span></div>
         <div class="flex-between" style="font-size:16px;"><strong>Tổng</strong><strong class="price-highlight">${formatPrice(o.total_amount)}</strong></div>
         <div style="font-size:12px; color:#94a3b8; margin-top:6px;">Giao tới: ${esc(o.address || '')}${o.customer?.ward_name ? `, ${esc(o.customer.ward_name)}` : ''}${o.customer?.province ? `, ${esc(o.customer.province)}` : ''}</div>
-        <div style="font-size:12px; color:#94a3b8;">Thanh toán: ${o.payment_method === 'COD' ? 'khi nhận hàng (COD)' : 'chuyển khoản'}${o.shipping_ref_code ? ` · Mã vận đơn: <strong>${esc(o.shipping_ref_code)}</strong>` : ''}</div>
+        <div style="font-size:12px; color:#94a3b8;">Thanh toán: ${o.payment_method === 'COD' ? 'khi nhận hàng (COD)' : 'chuyển khoản'}</div>
+        ${o.shipping_ref_code ? shipmentBlock(o) : ''}
         ${o.status === 'PENDING_PAYMENT' && o.payment ? `<button type="button" class="btn-primary-block" style="margin-top:12px;" onclick="resumePayment('${esc(o.id)}')"><i class="fa-solid fa-qrcode"></i> Mở Mã QR Để Thanh Toán</button>` : ''}
       </div>`;
     state.trackedOrder = o;
   } catch (e) {
     trackResult.innerHTML = `<p style="text-align:center; color:#ef4444;">${esc(e.message)}</p>`;
   }
+}
+
+// Hãng vận chuyển: không hãng nào cho mở thẳng kết quả theo mã (Viettel Post có captcha) → sao chép mã + mở trang tra cứu
+const CARRIERS = {
+  S: { name: 'SPX Express', url: 'https://spx.vn/' },
+  V: { name: 'Viettel Post', url: 'https://viettelpost.com.vn/tra-cuu-hanh-trinh-don/' }
+};
+function shipmentBlock(o) {
+  const c = CARRIERS[o.shipping_carrier] || (/^SPX/i.test(o.shipping_ref_code) ? CARRIERS.S : null);
+  const code = String(o.shipping_ref_code).split(',')[0].trim();
+  return `<div class="shipment-box">
+    <div><i class="fa-solid fa-truck-fast"></i> ${c ? esc(c.name) : 'Đơn vị vận chuyển'} · Mã vận đơn <strong>${esc(o.shipping_ref_code)}</strong></div>
+    <div class="shipment-actions">
+      <button type="button" class="btn-ghost" onclick="copyShipCode('${esc(code)}')"><i class="fa-regular fa-copy"></i> Sao chép mã</button>
+      ${c ? `<a class="btn-ghost" href="${c.url}" target="_blank" rel="noopener" onclick="copyShipCode('${esc(code)}', true)"><i class="fa-solid fa-arrow-up-right-from-square"></i> Tra cứu trên ${esc(c.name)}</a>` : ''}
+    </div>
+    ${c ? `<small>Mở trang tra cứu rồi dán mã vận đơn (đã tự sao chép).</small>` : ''}
+  </div>`;
+}
+function copyShipCode(code, silent) {
+  navigator.clipboard?.writeText(code).then(() => { if (!silent) showToast('Đã sao chép mã vận đơn'); }).catch(() => { if (!silent) uiPrompt('Mã vận đơn:', { value: code, readOnly: true }); });
 }
 
 function resumePayment(orderId) {

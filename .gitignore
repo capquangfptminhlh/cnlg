@@ -18,3 +18,6 @@ data/payments.json
 data/products_detail/
 data/backups/
 data/address-v2.json
+data/cred.key
+data/dropbuy-cred.json
+data/dropbuy-cred.json.tmp

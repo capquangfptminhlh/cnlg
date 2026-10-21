@@ -177,7 +177,7 @@ async function placeOrderOnDropbuy(orderId, io, { manual = false } = {}) {
       const sess = await ensureSession(config);
       if (!sess) throw new DropbuyError('Phiên DropBuy vừa hết hạn – đăng nhập lại trong admin.', 401);
       const created = await bff(`/orders/${sess.sid}/normal-submit`, { method: 'POST', config, body, timeoutMs: 45000 });
-      const list = (Array.isArray(created) ? created : [created]).filter(Boolean).map(x => ({ id: x.id, code: x.code, status: x.status }));
+      const list = (Array.isArray(created) ? created : [created]).filter(Boolean).map((x, k) => ({ id: x.id, code: x.code, status: x.status, carrier: depots[k]?.ship?.method || null }));
       if (!list.length || !list[0].code) throw Object.assign(new Error('DropBuy không trả về mã đơn.'), { unknown: true });
       const unpaid = list.filter(x => x.status !== 'O');
       const now = new Date().toISOString();
@@ -186,6 +186,7 @@ async function placeOrderOnDropbuy(orderId, io, { manual = false } = {}) {
         order_code: list[0].code,
         order_id: list[0].id,
         orders: list,
+        carrier: list[0].carrier,
         ordered_at: now,
         problem: unpaid.length ? `Đơn DropBuy chưa thanh toán (${unpaid.map(x => x.code).join(', ')}) – vào DropBuy thanh toán.` : null
       }, { status: 'PROCESSING', processing_at: now, needs_attention: unpaid.length > 0 });
@@ -325,6 +326,7 @@ async function syncDropbuyOrdersStatus(io) {
       ...order.dropbuy_sync,
       current_status: failed || (allDone ? head.order_status : sts.find(s => !DONE.has(s)) || head.order_status),
       shipping_ref_code: found.map(d => d.shipping_ref_code).filter(Boolean).join(', ') || order.dropbuy_sync.shipping_ref_code || null,
+      carrier: found.map(d => d.shipping_method).find(Boolean) || order.dropbuy_sync.carrier || null,
       dropbuy_total: found.reduce((s, d) => s + (d.total_amount || 0), 0),
       dropbuy_profit: found.reduce((s, d) => s + (d.profit_amount || 0), 0),
       checked_at: now

@@ -305,7 +305,7 @@ test('Đồng bộ trạng thái: giao xong → COMPLETED + mã vận đơn; COD
   const bom = mk('COD', 'D-B');
   const paidCancelled = mk('BANK', 'D-C');
   db.history = {
-    'D-S': { order_status: 'S', shipping_ref_code: 'SPXVN123', total_amount: 69000, profit_amount: 0 },
+    'D-S': { order_status: 'S', shipping_method: 'S', shipping_ref_code: 'SPXVN123', total_amount: 69000, profit_amount: 0 },
     'D-F': { order_status: 'F', shipping_ref_code: 'SPXVN456', total_amount: 69000, profit_amount: 40000 },
     'D-B': { order_status: 'B', total_amount: 69000 },
     'D-C': { order_status: 'C', total_amount: 69000 }
@@ -315,6 +315,7 @@ test('Đồng bộ trạng thái: giao xong → COMPLETED + mã vận đơn; COD
   assert.equal(g(shipping.id).status, 'PROCESSING');
   assert.equal(g(shipping.id).dropbuy_sync.shipping_ref_code, 'SPXVN123');
   assert.equal(g(shipping.id).dropbuy_sync.current_label, 'Đang giao');
+  assert.equal(g(shipping.id).dropbuy_sync.carrier, 'S');
   assert.equal(g(done.id).status, 'COMPLETED');
   assert.ok(g(done.id).paid_at); // COD giao xong = đã thu tiền
   assert.equal(g(bom.id).status, 'CANCELLED');

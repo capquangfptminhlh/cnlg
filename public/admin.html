@@ -107,6 +107,11 @@
               <label>Mã xác minh 2 bước (chỉ khi tài khoản bật)</label>
               <input type="text" id="dropbuyLoginTotp" placeholder="Bỏ trống nếu không bật" inputmode="numeric" autocomplete="one-time-code">
             </div>
+            <div class="form-group checkbox-group">
+              <label><input type="checkbox" id="dropbuyRemember" checked> Ghi nhớ để tự đăng nhập lại khi phiên (~2 ngày) hết hạn</label>
+              <small class="help-text">Mật khẩu được mã hoá và chỉ lưu trên máy chạy cửa hàng (thư mục data/, không lên git). Không áp dụng cho tài khoản bật mã 2 bước.</small>
+            </div>
+            <div id="dropbuyRememberInfo" class="help-text" style="display:none;"></div>
             <div style="display: flex; gap: 8px; margin-top: 14px;">
               <button type="button" class="btn-sync-now" id="btnDropbuyLogin" style="flex: 1; background: #f59e0b; color: #000; font-weight: 700;">
                 <i class="fa-solid fa-arrow-right-to-bracket"></i> Đăng Nhập & Kích Hoạt Giá Sỉ

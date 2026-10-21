@@ -1585,3 +1585,10 @@ input, textarea, select { font-family: var(--font); }
 .pay-option small { color: #94a3b8; font-size: 12px; }
 .cod-success { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; margin-bottom: 12px; border-radius: 10px; background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.4); }
 .cod-success > i { color: #10b981; font-size: 22px; margin-top: 2px; }
+
+/* ===== Tra cứu đơn: vận đơn ===== */
+.shipment-box { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: #fff7f4; border: 1px solid #fde0d7; font-size: 13px; color: #273141; display: flex; flex-direction: column; gap: 8px; }
+.shipment-box i { color: #ef4d31; }
+.shipment-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.shipment-actions .btn-ghost { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; text-decoration: none; }
+.shipment-box small { color: #667383; }

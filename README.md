@@ -46,44 +46,64 @@ Truy cập:
 
 ---
 
-## 🚀 Triển khai thật (để khách đặt hàng & ngân hàng gọi webhook)
+## 🚀 Triển khai thật (khách ngoài Internet đặt được hàng)
 
-### 0. Cấu hình bắt buộc
-1. `copy .env.example .env` rồi điền:
-   - `ADMIN_PASSWORD` – mật khẩu vào `/admin.html`
-   - `SEPAY_WEBHOOK_KEY` (hoặc `CASSO_SECURE_TOKEN`) – tự xác nhận tiền về
-   - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` – nhận thông báo đơn (tuỳ chọn)
-   - `TRUST_PROXY=1` nếu chạy sau nginx / Caddy / Cloudflare
-2. Vào **Admin → Cấu hình VietQR**: nhập **đúng số tài khoản nhận tiền của bạn** (không để số mẫu).
-3. Vào **Admin → Đăng nhập DropBuy** để lấy giá CTV; **Thiết lập giá bán**, **Phí vận chuyển** theo ý bạn.
+Mô hình hiện tại: khách trả **COD**, hệ thống tự đặt đơn **dropship** trên DropBuy và trừ quỹ DropBuy của shop
+(xem `AGENT_INSTRUCTIONS.md` mục 9). Không cần tài khoản ngân hàng hay webhook nếu chỉ bán COD.
 
-### 1. Windows (máy bàn / máy chủ Windows)
-Nhấp đúp `start.bat` – tự cài thư viện, chạy server, tự khởi động lại nếu bị dừng.
+### 0. Cấu hình (`copy .env.example .env`)
+| Biến | Bắt buộc | Ý nghĩa |
+|---|---|---|
+| `ADMIN_PASSWORD` | **Có** khi lên mạng | Mật khẩu `/admin.html` – đặt chuỗi dài, khó đoán |
+| `PUBLIC_BASE_URL` | Có | `https://ten-mien-cua-ban` – dùng cho link chia sẻ, sitemap, ảnh xem trước |
+| `TRUST_PROXY=1` | **Có** khi chạy sau Cloudflare / nginx / Caddy | Để giới hạn tần suất & khoá admin tính theo IP thật của khách, không phải IP của proxy |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Nên có | Báo đơn mới, đơn chưa đặt được, phiên DropBuy, quỹ thấp |
+| `DROPBUY_CRED_KEY` | Tuỳ chọn | Khoá mã hoá tài khoản DropBuy đã lưu (64 ký tự hex). Bỏ trống = tự sinh `data/cred.key` |
+| `SEPAY_WEBHOOK_KEY` / `CASSO_SECURE_TOKEN` | Chỉ khi bật chuyển khoản | Tự xác nhận tiền về |
 
-### 2. VPS Linux với PM2
+Trong admin: **Đăng nhập DropBuy** (tick *Ghi nhớ* để tự đăng nhập lại), kiểm tra **Tự Đặt Đơn** (hạn mức, quỹ),
+**Thiết lập giá bán**, **Phí vận chuyển** (mặc định lấy phí thật của DropBuy).
+
+### 1. Chạy trên máy Windows này
+- `start.bat`: tự cài thư viện, chạy server, tự bật lại khi lỗi, ghi log `data/server.log`. Mở 2 lần cũng chỉ có 1 server.
+- Tự chạy khi đăng nhập Windows: lối tắt `HoangMinhStore.cmd` trong thư mục Startup (`shell:startup`). Xoá file đó để tắt.
+- Máy phải bật và không ngủ thì cửa hàng mới hoạt động (đặt Power Options → Sleep: Never).
+
+### 2. Đưa lên tên miền bằng Cloudflare Tunnel (không cần mở port, có HTTPS)
+Máy này đã có tunnel `14e73d28-…` (đang phục vụ lhmcrm.com). Thêm cửa hàng vào **cùng tunnel** đó:
+1. Sửa `C:\Users\<bạn>\.cloudflared\config.yml`, thêm 1 dòng hostname **trước** dòng `http_status:404`:
+   ```yaml
+   ingress:
+     - hostname: lhmcrm.com
+       service: http://localhost:9876
+     - hostname: app.lhmcrm.com
+       service: http://localhost:9876
+     - hostname: shop.ten-mien.com        # ← thêm
+       service: http://localhost:3000     # ← thêm
+     - service: http_status:404
+   ```
+2. Tạo DNS cho hostname (tên miền phải nằm trên Cloudflare):
+   `cloudflared tunnel route dns 14e73d28-8efa-4769-acdf-c19cf12294b8 shop.ten-mien.com`
+3. Khởi động lại tunnel (lối tắt `LHM-AutoStart-Server-Tunnel` hoặc dịch vụ cloudflared).
+4. Đặt `.env`: `PUBLIC_BASE_URL=https://shop.ten-mien.com`, `TRUST_PROXY=1`, `ADMIN_PASSWORD=...` → chạy lại `start.bat`.
+5. Kiểm tra: `https://shop.ten-mien.com/healthz`, đặt thử 1 đơn COD rồi huỷ trong admin.
+Khuyên dùng: bật **Cloudflare Access** cho đường dẫn `/admin.html` và `/api/admin/*` (chỉ email của bạn vào được).
+
+### 3. VPS Linux (máy chủ thuê, chạy 24/7)
 ```bash
 npm ci --omit=dev
 npm i -g pm2
 pm2 start ecosystem.config.js && pm2 save && pm2 startup
 ```
-
-### 3. Docker
-```bash
-docker compose up -d --build     # dữ liệu nằm ở ./data (gắn volume)
+Hoặc `docker compose up -d --build` (dữ liệu ở `./data`). Đặt HTTPS bằng Caddy:
 ```
+shop.ten-mien.com {
+  reverse_proxy 127.0.0.1:3000
+}
+```
+Chép cả thư mục `data/` (config, orders, cred.key, dropbuy-cred.json) sang VPS nếu chuyển máy.
 
-### 4. Có tên miền + HTTPS
-- **Caddy** (tự cấp SSL): file `Caddyfile`
-  ```
-  hoangminh.com {
-    reverse_proxy 127.0.0.1:3000
-  }
-  ```
-- Hoặc **Cloudflare Tunnel** khi chạy trên máy ở nhà (không cần mở port):
-  `cloudflared tunnel --url http://localhost:3000` (dùng tunnel có tên + DNS cho tên miền thật).
-
-Sau khi có tên miền, đặt URL webhook ở SePay/Casso: `https://<tên-miền>/api/webhooks/sepay` (hoặc `/casso`).
-Kiểm tra sống: `https://<tên-miền>/healthz`. Kiểm tra API DropBuy: `npm run test:dropbuy`. Kiểm thử: `npm test`.
+Kiểm tra API DropBuy: `npm run test:dropbuy`. Kiểm thử: `npm test`.
 
 ### Quy trình 1 đơn hàng
 1. Khách chọn SP + phân loại → nhập địa chỉ, tỉnh → nhận mã VietQR (tổng đã gồm phí ship).
