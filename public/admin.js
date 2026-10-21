@@ -435,7 +435,9 @@ async function updateAuthStatusUI() {
       if (d.authenticated) {
         dropbuyAuthBadge.className = 'auth-badge badge-connected';
         dropbuyAuthBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Đã kết nối: ${esc(d.username || 'Đại lý')}`;
-        btnDropbuyLogin.style.display = 'none';
+        // Vẫn cho đăng nhập lại khi đang kết nối: gia hạn phiên / bật "Ghi nhớ" để tự đăng nhập lại
+        btnDropbuyLogin.style.display = 'inline-block';
+        btnDropbuyLogin.innerHTML = `<i class="fa-solid fa-rotate"></i> ${d.remember?.saved ? 'Đăng nhập lại & gia hạn phiên' : 'Đăng nhập lại & ghi nhớ (tự gia hạn)'}`;
         btnDropbuyLogout.style.display = 'inline-block';
         dropbuyLoginPass.value = '';
         dropbuyAuthMsg.style.display = 'block';
@@ -447,6 +449,7 @@ async function updateAuthStatusUI() {
         dropbuyAuthBadge.className = 'auth-badge badge-disconnected';
         dropbuyAuthBadge.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Chưa kết nối`;
         btnDropbuyLogin.style.display = 'inline-block';
+        btnDropbuyLogin.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Đăng Nhập & Kích Hoạt Giá Sỉ';
         btnDropbuyLogout.style.display = 'none';
         if (d.expired) {
           dropbuyAuthMsg.style.display = 'block';
