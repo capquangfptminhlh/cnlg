@@ -238,6 +238,8 @@ app.get('/api/products', (req, res) => {
   try {
     const { category, search, page = 1, limit = 24, sort = 'default', minPrice, maxPrice, inStock } = req.query;
     let products = scraper.getProducts();
+    // Không bán SP chưa có giá (DropBuy đôi khi để giá 0 khi ẩn giá / ngừng bán)
+    products = products.filter(p => Number(p.price) > 0);
 
     if (category && category !== 'all') {
       const ids = categoryIdsFor(parseInt(category, 10));
@@ -429,6 +431,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     for (const { line, r } of checked) {
       const label = `"${r.name || known.get(line.id).name}${r.variant_name ? ` – ${r.variant_name}` : ''}"`;
       if (!r.ok) problems.push({ id: line.id, variation_id: line.variation_id, reason: r.in_stock === false ? 'OUT_OF_STOCK' : 'INVALID', message: r.message || `${label} hiện không đặt được.` });
+      else if (!(Number(r.price) > 0)) problems.push({ id: line.id, variation_id: line.variation_id, reason: 'INVALID', message: `${label} chưa có giá bán, tạm thời không đặt được.` });
       else if (line.expected != null && line.expected !== r.price) problems.push({ id: line.id, variation_id: line.variation_id, reason: 'PRICE_CHANGED', old_price: line.expected, price: r.price, message: `Giá ${label} vừa đổi từ ${line.expected.toLocaleString('vi-VN')} đ thành ${r.price.toLocaleString('vi-VN')} đ.` });
     }
     if (problems.length) {

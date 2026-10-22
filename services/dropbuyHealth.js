@@ -1,4 +1,5 @@
 const scraper = require('./dropbuyScraper');
+const dropbuySession = require('./dropbuySession');
 
 const BFF = 'https://dropbuy.vn/api/proxy/bff';
 
@@ -93,10 +94,11 @@ async function checkDropbuy() {
 
   checks.push(await timed('Giá CTV/F1 (variations/get-price)', async () => {
     if (!sample) throw new Error('Bỏ qua: chưa có SP mẫu');
-    const res = await fetch(`${BFF}/variations/get-price`, { method: 'POST', headers: headers(config), body: JSON.stringify({ items: [{ variation_id: sample.unique_id, product_id: sample.product_id }] }) });
-    const j = await json(res);
-    if (!j.success) throw new Error(authenticated ? `${j.message} (phiên hết hạn?)` : 'Cần đăng nhập DropBuy để lấy giá CTV');
-    const p = j.data?.[0];
+    if (!authenticated) throw new Error('Cần đăng nhập DropBuy để lấy giá CTV');
+    // BFF xác thực bằng x-foxing-sid của phiên (cookie không đủ) → gọi qua dropbuySession
+    const data = await dropbuySession.bff('/variations/get-price', { method: 'POST', config, body: { items: [{ variation_id: sample.unique_id, product_id: sample.product_id }] } });
+    const p = data?.[0];
+    if (!p) throw new Error('DropBuy không trả giá cho SP mẫu');
     return `${sample.sku}: niêm yết ${Number(p.fe_price_public).toLocaleString('vi-VN')} đ → giá của bạn ${Number(p.fe_price_group || p.fe_price_override).toLocaleString('vi-VN')} đ (${p.fe_price_override_source})`;
   }, { required: false }));
 
