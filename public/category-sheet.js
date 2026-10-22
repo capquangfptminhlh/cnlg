@@ -76,6 +76,12 @@
 
   function choose(id) {
     if (typeof state === 'undefined' || typeof fetchProducts !== 'function') return;
+    if (typeof window.storeSelectCategory === 'function') {
+      window.storeSelectCategory(id); // trang danh mục: có link riêng + nút Back
+      close();
+      scrollToCatalogAfterRender();
+      return;
+    }
     // Danh mục cha có sẵn chip/nút → bấm nút đó để giữ đúng trạng thái giao diện; danh mục con → lọc trực tiếp
     const btn = document.querySelector(`#categoriesContainer .cat-btn[data-id="${CSS.escape(String(id))}"]`);
     if (btn) btn.click();

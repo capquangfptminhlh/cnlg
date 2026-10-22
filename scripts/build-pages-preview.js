@@ -11,7 +11,7 @@ const allowed=[
   'styles.css','marketplace.css','marketplace-v3.css','motion.css',
   'app.js','marketplace-home.js','favorites.js','motion.js',
   'storefront-premium.css','storefront-premium.js','storefront-finish.css',
-  'storefront-experience.css','dialogs.js','storefront-match.css','category-sheet.js'
+  'storefront-experience.css','dialogs.js','storefront-match.css','category-sheet.js','category-view.js'
 ];
 fs.rmSync(dst,{recursive:true,force:true});
 fs.mkdirSync(dst,{recursive:true});

@@ -119,6 +119,9 @@ async function fetchCategories() {
 }
 
 async function fetchProducts(append = false) {
+  if (append && state.loadingMore) return;
+  const reqId = (state.fetchSeq = (state.fetchSeq || 0) + 1);
+  if (append) state.loadingMore = true;
   window.dispatchEvent(new Event('storefront:loading'));
   if (!append) {
     catalogCount.innerText = 'Đang tải danh mục sản phẩm...';
@@ -137,10 +140,14 @@ async function fetchProducts(append = false) {
     const res = await fetch(`/api/products?${params.toString()}`);
     const json = await res.json();
 
+    if (reqId !== state.fetchSeq) return; // đã đổi danh mục / bộ lọc trong lúc chờ → bỏ kết quả cũ
     if (json.success) {
       rememberProducts(json.data);
+      const prevLen = append ? state.products.length : 0;
       state.products = append ? [...state.products, ...json.data] : json.data;
-      renderProducts();
+      state.totalProducts = json.total;
+      state.totalPages = json.totalPages;
+      renderProducts(append ? prevLen : null);
       window.dispatchEvent(new CustomEvent('storefront:products', { detail: { products: state.products } }));
       renderPagination(json.page, json.totalPages);
       catalogCount.innerText = `Đang hiển thị ${state.products.length} / tổng ${json.total.toLocaleString('vi-VN')} SP`;
@@ -161,11 +168,14 @@ async function fetchProducts(append = false) {
     console.error('Lỗi tải sản phẩm:', err);
     catalogCount.innerText = 'Lỗi kết nối! Vui lòng thử lại.';
     window.dispatchEvent(new Event('storefront:error'));
+  } finally {
+    if (append) state.loadingMore = false;
   }
 }
 
 if (btnLoadMore) {
   btnLoadMore.addEventListener('click', () => {
+    if (state.loadingMore) return; // đang tải trang trước → không nhảy cóc trang
     btnLoadMore.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải thêm sản phẩm...';
     state.currentPage++;
     fetchProducts(true);
@@ -228,7 +238,7 @@ function productBadges(p) {
   return html;
 }
 
-function renderProducts() {
+function renderProducts(appendFrom = null) {
   if (state.products.length === 0) {
     productGrid.innerHTML = `
       <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #64748b;">
@@ -239,7 +249,15 @@ function renderProducts() {
     return;
   }
 
-  productGrid.innerHTML = state.products.map(p => {
+  // Tải thêm (cuộn vô hạn): chỉ chèn thẻ mới, không vẽ lại hàng nghìn thẻ đã có
+  if (appendFrom != null && appendFrom > 0 && productGrid.children.length === appendFrom) {
+    productGrid.insertAdjacentHTML('beforeend', state.products.slice(appendFrom).map(productCardHtml).join(''));
+    return;
+  }
+  productGrid.innerHTML = state.products.map(productCardHtml).join('');
+}
+
+function productCardHtml(p) {
     const soldOut = p.in_stock === false;
     return `
     <div class="luxury-card${soldOut ? ' is-sold-out' : ''}" data-id="${p.id}">
@@ -278,7 +296,6 @@ function renderProducts() {
         </div>
       </div>
     </div>`;
-  }).join('');
 }
 
 // --- Pagination ---

@@ -90,3 +90,17 @@ test('menu "Danh mục" (thanh dưới, lối tắt, tab) mở bảng danh mục
   assert.match(sheet,/storefront:products/); // cuộn tới danh sách sau khi lọc xong
   assert.equal((html.match(/href="#categoryPanel"/g)||[]).length>=2,true);
 });
+
+test('vào danh mục là trang riêng: xem hết toàn bộ mục (cuộn vô hạn), có link riêng + nút Back',()=>{
+  const view=read('public/category-view.js');
+  const app=read('public/app.js');
+  // phải nạp trước category-sheet.js để bảng Danh mục dùng được storeSelectCategory
+  assert.ok(html.indexOf('/category-view.js')>0 && html.indexOf('/category-view.js')<html.indexOf('/category-sheet.js'));
+  assert.match(view,/danh-muc/);
+  assert.match(view,/popstate/);
+  assert.match(view,/IntersectionObserver/);
+  assert.match(view,/addEventListener\('scroll'/); // dự phòng khi nút "Tải thêm" đã nằm sẵn trong màn hình
+  assert.match(app,/state\.loadingMore/);       // không nhảy cóc trang khi cuộn nhanh
+  assert.match(app,/reqId !== state\.fetchSeq/); // bỏ kết quả cũ khi đổi mục giữa chừng
+  assert.match(app,/insertAdjacentHTML\('beforeend'/); // tải thêm chỉ chèn thẻ mới
+});
