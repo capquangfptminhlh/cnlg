@@ -15,11 +15,12 @@ if "%HOANGMINH_PORT%"=="" set HOANGMINH_PORT=3000
 curl.exe -s -m 3 -o nul -f http://localhost:%HOANGMINH_PORT%/healthz
 if not errorlevel 1 (
   REM Server khac dang chay tren cong nay -> doi 60 giay roi kiem tra lai
-  timeout /t 60 /nobreak >nul
+  ping -n 61 127.0.0.1 >nul
   goto loop
 )
-echo [%date% %time%] Khoi dong server...
+REM Ghi nhat ky vao file, khong in ra man hinh: bam chuot vao cua so (QuickEdit) se lam lenh in ra man hinh treo mai
+echo [%date% %time%] Khoi dong server... >> data\server.log
 node server.js >> data\server.log 2>&1
-echo [%date% %time%] Server dung, khoi dong lai sau 5 giay... (xem data\server.log)
-timeout /t 5 /nobreak >nul
+echo [%date% %time%] Server dung, khoi dong lai sau 5 giay... >> data\server.log
+ping -n 6 127.0.0.1 >nul
 goto loop
