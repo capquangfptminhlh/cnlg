@@ -1,4 +1,5 @@
 const scraper = require('./dropbuyScraper');
+const dropbuySession = require('./dropbuySession');
 
 /**
  * Đồng bộ realtime với DropBuy – 2 vòng độc lập:
@@ -13,6 +14,7 @@ const scraper = require('./dropbuyScraper');
 const STOCK_INTERVAL_MS = Math.max(10, Number(process.env.STOCK_SYNC_SECONDS || 30)) * 1000;
 const PRICE_INTERVAL_MS = Math.max(30, Number(process.env.PRICE_SYNC_SECONDS || 600)) * 1000;
 const MAX_BACKOFF_MS = 10 * 60 * 1000;
+let lastCompleteTotal = 0; // tổng SP của lần quét đủ gần nhất
 
 // Tuỳ chọn: đẩy giá niêm yết mới sang DB của dropbuy-api (bản clone). Bật bằng DROPBUY_API_DIR trong .env.
 let prisma = null;
@@ -79,6 +81,8 @@ async function runPriceSync() {
   const ctx = scraper.getPricingContext(config);
   const keepWholesale = !!config.dropbuy?.cookieHeader;
   // Tải dữ liệu từ DropBuy bên ngoài khoá (mất vài giây), chỉ khoá lúc ghép & ghi
+  // Nạp phiên TRƯỚC khi quét: thiếu sid thì DropBuy chỉ trả kho công khai (~1.300 SP) thay vì kho CTV (~14.000)
+  if (config.dropbuy?.cookieHeader) await dropbuySession.ensureSession(config).catch(() => null);
   const { items, totalRecords, complete, skippedVirtual = 0, failedPages = 0 } = await scraper.fetchAllSearchItems(config);
   if (items.length === 0) throw new Error('DropBuy không trả về sản phẩm nào');
   const priceMap = await scraper.fetchWholesalePrices(items, config);
@@ -112,7 +116,13 @@ async function runPriceSync() {
     }
 
     // SP không còn trên DropBuy (chỉ kết luận khi đã quét đủ mọi trang) → ngừng bán
-    if (complete) {
+    // Kho bỗng nhỏ hơn hẳn lần quét đủ trước (vd phiên vừa hết hạn → chỉ thấy kho công khai) → không gỡ SP nào
+    // Mốc so sánh: lần quét đủ trước, hoặc số SP đang bán trong catalog (giữ được qua lần khởi động lại)
+    const baseline = Math.max(lastCompleteTotal, products.filter(p => !p.removed_from_dropbuy).length);
+    const shrunk = baseline > 0 && totalRecords < baseline * 0.5;
+    if (shrunk) console.warn(`[RealtimeSync] DropBuy chỉ trả ${totalRecords} SP (mốc trước: ${baseline}) – bỏ qua bước gỡ SP.`);
+    if (complete && !shrunk) {
+      lastCompleteTotal = totalRecords;
       for (const p of products) {
         if (!liveIds.has(p.id) && !p.removed_from_dropbuy) {
           p.in_stock = false;
