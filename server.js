@@ -239,7 +239,7 @@ app.get('/api/products', (req, res) => {
     const { category, search, page = 1, limit = 24, sort = 'default', minPrice, maxPrice, inStock } = req.query;
     let products = scraper.getProducts();
     // Không bán SP chưa có giá (DropBuy đôi khi để giá 0 khi ẩn giá / ngừng bán)
-    products = products.filter(p => Number(p.price) > 0);
+    products = products.filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy);
 
     if (category && category !== 'all') {
       const ids = categoryIdsFor(parseInt(category, 10));
