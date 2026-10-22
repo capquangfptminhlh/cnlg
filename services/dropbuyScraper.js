@@ -97,33 +97,64 @@ async function syncCategories() {
 }
 
 /** Tải toàn bộ danh sách sản phẩm (biến thể chính) từ API tìm kiếm của DropBuy. */
-async function fetchAllSearchItems(config = getConfig(), { maxPages = 20, pageSize = 100, onProgress } = {}) {
-  const items = [];
-  let totalRecords = 0;
-  let complete = false;
-  for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
-    const res = await fetch(DROPBUY_API_SEARCH, {
-      method: 'POST',
-      headers: dropbuyHeaders(config),
-      body: JSON.stringify({ page_num: pageNum, page_size: pageSize, in_stock_mode: 'ALL' })
-    });
-    if (!res.ok) {
-      console.error(`[Scraper] Page ${pageNum} returned HTTP ${res.status}`);
-      break;
+/** Chạy `worker(item)` cho mọi phần tử, tối đa `limit` cái cùng lúc (giữ tải lên DropBuy vừa phải). */
+async function mapLimit(list, limit, worker) {
+  const out = new Array(list.length);
+  let next = 0;
+  const lanes = Array.from({ length: Math.min(limit, list.length) }, async () => {
+    while (next < list.length) {
+      const i = next++;
+      out[i] = await worker(list[i], i);
     }
-    const json = await res.json();
-    if (!json.success || !json.data || !Array.isArray(json.data.items)) {
-      console.warn(`[Scraper] Page ${pageNum} had unexpected format`);
-      break;
+  });
+  await Promise.all(lanes);
+  return out;
+}
+
+async function fetchAllSearchItems(config = getConfig(), { maxPages = 200, pageSize = 100, concurrency = 4, onProgress } = {}) {
+  // Khi đã đăng nhập, DropBuy trả toàn bộ kho CTV (~14.300 SP, ~143 trang) → trang 1 lấy tổng, các trang sau tải song song.
+  const fetchPage = async pageNum => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(DROPBUY_API_SEARCH, {
+          method: 'POST',
+          headers: dropbuyHeaders(config),
+          body: JSON.stringify({ page_num: pageNum, page_size: pageSize, in_stock_mode: 'ALL' })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (!json.success || !json.data || !Array.isArray(json.data.items)) throw new Error('dữ liệu không hợp lệ');
+        return json.data;
+      } catch (e) {
+        if (attempt === 2) {
+          console.warn(`[Scraper] Trang ${pageNum} lỗi: ${e.message}`);
+          return null;
+        }
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      }
     }
-    totalRecords = json.data.total_records || totalRecords;
-    if (json.data.items.length === 0) { complete = true; break; }
-    items.push(...json.data.items);
-    if (onProgress) onProgress({ current: items.length, total: totalRecords, page: pageNum });
-    if (items.length >= totalRecords) { complete = true; break; }
-    await new Promise(r => setTimeout(r, 200)); // giãn nhịp, tránh dồn tải lên DropBuy
-  }
-  return { items, totalRecords, complete };
+  };
+  const first = await fetchPage(1);
+  if (!first) return { items: [], totalRecords: 0, complete: false };
+  const totalRecords = first.total_records || first.items.length;
+  const pages = Math.min(maxPages, Math.max(1, Math.ceil(totalRecords / pageSize)));
+  const raw = [...first.items];
+  let failed = 0;
+  let done = 1;
+  await mapLimit(Array.from({ length: pages - 1 }, (_, k) => k + 2), concurrency, async pageNum => {
+    const d = await fetchPage(pageNum);
+    if (!d) failed++;
+    else raw.push(...d.items);
+    done++;
+    if (onProgress) onProgress({ current: raw.length, total: totalRecords, page: done });
+  });
+  // Trùng SP giữa các trang (DropBuy xếp lại khi có SP mới) → giữ 1 bản
+  const seen = new Set();
+  const unique = raw.filter(i => (seen.has(i.unique_id || i.product_id) ? false : seen.add(i.unique_id || i.product_id)));
+  const complete = failed === 0 && pages * pageSize >= totalRecords && unique.length >= totalRecords * 0.98;
+  // Bỏ hàng "kho ảo" (product_type V): cần luồng đặt hàng riêng mà cửa hàng chưa hỗ trợ
+  const items = unique.filter(i => (i.product_type || 'P') === 'P');
+  return { items, totalRecords, complete, skippedVirtual: unique.length - items.length, failedPages: failed };
 }
 
 /**
@@ -140,14 +171,18 @@ async function fetchWholesalePrices(items, config = getConfig()) {
     return map;
   }
   const reqItems = items.filter(i => i.unique_id && i.product_id).map(i => ({ variation_id: i.unique_id, product_id: i.product_id }));
-  for (let i = 0; i < reqItems.length; i += 50) {
+  const batches = [];
+  for (let i = 0; i < reqItems.length; i += 50) batches.push(i);
+  let expired = false;
+  await mapLimit(batches, 3, async i => {
+    if (expired) return;
     try {
       const res = await fetch(DROPBUY_API_PRICE, { method: 'POST', headers: dropbuyHeaders(config), body: JSON.stringify({ items: reqItems.slice(i, i + 50) }) });
       const json = await res.json().catch(() => null);
       if (!json?.success || !Array.isArray(json.data)) {
         console.warn(`[Scraper] Không lấy được giá sỉ (lô ${i / 50 + 1}): ${json?.message || res.status}`);
-        if (json?.error_code === 401) break; // phiên hết hạn → dừng, dùng giá công khai
-        continue;
+        if (json?.error_code === 401) expired = true; // phiên hết hạn → dừng, dùng giá công khai
+        return;
       }
       for (const p of json.data) {
         // fe_price_group = giá theo nhóm đại lý (không tính flash sale có thời hạn)
@@ -157,8 +192,7 @@ async function fetchWholesalePrices(items, config = getConfig()) {
     } catch (e) {
       console.warn('[Scraper] Lỗi lấy giá sỉ:', e.message);
     }
-    await new Promise(r => setTimeout(r, 150));
-  }
+  });
   return map;
 }
 
@@ -222,7 +256,7 @@ function repriceAll(products, ctx = getPricingContext()) {
 
 // Sync catalog: page by page until complete or up to maxItems
 async function syncCatalog(options = {}) {
-  const { maxPages = 20, pageSize = 100, onProgress } = options;
+  const { maxPages = 200, pageSize = 100, onProgress } = options;
   const config = getConfig();
   const ctx = getPricingContext(config);
 
@@ -264,13 +298,15 @@ async function syncCatalog(options = {}) {
  */
 async function fetchStockMap(ids, config = getConfig(), batchSize = 700) {
   const map = new Map();
-  for (let i = 0; i < ids.length; i += batchSize) {
+  const starts = [];
+  for (let i = 0; i < ids.length; i += batchSize) starts.push(i);
+  await mapLimit(starts, 3, async i => {
     const res = await fetch(DROPBUY_API_IN_STOCK, { method: 'POST', headers: dropbuyHeaders(config), body: JSON.stringify({ product_ids: ids.slice(i, i + batchSize) }) });
     if (!res.ok) throw new Error(`in-stock HTTP ${res.status}`);
     const json = await res.json();
     if (!json.success || !Array.isArray(json.data)) throw new Error(`in-stock: ${json.message || 'dữ liệu không hợp lệ'}`);
     for (const r of json.data) map.set(r.product_id, !!r.in_stock);
-  }
+  });
   return map;
 }
 

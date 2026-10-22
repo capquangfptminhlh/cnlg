@@ -2,15 +2,16 @@ const scraper = require('./dropbuyScraper');
 
 /**
  * Đồng bộ realtime với DropBuy – 2 vòng độc lập:
- *  - Vòng TỒN KHO (mặc định 30s): 1 lần gọi `variations/in-stock` cho toàn bộ SP (~1,6s).
- *  - Vòng GIÁ & CATALOG (mặc định 120s): quét toàn bộ `variations/search` (+ giá sỉ F1 khi đã đăng nhập),
+ *  - Vòng TỒN KHO (mặc định 30s sau khi lượt trước xong): `variations/in-stock` cho toàn bộ SP (~14.000 SP ≈ 15s).
+ *  - Vòng GIÁ & CATALOG (mặc định 600s): quét toàn bộ kho CTV `variations/search` (~143 trang, song song)
+ *    + giá sỉ F1 khi đã đăng nhập,
  *    phát hiện SP mới / SP bị gỡ.
  * Mọi thay đổi được đẩy qua Socket.IO dạng `PRODUCTS_UPDATED` (chỉ các SP đổi) để trang khách cập nhật tại chỗ.
  * Lỗi mạng → giãn nhịp lũy thừa (tối đa 10 phút) để không dồn request vào DropBuy.
  */
 
 const STOCK_INTERVAL_MS = Math.max(10, Number(process.env.STOCK_SYNC_SECONDS || 30)) * 1000;
-const PRICE_INTERVAL_MS = Math.max(30, Number(process.env.PRICE_SYNC_SECONDS || 120)) * 1000;
+const PRICE_INTERVAL_MS = Math.max(30, Number(process.env.PRICE_SYNC_SECONDS || 600)) * 1000;
 const MAX_BACKOFF_MS = 10 * 60 * 1000;
 
 // Tuỳ chọn: đẩy giá niêm yết mới sang DB của dropbuy-api (bản clone). Bật bằng DROPBUY_API_DIR trong .env.
@@ -78,7 +79,7 @@ async function runPriceSync() {
   const ctx = scraper.getPricingContext(config);
   const keepWholesale = !!config.dropbuy?.cookieHeader;
   // Tải dữ liệu từ DropBuy bên ngoài khoá (mất vài giây), chỉ khoá lúc ghép & ghi
-  const { items, totalRecords, complete } = await scraper.fetchAllSearchItems(config);
+  const { items, totalRecords, complete, skippedVirtual = 0, failedPages = 0 } = await scraper.fetchAllSearchItems(config);
   if (items.length === 0) throw new Error('DropBuy không trả về sản phẩm nào');
   const priceMap = await scraper.fetchWholesalePrices(items, config);
 
@@ -111,7 +112,7 @@ async function runPriceSync() {
     }
 
     // SP không còn trên DropBuy (chỉ kết luận khi đã quét đủ mọi trang) → ngừng bán
-    if (complete && items.length >= totalRecords * 0.9) {
+    if (complete) {
       for (const p of products) {
         if (!liveIds.has(p.id) && !p.removed_from_dropbuy) {
           p.in_stock = false;
@@ -129,7 +130,7 @@ async function runPriceSync() {
         await prisma.variation.updateMany({ where: { product_id: p.id }, data: { price_public: p.public_price } }).catch(() => {});
       }
     }
-    console.log(`[RealtimeSync] Giá & catalog: ${items.length}/${totalRecords} SP, giá sỉ ${priceMap.size}, ${changed.length} thay đổi, ${newCount} SP mới.`);
+    console.log(`[RealtimeSync] Giá & catalog: ${items.length}/${totalRecords} SP${skippedVirtual ? ` (bỏ ${skippedVirtual} kho ảo)` : ''}${failedPages ? `, ${failedPages} trang lỗi` : ''}, giá sỉ ${priceMap.size}, ${changed.length} thay đổi, ${newCount} SP mới.`);
     return changed.length;
   });
 }
