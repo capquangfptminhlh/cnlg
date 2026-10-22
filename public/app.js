@@ -202,18 +202,20 @@ function renderCategories() {
     <i class="fa-solid fa-border-all"></i> Tất Cả Sản Phẩm
   </button>`;
 
-  // Chỉ hiện danh mục gốc còn sản phẩm (lọc danh mục cha đã bao gồm danh mục con ở server)
+  // Chỉ hiện danh mục gốc còn sản phẩm (lọc danh mục cha đã bao gồm danh mục con ở server).
+  // Danh mục nhạy cảm (người lớn) xếp cuối, không đứng giữa trang chủ.
+  const sensitive = c => /người lớn|phòng the/i.test(c.name);
   const roots = state.categories
     .filter(c => !c.parent_id && (c.product_count ?? 1) > 0)
-    .sort((a, b) => (b.product_count || 0) - (a.product_count || 0));
+    .sort((a, b) => (sensitive(a) - sensitive(b)) || (b.product_count || 0) - (a.product_count || 0));
 
   roots.forEach(cat => {
-    html += `<button class="cat-btn ${state.currentCategory == cat.id ? 'active' : ''}" data-id="${cat.id}" title="${esc(cat.name)} (${cat.product_count || 0} SP)">
-      <i class="fa-solid ${categoryIcon(cat.name)}"></i> ${esc(cat.name)}
+    html += `<button class="cat-btn${sensitive(cat) ? ' cat-sensitive' : ''} ${state.currentCategory == cat.id ? 'active' : ''}" data-id="${cat.id}" title="${esc(cat.name)} (${cat.product_count || 0} SP)">
+      <i class="fa-solid ${categoryIcon(cat.name)}"></i> <span class="cat-btn-name">${esc(cat.name)}</span><i class="fa-solid fa-chevron-right cat-btn-arrow" aria-hidden="true"></i>
     </button>`;
   });
 
-  categoriesContainer.innerHTML = html;
+  categoriesContainer.innerHTML = html + `<button type="button" class="cat-more" data-store-action="categories"><i class="fa-solid fa-ellipsis"></i> Xem thêm</button>`;
 
   categoriesContainer.querySelectorAll('.cat-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -230,12 +232,12 @@ function renderCategories() {
 }
 
 // --- Render Products ---
+// Nhãn góc ảnh (1 nhãn, như mẫu): Hết hàng > Giảm sâu > Mall. % giảm hiện cạnh giá gốc.
 function productBadges(p) {
-  let html = '';
-  if (p.is_mall) html += `<span class="badge-official"><i class="fa-solid fa-circle-check" style="color: #38bdf8;"></i> Chính Hãng Mall</span>`;
-  if (p.in_stock === false) html += `<span class="badge-discount">HẾT HÀNG</span>`;
-  else if (p.discount_percent > 0) html += `<span class="badge-discount">-${p.discount_percent}%</span>`;
-  return html;
+  if (p.in_stock === false) return `<span class="card-tag tag-out">Hết hàng</span>`;
+  if (p.discount_percent >= 40) return `<span class="card-tag tag-deal">Giảm sâu</span>`;
+  if (p.is_mall) return `<span class="card-tag tag-mall"><i class="fa-solid fa-circle-check"></i> Mall</span>`;
+  return '';
 }
 
 function renderProducts(appendFrom = null) {
@@ -264,7 +266,7 @@ function productCardHtml(p) {
       <div class="card-media">
         ${productBadges(p)}
         <button type="button" class="card-heart" data-favorite-id="${p.id}" aria-label="Lưu sản phẩm" aria-pressed="false"><i class="fa-regular fa-heart"></i></button>
-        <img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'400\\' height=\\'400\\' viewBox=\\'0 0 400 400\\'><rect fill=\\'%23111422\\' width=\\'400\\' height=\\'400\\'/><text fill=\\'%238b92b3\\' font-size=\\'18\\' font-family=\\'sans-serif\\' x=\\'50%\\' y=\\'50%\\' text-anchor=\\'middle\\'>HOANGMINH.COM</text></svg>'">
+        <img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'400\\' height=\\'400\\' viewBox=\\'0 0 400 400\\'><rect fill=\\'%23111422\\' width=\\'400\\' height=\\'400\\'/><text fill=\\'%238b92b3\\' font-size=\\'18\\' font-family=\\'sans-serif\\' x=\\'50%\\' y=\\'50%\\' text-anchor=\\'middle\\'>Hoang Minh Store</text></svg>'">
 
         <div class="card-quick-overlay">
           <button class="btn-quick-view" onclick="openProductDetail(${p.id})">
@@ -274,24 +276,23 @@ function productCardHtml(p) {
       </div>
 
       <div class="card-details">
-        <div class="card-category">${esc(p.category_name || 'Công nghệ & Tiện ích')}</div>
         <h3 class="card-title" title="${esc(p.name)}" onclick="openProductDetail(${p.id})">${esc(p.name)}</h3>
+
+        <div class="card-pricing">
+          <span class="price-highlight">${formatPrice(p.price)}</span>
+          ${p.original_price > p.price ? `<span class="price-old-row"><span class="price-strike">${formatPrice(p.original_price)}</span>${p.discount_percent > 0 ? `<span class="price-off">-${p.discount_percent}%</span>` : ''}</span>` : ''}
+        </div>
 
         <div class="card-meta">
           <span><i class="fa-solid fa-shield-halved"></i> ${esc(p.warranty || 'Xem chi tiết sản phẩm')}</span>
         </div>
 
-        <div class="card-pricing">
-          <span class="price-highlight">${formatPrice(p.price)}</span>
-          ${p.original_price ? `<span class="price-strike">${formatPrice(p.original_price)}</span>` : ''}
-        </div>
-
         <div class="card-actions-row">
-          <button class="btn-buy-instant" onclick="buyNowInstant(${p.id})" ${soldOut ? 'disabled' : ''}>
-            <i class="fa-solid fa-bolt"></i> ${soldOut ? 'Hết Hàng' : 'Mua Ngay'}
-          </button>
-          <button class="btn-add-mini" title="Thêm vào giỏ" onclick="addToCart(${p.id})" ${soldOut ? 'disabled' : ''}>
+          <button class="btn-add-mini" title="Thêm vào giỏ" aria-label="Thêm vào giỏ" onclick="addToCart(${p.id})" ${soldOut ? 'disabled' : ''}>
             <i class="fa-solid fa-cart-plus"></i>
+          </button>
+          <button class="btn-buy-instant" onclick="buyNowInstant(${p.id})" ${soldOut ? 'disabled' : ''}>
+            ${soldOut ? 'Hết hàng' : 'Mua ngay'}
           </button>
         </div>
       </div>

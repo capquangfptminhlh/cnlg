@@ -135,7 +135,10 @@ function publicProduct(p) {
   if (!p) return p;
   // Không lộ nguồn hàng cho khách: bỏ giá vốn/biên lãi và link/mã SP bên nguồn
   const { dropbuy_cost, profit_margin, is_wholesale_price, public_price, wholesale_price, pricing_rule, dropbuy_url, dropbuy_id, ...rest } = p;
+  // "Giá gốc" nguồn đôi khi bị thổi (vd 574k so với 10 triệu = -94%) → giảm > 70% coi như không có giá gốc,
+  // tránh hiển thị khuyến mãi trông như giả
   const discount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
+  if (discount > 70) return { ...rest, original_price: null, discount_percent: 0 };
   return { ...rest, discount_percent: discount };
 }
 

@@ -159,3 +159,69 @@ body.is-category-view .premium-catalog-heading { display: none !important; }
 @keyframes catChipPop { 0% { transform: scale(.92); } 60% { transform: scale(1.05); } 100% { transform: scale(1); } }
 @keyframes catShimmer { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
 @keyframes catCardIn { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* ===================== Bám ảnh mẫu (Hoàng Minh Store) ===================== */
+/* Thương hiệu: ô túi trắng + "Hoàng Minh Store" + khẩu hiệu */
+.main-header .brand-logo { padding-left: 0; display: flex; flex-direction: row; align-items: center; gap: 11px; }
+.main-header .brand-logo::before { content: none; }
+.logo-mark {
+  width: 46px; height: 46px; border-radius: 12px; flex: 0 0 46px;
+  background: #fff; color: #ee4d2d; display: grid; place-items: center; font-size: 23px;
+  box-shadow: 0 4px 12px rgba(120, 30, 10, .18);
+}
+.logo-stack { display: flex; flex-direction: column; min-width: 0; }
+.main-header .logo-text { font-size: 25px; font-weight: 800; letter-spacing: -.5px; line-height: 1.05; text-transform: none; white-space: nowrap; }
+.main-header .logo-sub { font-size: 12px; letter-spacing: 0; text-transform: none; color: rgba(255,255,255,.9); margin-top: 3px; font-weight: 600; }
+.footer-brand .brand-logo { font-size: 22px; font-weight: 800; letter-spacing: -.4px; }
+
+@media (min-width: 701px) {
+  /* Cột danh mục chạy dài cạnh banner + hàng biểu tượng, không cuộn trong khung */
+  .market-desktop-layout { align-items: stretch; }
+  .market-sidebar { max-height: none !important; height: auto; align-self: stretch; }
+  .market-sidebar .cat-scroll { max-height: none !important; overflow: visible; padding-bottom: 8px; }
+  .market-sidebar .cat-btn { display: flex; align-items: center; gap: 10px; padding: 8px 10px; font-size: 12.5px; }
+  .market-sidebar .cat-btn-name { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Như mẫu: 11 ngành hàng lớn nhất + "Xem thêm" (mở bảng đủ danh mục cha/con) */
+  .market-sidebar .cat-btn:nth-child(n+13) { display: none; }
+  .market-sidebar .cat-btn-arrow { flex: 0 0 auto; width: auto; font-size: 9px; color: #c3c8d0; transition: transform .2s ease, color .2s ease; }
+  .market-sidebar .cat-btn:hover .cat-btn-arrow { color: #ee4d2d; transform: translateX(2px); }
+  .market-sidebar .cat-btn.active .cat-btn-arrow { color: #ee4d2d; }
+  .market-sidebar .cat-sensitive { color: #8a909a; }
+  .cat-more {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; margin-top: 2px;
+    border: 0; border-top: 1px solid #f0f1f4; background: none; color: #4b5260; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .cat-more i { width: 18px; text-align: center; color: #6d7581; }
+  .cat-more:hover { color: #ee4d2d; }
+  /* Hàng biểu tượng nằm trong cột phải, dưới banner */
+  .market-discovery .market-shortcuts { margin-top: 12px; }
+}
+
+@media (max-width: 700px) {
+  .cat-btn-arrow, .cat-more { display: none; }
+  /* Điện thoại: đủ 8 biểu tượng, lưới 4 x 2 như mẫu */
+  .market-discovery .market-shortcuts { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 12px; min-height: 0; padding: 12px 4px; }
+  .market-discovery .market-shortcut:nth-child(n+5) { display: flex; }
+  .main-header .brand-logo { padding-left: 0; gap: 8px; }
+  .logo-mark { width: 34px; height: 34px; flex-basis: 34px; border-radius: 9px; font-size: 17px; }
+  .main-header .logo-text { font-size: 18px !important; }
+  .main-header .logo-sub { display: block; font-size: 10px; margin-top: 1px; }
+}
+
+/* Thẻ sản phẩm: 1 nhãn góc ảnh, % giảm cạnh giá gốc, nút giỏ + Mua ngay */
+.luxury-card .card-media, .featured-card { position: relative; }
+.card-tag {
+  position: absolute; top: 8px; left: 8px; z-index: 3;
+  padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; line-height: 1.3; color: #fff;
+  background: #ee4d2d; box-shadow: 0 2px 6px rgba(238, 77, 45, .25);
+}
+.card-tag.tag-out { background: #6b7280; box-shadow: none; }
+.card-tag.tag-mall { background: #d0011b; }
+.card-tag.tag-mall i { font-size: 10px; margin-right: 2px; }
+.luxury-card .card-pricing { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 2px; min-height: 44px; }
+.price-old-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.price-old-row .price-strike, .price-old-row .featured-old { font-size: 12px; color: #9aa1ac; text-decoration: line-through; }
+.price-off { font-size: 11px; font-weight: 800; color: #ee4d2d; background: #fff0ec; border-radius: 3px; padding: 1px 5px; }
+.luxury-card .card-meta { font-size: 11px; color: #8a919c; }
+.luxury-card .card-actions-row .btn-buy-instant { font-size: 13px; font-weight: 800; }
+.featured-info .price-old-row { margin-top: 2px; }

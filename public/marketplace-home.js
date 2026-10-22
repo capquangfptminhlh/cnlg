@@ -54,10 +54,12 @@
     const price = Number(p.price);
     const showOld = Number.isFinite(oldPrice) && Number.isFinite(price) && oldPrice > price;
     const discount = Number(p.discount_percent);
-    const discountBadge = Number.isFinite(discount) && discount > 0 && showOld
-      ? '<span class="featured-badge">-' + Math.round(discount) + '%</span>' : '';
+    const hasOff = Number.isFinite(discount) && discount > 0 && showOld;
+    const discountBadge = soldOut ? '<span class="card-tag tag-out">Hết hàng</span>'
+      : hasOff && discount >= 40 ? '<span class="card-tag tag-deal">Giảm sâu</span>'
+      : p.is_mall ? '<span class="card-tag tag-mall"><i class="fa-solid fa-circle-check"></i> Mall</span>' : '';
     const fallback = 'data:image/svg+xml,' + encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="100%" height="100%" fill="#f8f8fa"/><text x="50%" y="50%" fill="#aab0b9" text-anchor="middle" dominant-baseline="central" font-size="20">HOANGMINH.COM</text></svg>'
+      '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="100%" height="100%" fill="#f8f8fa"/><text x="50%" y="50%" fill="#aab0b9" text-anchor="middle" dominant-baseline="central" font-size="20">Hoang Minh Store</text></svg>'
     );
     const src = String(p.image || '');
     return '<article class="featured-card" data-product-id="' + id + '">' +
@@ -69,7 +71,7 @@
       '<div class="featured-info">' +
       '<button type="button" class="featured-name" data-shop-product="' + id + '">' + escapeHTML(p.name) + '</button>' +
       '<strong class="featured-price">' + formatVND(p.price) + '</strong>' +
-      (showOld ? '<span class="featured-old">' + formatVND(oldPrice) + '</span>' : '') +
+      (showOld ? '<span class="price-old-row"><span class="featured-old">' + formatVND(oldPrice) + '</span>' + (hasOff ? '<span class="price-off">-' + Math.round(discount) + '%</span>' : '') + '</span>' : '') +
       '<div class="featured-actions"><button type="button" class="featured-cart" data-shop-cart="' + id + '" aria-label="Thêm vào giỏ"' + (soldOut ? ' disabled' : '') + '><i class="fa-solid fa-cart-plus"></i></button>' +
       '<button type="button" class="featured-buy" data-shop-buy="' + id + '"' + (soldOut ? ' disabled' : '') + '>' +
       (soldOut ? 'Hết hàng' : 'Mua ngay') + '</button></div></div></article>';
@@ -82,8 +84,22 @@
     updateHeartButtons();
   }
 
+  // "Sản phẩm nổi bật": lấy riêng (không lặp trang đầu của danh sách bên dưới) – SP còn hàng, giảm nhiều nhất
+  // trong 1 trang chọn theo ngày, nên mỗi ngày một nhóm khác. Lỗi mạng → dùng tạm SP đang hiển thị.
+  let featuredLoaded = false;
+  async function loadFeatured() {
+    try {
+      const day = Math.floor(Date.now() / 86400000);
+      const res = await fetch('/api/products?inStock=1&limit=60&page=' + (day % 20 + 1));
+      const json = await res.json();
+      const pool = (json.data || []).filter(p => p.image);
+      pool.sort((a, b) => (Number(b.discount_percent) || 0) - (Number(a.discount_percent) || 0));
+      if (pool.length >= 6) { featuredLoaded = true; renderFeatured(pool); }
+    } catch (_) { /* giữ bản dự phòng */ }
+  }
+  loadFeatured();
   window.addEventListener('storefront:products', event => {
-    renderFeatured(event.detail && event.detail.products);
+    if (!featuredLoaded) renderFeatured(event.detail && event.detail.products);
   });
 
   function jumpToCatalog() {
@@ -168,6 +184,6 @@
   // The native product renderer emits the event after each successful product API refresh.
   // Also handle a restored view if integration loads the module after the product state.
   try {
-    if (typeof state !== 'undefined' && Array.isArray(state.products) && state.products.length) renderFeatured(state.products);
+    if (!featuredLoaded && typeof state !== 'undefined' && Array.isArray(state.products) && state.products.length) renderFeatured(state.products);
   } catch (_) { /* no storefront state available */ }
 })();
