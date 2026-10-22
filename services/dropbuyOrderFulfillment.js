@@ -24,6 +24,8 @@ const { vnDate } = require('./backup');
  */
 const DONE = new Set(['D', 'F']);
 const FAILED = { C: 'DropBuy đã huỷ đơn', B: 'Khách bom hàng', X: 'Hàng hoàn về kho', N: 'Giao không thành công' };
+// Câu hiện cho KHÁCH (trang tra cứu, tin nhắn) – không lộ nguồn hàng
+const FAILED_CUSTOMER = { C: 'Đơn đã bị huỷ do hết hàng', B: 'Giao hàng không thành công', X: 'Hàng đã hoàn về kho', N: 'Giao hàng không thành công' };
 const STATUS_LABEL = { U: 'Nháp', P: 'Chờ thanh toán', O: 'Đã thanh toán', W: 'Chờ đóng hàng', G: 'Đã đóng hàng', Q: 'Chờ lấy hàng', S: 'Đang giao', F: 'Đã giao', D: 'Hoàn thành', K: 'Đang khiếu nại', C: 'Đã huỷ', B: 'Bom hàng', X: 'Hoàn hàng', N: 'Giao không thành công' };
 const LOCKED_SYNC = new Set(['SUBMITTING', 'ORDERED', 'SUBMIT_UNKNOWN']);
 
@@ -293,7 +295,7 @@ async function cancelOnDropbuy(orderId, io) {
   const now = new Date().toISOString();
   const refund = order.payment_method !== 'COD' && ['PAID', 'PROCESSING'].includes(order.status) && order.paid_at;
   const updated = setSync(orderId, { current_status: 'C', current_label: STATUS_LABEL.C, cancelled_at: now },
-    { status: 'CANCELLED', cancelled_at: now, cancel_reason: 'Admin huỷ đơn trên DropBuy', needs_attention: !!refund, ...(refund ? { refund_needed: true } : {}) });
+    { status: 'CANCELLED', cancelled_at: now, cancel_reason: 'Cửa hàng huỷ đơn', internal_note: 'Admin huỷ đơn trên DropBuy', needs_attention: !!refund, ...(refund ? { refund_needed: true } : {}) });
   emit(io, updated, 'CANCELLED', 'Đơn hàng đã được huỷ.');
   return updated;
 }
@@ -342,7 +344,7 @@ async function syncDropbuyOrdersStatus(io) {
     } else if (failed) {
       if (order.payment_method === 'COD') {
         // Khách chưa trả tiền → huỷ đơn bên mình, quỹ do DropBuy hoàn/trừ theo chính sách của họ
-        const updated = orderStore.updateOrder(order.id, { status: 'CANCELLED', cancelled_at: now, cancel_reason: FAILED[failed], dropbuy_sync: { ...sync, problem: FAILED[failed] }, needs_attention: failed !== 'C' });
+        const updated = orderStore.updateOrder(order.id, { status: 'CANCELLED', cancelled_at: now, cancel_reason: FAILED_CUSTOMER[failed], dropbuy_sync: { ...sync, problem: FAILED[failed] }, needs_attention: failed !== 'C' });
         emit(io, updated, 'CANCELLED', 'Đơn hàng đã bị huỷ.');
         if (failed !== 'C') notify.paymentIssue(`Đơn COD ${order.id} (DropBuy ${codes.join(', ')}): ${FAILED[failed]} – kiểm tra phí hoàn trên DropBuy.`);
       } else {

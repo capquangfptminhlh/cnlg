@@ -200,3 +200,29 @@ test('Báo cáo: đơn thử bị loại; đơn thiếu giá vốn không đư�
   assert.equal(r.totals.today.cost_unknown_revenue, 500000);
   assert.equal(r.pipeline.PAID, 2);                // đơn thử không vào "đã nhận tiền chưa đặt kho"
 });
+
+test('Tin nhắn cho khách: đúng giai đoạn, đủ mã vận đơn, không nhắc DropBuy', () => {
+  const { buildCustomerMessage, zaloLink } = require('../services/customerMessage');
+  const base = { id: 'HMAB12CD34', payment_method: 'COD', total_amount: 356000, customer: { name: 'Chị Lan', phone: '0901234567' }, items: [{ name: 'Bàn là mini', quantity: 1 }] };
+  const opts = { storeName: 'Hoàng Minh Store', trackUrl: 'https://shop.vn/?tra-cuu=HMAB12CD34' };
+  const confirmed = buildCustomerMessage({ ...base, status: 'CONFIRMED', dropbuy_sync: { status: 'WAITING_STAFF' } }, opts);
+  assert.equal(confirmed.stage, 'confirmed');
+  assert.match(confirmed.text, /HMAB12CD34/);
+  assert.match(confirmed.text, /356\.000đ/);
+  assert.match(confirmed.text, /Bàn là mini x1/);
+  const shipping = buildCustomerMessage({ ...base, status: 'PROCESSING', dropbuy_sync: { status: 'ORDERED', order_code: 'D-261022-1', carrier: 'S', shipping_ref_code: 'SPXVN0123' } }, opts);
+  assert.equal(shipping.stage, 'shipping');
+  assert.match(shipping.text, /SPX Express/);
+  assert.match(shipping.text, /SPXVN0123/);
+  assert.match(shipping.text, /https:\/\/shop\.vn\/\?tra-cuu=HMAB12CD34/);
+  assert.equal(buildCustomerMessage({ ...base, status: 'PROCESSING', dropbuy_sync: { status: 'ORDERED' } }, opts).stage, 'preparing');
+  assert.equal(buildCustomerMessage({ ...base, status: 'COMPLETED' }, opts).stage, 'completed');
+  assert.equal(buildCustomerMessage({ ...base, status: 'CANCELLED', cancel_reason: 'Khách đổi ý' }, opts).stage, 'cancelled');
+  for (const t of [confirmed.text, shipping.text]) {
+    assert.doesNotMatch(t, /dropbuy|D-261022/i); // không lộ nguồn hàng / mã đơn DropBuy
+  }
+  const cancelledLeak = buildCustomerMessage({ ...base, status: 'CANCELLED', cancel_reason: 'Admin huỷ đơn trên DropBuy' }, opts);
+  assert.doesNotMatch(cancelledLeak.text, /dropbuy|admin/i);
+  assert.equal(zaloLink('+84 901 234 567'), 'https://zalo.me/0901234567');
+  assert.equal(zaloLink('123'), null);
+});

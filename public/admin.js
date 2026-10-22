@@ -182,7 +182,7 @@ function renderOrders(orders) {
       <td class="order-items-cell">${items}${o.shipping_fee != null ? `<br>Ship: ${o.shipping_fee ? formatPrice(o.shipping_fee) : 'miễn phí'}${o.customer?.province ? ` (${esc(o.customer.province)})` : ''}` : ''}${cost ? `<br><strong>Lãi gộp hàng: ${formatPrice((o.subtotal ?? o.total_amount) - cost)}</strong>` : ''}</td>
       <td><strong style="color: #e11d48;">${formatPrice(o.total_amount)}</strong><br><small style="color:${o.payment_method === 'COD' ? '#38bdf8' : '#94a3b8'};">${o.payment_method === 'COD' ? 'COD – thu khi giao' : 'Chuyển khoản'}</small>${ds.spend ? `<br><small style="color:#10b981;">Lãi ${formatPrice(o.total_amount - ds.spend)}</small>` : ''}${o.payment_via ? `<br><small style="color:#10b981;">${o.payment_via === 'admin' ? 'xác nhận tay' : `tự động: ${esc(o.payment_via)}`}</small>` : ''}${o.late_payment ? `<br><small style="color:#ef4444;">Tiền về sau khi huỷ: ${formatPrice(o.late_payment.amount)}</small>` : ''}</td>
       <td>${o.is_test ? '<span class="status-pill cancelled">ĐƠN THỬ</span><br>' : ''}<span class="status-pill ${cls}">${label}</span>${o.needs_attention && o.status === 'PAYMENT_REPORTED' ? '<br><small style="color:#ef4444;">⚠ Khách báo CK đã lâu – cần đối soát</small>' : ''}${o.cancel_reason ? `<br><small style="color:#94a3b8;">${esc(o.cancel_reason)}</small>` : ''}</td>
-      <td>${actions}<br><a href="#" style="font-size:11px;" onclick="toggleTestOrder('${esc(o.id)}', ${!o.is_test}); return false;">${o.is_test ? 'Bỏ đánh dấu đơn thử' : 'Đánh dấu là đơn thử'}</a></td>
+      <td>${actions}${o.status !== 'PENDING_PAYMENT' && !o.is_test ? `<br><button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 6px;" onclick="customerMessageFor('${esc(o.id)}')"><i class="fa-regular fa-comment-dots"></i> Tin nhắn cho khách</button>` : ''}<br><a href="#" style="font-size:11px;" onclick="toggleTestOrder('${esc(o.id)}', ${!o.is_test}); return false;">${o.is_test ? 'Bỏ đánh dấu đơn thử' : 'Đánh dấu là đơn thử'}</a></td>
     </tr>`;
   }).join('');
 }
@@ -197,6 +197,25 @@ async function pushToDropbuyCart(orderId) {
     copyReceiver(orderId, true);
     if (await uiConfirm(`${json.message}\n\n${lines}\n\nThông tin người nhận đã được sao chép. Mở giỏ DropBuy ngay?`)) window.open(json.data.cart_url, '_blank', 'noopener');
     loadData();
+  } catch (e) {
+    uiAlert('Lỗi: ' + e.message);
+  }
+}
+
+async function customerMessageFor(orderId) {
+  try {
+    const json = await (await adminFetch(`/api/admin/orders/${orderId}/customer-message`)).json();
+    if (!json.success) throw new Error(json.error);
+    const d = json.data;
+    let copied = false;
+    try { await navigator.clipboard.writeText(d.text); copied = true; } catch (e) {}
+    const warn = d.local_link ? '\n\n⚠ Link tra cứu đang là địa chỉ máy nội bộ – khách bên ngoài chưa mở được cho tới khi cửa hàng có tên miền (đặt PUBLIC_BASE_URL).' : '';
+    if (!copied) await uiPrompt('Sao chép tin nhắn gửi khách:', { value: d.text, readOnly: true });
+    if (d.zalo) {
+      if (await uiConfirm(`${copied ? 'Đã sao chép tin nhắn:' : 'Tin nhắn:'}\n\n${d.text}${warn}\n\nMở Zalo tới ${d.phone} để dán gửi?`, { ok: 'Mở Zalo', cancel: 'Đóng' })) window.open(d.zalo, '_blank', 'noopener');
+    } else if (copied) {
+      uiAlert(`Đã sao chép tin nhắn:\n\n${d.text}${warn}`);
+    }
   } catch (e) {
     uiAlert('Lỗi: ' + e.message);
   }

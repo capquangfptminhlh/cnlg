@@ -1378,3 +1378,12 @@ document.getElementById('trackForm').addEventListener('submit', e => {
   e.preventDefault();
   trackOrder(document.getElementById('trackOrderId').value, document.getElementById('trackPhone').value);
 });
+// Link tra cứu shop gửi khách: /?tra-cuu=HMxxxxxxxx → mở sẵn ô tra cứu, khách chỉ cần nhập SĐT
+document.addEventListener('DOMContentLoaded', () => {
+  const code = new URLSearchParams(location.search).get('tra-cuu');
+  if (!code || !/^HM[0-9A-F]{8}$/i.test(code)) return;
+  const saved = myOrders().find(o => o.id === code.toUpperCase());
+  openTrackModal({ id: code.toUpperCase(), phone: saved?.phone || '' });
+  if (saved?.phone) trackOrder(code.toUpperCase(), saved.phone);
+  else setTimeout(() => document.getElementById('trackPhone')?.focus(), 50);
+});

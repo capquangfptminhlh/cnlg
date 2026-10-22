@@ -30,6 +30,7 @@ const dropbuySession = require('./services/dropbuySession');
 const shippingLive = require('./services/shippingLive');
 const watchdog = require('./services/dropbuyWatchdog');
 const vault = require('./services/credentialVault');
+const customerMessage = require('./services/customerMessage');
 const catalogImage = require('./services/catalogImage');
 
 const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
@@ -154,6 +155,9 @@ function categoryIdsFor(catId) {
   return ids;
 }
 
+/** Không để chữ "DropBuy" (nguồn hàng) lọt ra phía khách */
+const customerSafe = t => (t ? String(t).replace(/(trên|từ|của)?\s*drop\s*buy(\.vn)?/gi, '').replace(/\s{2,}/g, ' ').trim() || 'Đã huỷ' : t);
+
 /** Dữ liệu đơn trả cho khách: che bớt thông tin cá nhân, không lộ thông tin nội bộ. */
 function publicOrder(o) {
   return {
@@ -164,7 +168,7 @@ function publicOrder(o) {
     subtotal: o.subtotal ?? o.total_amount,
     shipping_fee: o.shipping_fee || 0,
     shipping_detail: o.shipping_detail || null,
-    cancel_reason: o.cancel_reason || null,
+    cancel_reason: customerSafe(o.cancel_reason) || null,
     items: (o.items || []).map(i => ({ id: i.id, name: i.name, variant_name: i.variant_name || null, price: i.price, quantity: i.quantity, image: i.image })),
     customer: { name: o.customer?.name, phone: maskPhone(o.customer?.phone), province: o.customer?.province || null, ward_name: o.customer?.ward_name || null },
     payment: o.payment,
@@ -541,7 +545,7 @@ app.get('/api/orders/:id/track', rateLimit('track', 10 * 60e3, 30), (req, res) =
     order.paid_at && { status: 'PAID', at: order.paid_at, label: 'Cửa hàng đã nhận tiền' },
     order.processing_at && { status: 'PROCESSING', at: order.processing_at, label: order.dropbuy_sync?.shipping_ref_code ? `Đang giao – mã vận đơn ${order.dropbuy_sync.shipping_ref_code}` : 'Kho đang chuẩn bị hàng' },
     order.completed_at && { status: 'COMPLETED', at: order.completed_at, label: 'Giao hàng thành công' },
-    order.cancelled_at && { status: 'CANCELLED', at: order.cancelled_at, label: order.cancel_reason || 'Đã huỷ' }
+    order.cancelled_at && { status: 'CANCELLED', at: order.cancelled_at, label: customerSafe(order.cancel_reason) || 'Đã huỷ' }
   ].filter(Boolean);
   res.json({ success: true, data: { ...publicOrder(order), address: order.customer?.address, timeline } });
 });
@@ -679,6 +683,16 @@ app.post('/api/admin/auto-order', requireAdmin, (req, res) => {
   }
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
   res.json({ success: true, data: { autoOrder: dropbuyOrderFulfillment.normalizeAutoOrder(cfg.autoOrder), payments: paymentOptions(cfg) } });
+});
+
+// Tin nhắn cho khách (nhân viên sao chép, gửi qua Zalo / SMS) theo trạng thái đơn
+app.get('/api/admin/orders/:id/customer-message', requireAdmin, (req, res) => {
+  const order = orderStore.getOrderById(req.params.id);
+  if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
+  const base = (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  const cfg = readConfig();
+  const msg = customerMessage.buildCustomerMessage(order, { storeName: cfg.store?.name || 'Hoàng Minh Store', trackUrl: `${base}/?tra-cuu=${encodeURIComponent(order.id)}` });
+  res.json({ success: true, data: { ...msg, zalo: customerMessage.zaloLink(order.customer?.phone), phone: order.customer?.phone || null, local_link: !process.env.PUBLIC_BASE_URL } });
 });
 
 // Đánh dấu đơn thử (loại khỏi báo cáo, không tự đặt DropBuy)
