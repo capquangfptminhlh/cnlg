@@ -202,7 +202,7 @@
   <aside class="cart-drawer" id="cartDrawer" role="dialog" aria-label="Giỏ hàng" aria-modal="true" aria-hidden="true">
     <div class="drawer-header flex-between">
       <div class="drawer-title">
-        <i class="fa-solid fa-bag-shopping"></i> Giỏ Hàng (<span id="drawerCount">0</span>)
+        <i class="fa-solid fa-bag-shopping"></i> <span>Giỏ hàng (<span id="drawerCount">0</span>)</span>
       </div>
       <button type="button" class="drawer-close-btn" id="closeCartBtn" aria-label="Đóng giỏ hàng">&times;</button>
     </div>
@@ -211,12 +211,12 @@
     </div>
     <div class="drawer-footer">
       <div class="drawer-subtotal flex-between">
-        <span class="sub-label">Tổng cộng thanh toán:</span>
+        <span class="sub-label">Tạm tính:</span>
         <strong class="sub-amount price-highlight" id="drawerTotalAmount">0 đ</strong>
       </div>
       <p class="drawer-note"><i class="fa-solid fa-circle-info"></i> Phí vận chuyển sẽ được tính tại bước đặt hàng.</p>
       <button class="btn-checkout-primary" id="checkoutBtn" disabled>
-        <span>Tiến Hành Đặt Hàng</span>
+        <span>Tiến hành đặt hàng</span>
         <i class="fa-solid fa-arrow-right"></i>
       </button>
     </div>
@@ -226,7 +226,7 @@
   <div class="modal-backdrop" id="checkoutModal" aria-hidden="true">
     <div class="modal-dialog checkout-dialog" role="dialog" aria-modal="true" aria-label="Thông tin nhận hàng">
       <div class="modal-top flex-between">
-        <h3><i class="fa-solid fa-truck-ramp-box"></i> Thông Tin Nhận Hàng</h3>
+        <h3><i class="fa-solid fa-truck-ramp-box"></i> Thông tin nhận hàng</h3>
         <button type="button" class="modal-close-icon" id="closeCheckoutBtn" aria-label="Đóng trang đặt hàng">&times;</button>
       </div>
 
@@ -282,6 +282,7 @@
         </div>
 
         <div class="checkout-order-summary">
+          <div class="summary-items" id="summaryItems"></div>
           <div class="summary-line flex-between">
             <span>Số lượng sản phẩm:</span>
             <span id="summaryCount">0</span>

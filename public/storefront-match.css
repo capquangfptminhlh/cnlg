@@ -225,3 +225,55 @@ body.is-category-view .premium-catalog-heading { display: none !important; }
 .luxury-card .card-meta { font-size: 11px; color: #8a919c; }
 .luxury-card .card-actions-row .btn-buy-instant { font-size: 13px; font-weight: 800; }
 .featured-info .price-old-row { margin-top: 2px; }
+
+/* ===================== Chi tiết SP · Giỏ hàng · Đặt hàng ===================== */
+/* Chi tiết: "Sao chép link" nằm cùng hàng nhãn cửa hàng, chừa chỗ cho nút đóng ở góc */
+#productDetailModal .detail-head-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-right: 48px; }
+.detail-copy-link {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid #e3e7ee; background: #fff; color: #4b5563; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.detail-copy-link:hover { border-color: #f7a088; color: #ee4d2d; }
+
+/* Giỏ hàng */
+#cartDrawer .cart-drawer-item img { cursor: pointer; }
+#cartDrawer .drawer-item-title { cursor: pointer; }
+#cartDrawer .drawer-item-title:hover { color: #ee4d2d; }
+.cart-line-top { display: flex; align-items: flex-start; gap: 8px; }
+.cart-line-top .drawer-item-title { flex: 1; min-width: 0; }
+.cart-line-remove {
+  flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; border: 0; background: transparent;
+  color: #9aa1ac; cursor: pointer; display: grid; place-items: center;
+}
+.cart-line-remove:hover { background: #fff0ec; color: #ee4d2d; }
+.cart-line-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.cart-qty { display: inline-flex; align-items: center; height: 30px; border: 1px solid #e3e7ee; border-radius: 8px; overflow: hidden; }
+.cart-qty button { width: 30px; height: 30px; border: 0; background: #f7f8fa; color: #374151; font-size: 15px; cursor: pointer; }
+.cart-qty button:disabled { opacity: .4; cursor: not-allowed; }
+.cart-qty span { min-width: 34px; text-align: center; font-size: 13px; font-weight: 700; }
+.cart-line-total { font-size: 14px; font-weight: 800; color: #1f2937; }
+.cart-empty { text-align: center; padding: 56px 20px; color: #8a919c; }
+.cart-empty-icon { width: 76px; height: 76px; border-radius: 50%; background: #fff3ef; color: #ee4d2d; display: inline-grid; place-items: center; font-size: 32px; margin-bottom: 14px; }
+.cart-empty h4 { color: #2f3747; margin-bottom: 4px; font-size: 15px; }
+.cart-empty p { font-size: 13px; margin-bottom: 16px; }
+.cart-empty-btn { border: 0; background: #ee4d2d; color: #fff; font-weight: 800; padding: 10px 22px; border-radius: 8px; cursor: pointer; }
+
+/* Đặt hàng: ô chọn thanh toán (nút tròn không bị kéo giãn như ô nhập), ô ẩn không giữ chỗ */
+#checkoutModal .pay-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+#checkoutModal .pay-option { display: flex; align-items: flex-start; gap: 10px; min-height: 0; padding: 13px 14px; cursor: pointer; }
+#checkoutModal .pay-option input[type="radio"] {
+  width: 18px; height: 18px; min-height: 0; flex: 0 0 18px; margin: 2px 0 0; padding: 0; border: 0;
+}
+#checkoutModal .pay-option > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+#checkoutModal .pay-option strong { font-size: 13px; }
+#checkoutModal .pay-option small { font-size: 12px; }
+/* Danh sách món trong phần tóm tắt */
+.summary-items { display: flex; flex-direction: column; gap: 8px; padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px dashed #e5e8ee; }
+.summary-items:empty { display: none; }
+.summary-item { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; font-size: 12.5px; }
+.summary-item img { width: 42px; height: 42px; border-radius: 7px; object-fit: cover; border: 1px solid #eef0f4; background: #fff; }
+.summary-item-name { color: #374151; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
+.summary-item-name small { display: block; color: #8a919c; font-size: 11px; }
+.summary-item-qty { color: #6b7280; }
+.summary-item-price { font-weight: 800; color: #1f2937; white-space: nowrap; }
+#checkoutModal #summaryShippingNote:empty { display: none; }

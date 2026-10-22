@@ -472,11 +472,11 @@ function renderDetailModal(prod) {
       </div>
 
       <div class="detail-info">
-        <div class="flex-between" style="gap:8px; flex-wrap:wrap;">
+        <div class="detail-head-row">
           <div class="detail-brand-badge">
             <i class="fa-solid fa-store"></i> Hoàng Minh Store${prod.is_mall ? ' · Sản phẩm Mall' : ''}
           </div>
-          <button type="button" class="variant-chip" onclick="copyProductLink()"><i class="fa-solid fa-link"></i> Sao chép link</button>
+          <button type="button" class="detail-copy-link" onclick="copyProductLink()"><i class="fa-solid fa-link"></i> Sao chép link</button>
         </div>
         <h2 class="detail-title">${esc(prod.name)}</h2>
 
@@ -502,7 +502,7 @@ function renderDetailModal(prod) {
         <div class="detail-features-list">
           <div><i class="fa-solid fa-shield-halved"></i> Bảo hành: ${esc(prod.warranty || 'Xem thông tin bảo hành')}</div>
           <div><i class="fa-solid fa-truck-fast"></i> Giao hàng toàn quốc, được đồng kiểm khi nhận${v?.weight_gram ? ` · ${(v.weight_gram / 1000).toLocaleString('vi-VN')} kg` : ''}</div>
-          <div><i class="fa-solid fa-truck-fast"></i> Thanh toán khi nhận hàng (COD) hoặc chuyển khoản</div>
+          <div><i class="fa-solid fa-hand-holding-dollar"></i> ${typeof payOptions !== 'undefined' && payOptions.bank?.enabled ? 'Thanh toán khi nhận hàng (COD) hoặc chuyển khoản' : 'Thanh toán khi nhận hàng (COD) – kiểm tra hàng rồi mới trả tiền'}</div>
         </div>
 
         <div class="detail-qty-row">
@@ -516,10 +516,10 @@ function renderDetailModal(prod) {
 
         <div class="detail-actions-row">
           <button class="btn-order-now-large" onclick="buyFromModalNow()" ${canBuy ? '' : 'disabled'}>
-            <i class="fa-solid fa-bolt"></i> ${soldOut ? 'Tạm Hết Hàng' : 'Mua Ngay'}
+            <i class="fa-solid fa-bolt"></i> ${soldOut ? 'Tạm hết hàng' : 'Mua ngay'}
           </button>
           <button class="btn-add-cart-large" onclick="addFromModalToCart()" ${canBuy ? '' : 'disabled'}>
-            <i class="fa-solid fa-cart-plus"></i> Thêm Vào Giỏ
+            <i class="fa-solid fa-cart-plus"></i> Thêm vào giỏ
           </button>
         </div>
       </div>
@@ -527,7 +527,7 @@ function renderDetailModal(prod) {
 
     <div class="detail-tabs-section">
       <div class="detail-tabs-header">
-        <button class="tab-btn active" id="tabDescBtn">Mô Tả Sản Phẩm & Thông Số Kỹ Thuật</button>
+        <button class="tab-btn active" id="tabDescBtn">Mô tả sản phẩm & thông số kỹ thuật</button>
       </div>
       <div class="detail-desc-body">
         ${prod.description || 'Chưa có thông số chi tiết.'}
@@ -713,10 +713,12 @@ function addToCart(productId, notify = true, qty = 1) {
     return;
   }
   addLineToCart(cartLine(product, qty));
-  if (notify) {
-    showToast(`Đã thêm <strong>${esc(product.name.slice(0, 30))}...</strong> vào giỏ!`);
-    openCartDrawer();
-  }
+  if (notify) openCartDrawer(); // giỏ tự mở và hiện món vừa thêm → không cần thông báo đè lên giỏ
+}
+
+function removeCartLine(key) {
+  state.cart = state.cart.filter(i => i.key !== key);
+  updateCartUI();
 }
 
 function updateCartQty(key, delta) {
@@ -740,25 +742,32 @@ function updateCartUI() {
 
   if (state.cart.length === 0) {
     cartItemsContainer.innerHTML = `
-      <div style="text-align: center; padding: 60px 20px; color: #94a3b8;">
-        <i class="fa-solid fa-basket-shopping" style="font-size: 48px; color: #475569; margin-bottom: 12px;"></i>
-        <h4 style="color: #2f3747; margin-bottom: 4px;">Giỏ hàng của bạn đang trống</h4>
-        <p style="font-size: 13px;">Hãy khám phá các sản phẩm công nghệ giá tốt nhé!</p>
+      <div class="cart-empty">
+        <span class="cart-empty-icon"><i class="fa-solid fa-basket-shopping"></i></span>
+        <h4>Giỏ hàng của bạn đang trống</h4>
+        <p>Hãy khám phá các sản phẩm giá tốt nhé!</p>
+        <button type="button" class="cart-empty-btn" onclick="closeCartDrawer(); document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' })">Mua sắm ngay</button>
       </div>`;
     return;
   }
 
   cartItemsContainer.innerHTML = state.cart.map(item => `
     <div class="cart-drawer-item">
-      <img src="${esc(item.image)}" alt="${esc(item.name)}">
+      <img src="${esc(item.image)}" alt="${esc(item.name)}" onclick="closeCartDrawer(); openProductDetail(${Number(item.id)})">
       <div class="cart-drawer-item-info">
-        <div class="drawer-item-title">${esc(item.name)}</div>
+        <div class="cart-line-top">
+          <div class="drawer-item-title" onclick="closeCartDrawer(); openProductDetail(${Number(item.id)})">${esc(item.name)}</div>
+          <button type="button" class="cart-line-remove" aria-label="Xoá khỏi giỏ" title="Xoá khỏi giỏ" onclick="removeCartLine('${item.key}')"><i class="fa-regular fa-trash-can"></i></button>
+        </div>
         ${item.variant_name ? `<div class="drawer-item-variant">Phân loại: ${esc(item.variant_name)}</div>` : ''}
         <div class="drawer-item-price">${formatPrice(item.price)}</div>
-        <div class="qty-stepper" style="display: inline-flex; height: 30px;">
-          <button style="width: 28px; height: 28px;" onclick="updateCartQty('${item.key}', -1)">-</button>
-          <span style="width: 32px; font-size: 13px;">${item.quantity}</span>
-          <button style="width: 28px; height: 28px;" onclick="updateCartQty('${item.key}', 1)">+</button>
+        <div class="cart-line-bottom">
+          <div class="qty-stepper cart-qty">
+            <button type="button" aria-label="Giảm" onclick="updateCartQty('${item.key}', -1)">−</button>
+            <span>${item.quantity}</span>
+            <button type="button" aria-label="Tăng" onclick="updateCartQty('${item.key}', 1)" ${item.quantity >= 50 ? 'disabled' : ''}>+</button>
+          </div>
+          <span class="cart-line-total">${formatPrice(item.price * item.quantity)}</span>
         </div>
       </div>
     </div>
@@ -825,7 +834,7 @@ function selectedPayMethod() {
 
 function updatePayButton() {
   const cod = selectedPayMethod() === 'COD';
-  submitOrderBtn.innerHTML = cod ? '<i class="fa-solid fa-check"></i> Đặt Hàng – Trả Tiền Khi Nhận' : '<i class="fa-solid fa-qrcode"></i> Đặt Hàng & Nhận Mã QR';
+  submitOrderBtn.innerHTML = cod ? '<i class="fa-solid fa-check"></i> Đặt hàng – trả tiền khi nhận' : '<i class="fa-solid fa-qrcode"></i> Đặt hàng & nhận mã QR';
   document.getElementById('payMethodNote').innerText = cod && payOptions.cod.maxTotal ? `COD áp dụng cho đơn đến ${formatPrice(payOptions.cod.maxTotal)}.` : '';
 }
 document.querySelectorAll('input[name="payMethod"]').forEach(r => r.addEventListener('change', updatePayButton));
@@ -847,6 +856,14 @@ async function updateCheckoutSummary() {
   const totalCount = state.cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = state.cart.reduce((sum, item) => sum + item.quantity * item.price, 0);
   summaryCount.innerText = totalCount + ' sản phẩm';
+  const summaryItems = document.getElementById('summaryItems');
+  if (summaryItems) summaryItems.innerHTML = state.cart.map(i => `
+    <div class="summary-item">
+      <img src="${esc(i.image)}" alt="">
+      <div class="summary-item-name">${esc(i.name)}${i.variant_name ? `<small>${esc(i.variant_name)}</small>` : ''}</div>
+      <div class="summary-item-qty">x${i.quantity}</div>
+      <div class="summary-item-price">${formatPrice(i.price * i.quantity)}</div>
+    </div>`).join('');
   summarySubtotal.innerText = formatPrice(subtotal);
   const province = provinceSelect.value;
   const seq = ++quoteSeq;
