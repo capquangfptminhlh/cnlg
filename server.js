@@ -133,7 +133,8 @@ function readConfig() {
 /** Trường nội bộ (giá vốn, lãi) không được trả ra cho khách. */
 function publicProduct(p) {
   if (!p) return p;
-  const { dropbuy_cost, profit_margin, is_wholesale_price, public_price, wholesale_price, pricing_rule, ...rest } = p;
+  // Không lộ nguồn hàng cho khách: bỏ giá vốn/biên lãi và link/mã SP bên nguồn
+  const { dropbuy_cost, profit_margin, is_wholesale_price, public_price, wholesale_price, pricing_rule, dropbuy_url, dropbuy_id, ...rest } = p;
   const discount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
   return { ...rest, discount_percent: discount };
 }
@@ -206,11 +207,17 @@ function paymentOptions(cfg = readConfig()) {
 
 app.get('/api/categories', (req, res) => {
   try {
-    const products = scraper.getProducts();
+    // Đếm đúng như /api/products đang bán (bỏ SP chưa có giá / đã gỡ) để số trên menu khớp số trong trang danh mục
+    const perCat = new Map();
+    for (const p of scraper.getProducts()) {
+      if (!(Number(p.price) > 0) || p.removed_from_dropbuy) continue;
+      perCat.set(p.category_id, (perCat.get(p.category_id) || 0) + 1);
+    }
     const cats = scraper.getCategories();
     const withCount = cats.map(c => {
-      const ids = categoryIdsFor(c.id);
-      return { ...c, product_count: products.filter(p => ids.has(p.category_id)).length };
+      let n = 0;
+      for (const id of categoryIdsFor(c.id)) n += perCat.get(id) || 0;
+      return { ...c, product_count: n };
     });
     res.json({ success: true, data: withCount });
   } catch (err) {
@@ -250,10 +257,30 @@ app.get('/api/products', (req, res) => {
       products = products.filter(p => ids.has(p.category_id));
     }
 
+    // Tìm theo từng chữ (không cần đúng thứ tự, bỏ dấu, bỏ dấu cách thừa); kết quả sát nghĩa xếp trước
+    let relevance = null;
     if (search) {
-      const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
-      const q = norm(search).trim();
-      products = products.filter(p => norm(p.name).includes(q) || norm(p.sku).includes(q));
+      const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
+      const q = norm(search);
+      const words = q.split(' ').filter(Boolean);
+      // "đèn" và "đen" bỏ dấu đều là "den" → ưu tiên tên có đúng chữ có dấu người dùng gõ
+      const raw = String(search).toLowerCase().replace(/\s+/g, ' ').trim();
+      relevance = new Map();
+      products = products.filter(p => {
+        const name = norm(p.name);
+        const hay = name + ' ' + norm(p.sku);
+        const tokens = new Set(name.split(/[^a-z0-9]+/));
+        // chữ 1 ký tự ("ổ" → "o") phải khớp trọn chữ, không thì khớp gần như mọi tên
+        if (!words.every(w => (w.length === 1 ? tokens.has(w) : hay.includes(w)))) return false;
+        let score = 0;
+        if (name.includes(q)) score += 4;
+        if (name.startsWith(q)) score += 2;
+        score += words.filter(w => tokens.has(w)).length / words.length * 2;
+        if (String(p.name).toLowerCase().includes(raw)) score += 3;
+        if (norm(p.sku) === q) score += 10;
+        relevance.set(p.id, score);
+        return true;
+      });
     }
 
     if (minPrice) {
@@ -273,7 +300,8 @@ app.get('/api/products', (req, res) => {
     } else if (sort === 'name-asc') {
       products.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
     } else {
-      // Mặc định: còn hàng lên trước
+      // Mặc định: còn hàng lên trước; đang tìm kiếm thì trong mỗi nhóm xếp theo độ khớp
+      if (relevance) products.sort((a, b) => relevance.get(b.id) - relevance.get(a.id));
       products = [...products.filter(p => p.in_stock !== false), ...products.filter(p => p.in_stock === false)];
     }
 
@@ -314,6 +342,8 @@ app.get('/api/products/:id', async (req, res) => {
       video_url: detail.video_url
     };
     delete merged.dropbuy_cost;
+    delete merged.dropbuy_url;
+    delete merged.dropbuy_id;
     delete merged.rating;
     delete merged.sold_count;
     merged.variants = await variants.variantsWithPrices(product, detail).catch(() => []);

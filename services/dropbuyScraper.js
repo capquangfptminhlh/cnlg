@@ -295,17 +295,31 @@ async function syncCatalog(options = {}) {
  * Tồn kho realtime: `variations/in-stock` nhận danh sách product_ids, trả [{product_id, in_stock}].
  * ~1,6s cho toàn bộ ~1.300 SP → đủ nhanh để quét mỗi 30 giây.
  */
-async function fetchStockMap(ids, config = getConfig(), batchSize = 700) {
+async function fetchStockMap(ids, config = getConfig(), batchSize = 700, { retries = 2, retryDelayMs = 1500 } = {}) {
   const map = new Map();
   const starts = [];
   for (let i = 0; i < ids.length; i += batchSize) starts.push(i);
+  const errors = [];
+  // DropBuy thỉnh thoảng trả 502/504 cho 1 lô → thử lại lô đó; vẫn lỗi thì bỏ qua lô (SP trong lô giữ tồn kho cũ)
+  // thay vì vứt cả vòng ~21 lô. Chỉ báo lỗi khi mọi lô đều hỏng.
   await mapLimit(starts, 3, async i => {
-    const res = await fetch(DROPBUY_API_IN_STOCK, { method: 'POST', headers: dropbuyHeaders(config), body: JSON.stringify({ product_ids: ids.slice(i, i + batchSize) }) });
-    if (!res.ok) throw new Error(`in-stock HTTP ${res.status}`);
-    const json = await res.json();
-    if (!json.success || !Array.isArray(json.data)) throw new Error(`in-stock: ${json.message || 'dữ liệu không hợp lệ'}`);
-    for (const r of json.data) map.set(r.product_id, !!r.in_stock);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await fetch(DROPBUY_API_IN_STOCK, { method: 'POST', headers: dropbuyHeaders(config), body: JSON.stringify({ product_ids: ids.slice(i, i + batchSize) }) });
+        if (!res.ok) throw new Error(`in-stock HTTP ${res.status}`);
+        const json = await res.json();
+        if (!json.success || !Array.isArray(json.data)) throw new Error(`in-stock: ${json.message || 'dữ liệu không hợp lệ'}`);
+        for (const r of json.data) map.set(r.product_id, !!r.in_stock);
+        return;
+      } catch (e) {
+        if (attempt >= retries) { errors.push(e); return; }
+        await new Promise(r => setTimeout(r, retryDelayMs * (attempt + 1)));
+      }
+    }
   });
+  if (errors.length && errors.length === starts.length) throw errors[0];
+  if (errors.length) console.warn(`[Scraper] Tồn kho: bỏ qua ${errors.length}/${starts.length} lô lỗi (${errors[0].message}), các SP đó giữ trạng thái cũ.`);
+  map.failedBatches = errors.length;
   return map;
 }
 
