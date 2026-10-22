@@ -80,3 +80,13 @@ test('layout and motion CSS braces remain balanced',()=>{
     assert.equal(a,b,name+' CSS block mismatch');
   }
 });
+
+test('menu "Danh mục" (thanh dưới, lối tắt, tab) mở bảng danh mục thay vì chỉ nhảy tới #categoryPanel',()=>{
+  const sheet=read('public/category-sheet.js');
+  assert.match(html,/<script src="\/category-sheet\.js"><\/script>/);
+  assert.match(html,/<link rel="stylesheet" href="\/storefront-match\.css">/);
+  assert.match(sheet,/a\[href="#categoryPanel"\]/);
+  assert.match(sheet,/preventDefault\(\)/);
+  assert.match(sheet,/storefront:products/); // cuộn tới danh sách sau khi lọc xong
+  assert.equal((html.match(/href="#categoryPanel"/g)||[]).length>=2,true);
+});

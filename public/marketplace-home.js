@@ -70,8 +70,9 @@
       '<button type="button" class="featured-name" data-shop-product="' + id + '">' + escapeHTML(p.name) + '</button>' +
       '<strong class="featured-price">' + formatVND(p.price) + '</strong>' +
       (showOld ? '<span class="featured-old">' + formatVND(oldPrice) + '</span>' : '') +
+      '<div class="featured-actions"><button type="button" class="featured-cart" data-shop-cart="' + id + '" aria-label="Thêm vào giỏ"' + (soldOut ? ' disabled' : '') + '><i class="fa-solid fa-cart-plus"></i></button>' +
       '<button type="button" class="featured-buy" data-shop-buy="' + id + '"' + (soldOut ? ' disabled' : '') + '>' +
-      (soldOut ? 'Hết hàng' : 'Mua ngay') + '</button></div></article>';
+      (soldOut ? 'Hết hàng' : 'Mua ngay') + '</button></div></div></article>';
   }
   function renderFeatured(products) {
     if (!section || !featuredGrid) return;
@@ -121,6 +122,12 @@
     if (favoriteBtn) {
       event.stopPropagation();
       toggleFavorite(favoriteBtn.dataset.favoriteId);
+      return;
+    }
+    const cartBtn = event.target.closest('[data-shop-cart]');
+    if (cartBtn) {
+      const id = Number(cartBtn.dataset.shopCart);
+      if (Number.isSafeInteger(id) && id >= 0 && typeof addToCart === 'function') addToCart(id);
       return;
     }
     const button = event.target.closest('[data-shop-product],[data-shop-buy]');

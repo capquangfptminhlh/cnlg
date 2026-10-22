@@ -1,0 +1,96 @@
+/* ==========================================================================
+   Chỉnh giao diện theo ảnh mẫu (sàn TMĐT cam): banner cam đậm, header có "Theo dõi đơn hàng",
+   thẻ sản phẩm [giỏ][Mua ngay], bảng Danh mục. Nạp sau cùng.
+   ========================================================================== */
+
+/* ---------- Header ---------- */
+.header-right { display: flex; align-items: center; gap: 14px; }
+.header-track-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent; border: 0; color: #fff; cursor: pointer;
+  font: 600 12px/1.25 var(--font, 'Be Vietnam Pro', sans-serif); text-align: left; padding: 4px 6px; border-radius: 8px;
+}
+.header-track-btn i { font-size: 22px; }
+.header-track-btn:hover { background: rgba(255, 255, 255, .14); }
+@media (max-width: 900px) { .header-track-btn { display: none; } }
+
+/* ---------- Banner chính: cam đậm như ảnh mẫu ---------- */
+.market-main-banner {
+  background: linear-gradient(118deg, #ff7a3d 0%, #f4511e 46%, #ee3b2b 100%) !important;
+  color: #fff;
+}
+.market-main-banner .premium-orbit { border-color: rgba(255, 255, 255, .22) !important; opacity: .8; }
+.market-main-banner .market-banner-label { color: #fff !important; background: rgba(255, 255, 255, .16) !important; border-color: rgba(255, 255, 255, .3) !important; }
+.market-main-banner .banner-overline { color: #ffe1a8 !important; letter-spacing: .14em; }
+.market-main-banner h1 { color: #fff !important; text-shadow: 0 2px 0 rgba(150, 30, 10, .25); }
+.market-main-banner h1 em, .market-main-banner h1 span { color: #ffe08a !important; -webkit-text-fill-color: #ffe08a; }
+.market-main-banner p { color: rgba(255, 255, 255, .92) !important; }
+.market-main-banner .banner-shop-btn {
+  background: #fff !important; color: #e8401f !important; border: 0 !important;
+  box-shadow: 0 6px 16px rgba(120, 25, 5, .22) !important; font-weight: 800;
+}
+.market-main-banner .banner-catalog-count { color: rgba(255, 255, 255, .88) !important; }
+.market-main-banner .banner-catalog-count strong { color: #fff !important; }
+.market-main-banner .banner-slides span { background: rgba(255, 255, 255, .45) !important; }
+.market-main-banner .banner-slides span.active { background: #fff !important; }
+.market-main-banner .premium-gallery-backdrop { background: rgba(255, 255, 255, .14) !important; }
+.market-main-banner .premium-float-label { background: #fff !important; color: #e8401f !important; }
+
+/* ---------- Thanh tab ---------- */
+nav.market-links a.active { color: #ee4d2d; box-shadow: inset 0 -2px 0 #ee4d2d; }
+
+/* ---------- Thẻ "Gợi ý": [giỏ][Mua ngay] ---------- */
+.featured-actions { display: flex; gap: 6px; align-items: stretch; margin-top: 8px; }
+.featured-actions .featured-buy { flex: 1; margin-top: 0 !important; }
+.featured-cart {
+  flex: 0 0 38px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid #ee4d2d; background: #fff; color: #ee4d2d; border-radius: 8px; cursor: pointer; font-size: 15px;
+}
+.featured-cart:hover:not(:disabled) { background: #fff1eb; }
+.featured-cart:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Lưới chính: nút giỏ nằm TRƯỚC "Mua ngay" như ảnh mẫu */
+.card-actions-row { display: flex; gap: 6px; }
+.card-actions-row .btn-add-mini { order: -1; flex: 0 0 38px; border: 1px solid #ee4d2d; background: #fff; color: #ee4d2d; border-radius: 8px; }
+.card-actions-row .btn-buy-instant { flex: 1; }
+
+/* ---------- Bảng Danh mục ---------- */
+.cat-sheet { position: fixed; inset: 0; z-index: 2600; display: none; }
+.cat-sheet.open { display: block; }
+.cat-sheet-backdrop { position: absolute; inset: 0; background: rgba(20, 24, 33, .5); }
+.cat-sheet-panel {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 32px)); max-height: min(78vh, 760px);
+  background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgba(0, 0, 0, .25);
+  display: flex; flex-direction: column; overflow: hidden; font-family: var(--font, 'Be Vietnam Pro', sans-serif);
+}
+.cat-sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #eef0f4; }
+.cat-sheet-head strong { font-size: 16px; color: #222734; display: flex; gap: 8px; align-items: center; }
+.cat-sheet-head strong i { color: #ee4d2d; }
+.cat-sheet-close { border: 0; background: #f2f4f7; width: 32px; height: 32px; border-radius: 50%; font-size: 20px; line-height: 1; cursor: pointer; color: #344054; }
+.cat-sheet-search { margin: 10px 16px 6px; padding: 10px 12px; border: 1px solid #e4e7ec; border-radius: 10px; font: inherit; font-size: 14px; }
+.cat-sheet-search:focus { outline: none; border-color: #ee4d2d; box-shadow: 0 0 0 3px rgba(238, 77, 45, .12); }
+.cat-sheet-list { overflow-y: auto; padding: 6px 8px 14px; overscroll-behavior: contain; }
+.cat-sheet-row { display: flex; align-items: center; }
+.cat-sheet-item {
+  flex: 1; display: flex; align-items: center; gap: 12px; padding: 11px 10px; border: 0; background: transparent;
+  border-radius: 10px; cursor: pointer; text-align: left; font: inherit; font-size: 14px; color: #222734; min-height: 44px;
+}
+.cat-sheet-item i { width: 22px; text-align: center; color: #667085; font-size: 16px; }
+.cat-sheet-item span { flex: 1; }
+.cat-sheet-item small, .cat-sheet-kid small { color: #98a2b3; font-size: 12px; }
+.cat-sheet-item:hover, .cat-sheet-kid:hover { background: #fff5f1; }
+.cat-sheet-item.active, .cat-sheet-kid.active { background: #fff1eb; color: #e8401f; font-weight: 700; }
+.cat-sheet-item.active i { color: #ee4d2d; }
+.cat-sheet-toggle { border: 0; background: transparent; width: 44px; height: 44px; border-radius: 10px; cursor: pointer; color: #98a2b3; }
+.cat-sheet-toggle:hover { background: #f2f4f7; }
+.cat-sheet-group.open .cat-sheet-toggle i { transform: rotate(180deg); }
+.cat-sheet-kids { display: none; padding: 2px 0 6px 44px; flex-wrap: wrap; gap: 6px; }
+.cat-sheet-group.open .cat-sheet-kids { display: flex; }
+.cat-sheet-kid { border: 1px solid #e9ebf1; background: #fff; border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 13px; color: #344054; cursor: pointer; min-height: 36px; }
+body.cat-sheet-open { overflow: hidden; }
+
+@media (max-width: 700px) {
+  /* Điện thoại: bảng trượt từ dưới lên, chừa thanh menu dưới */
+  .cat-sheet-panel { left: 0; right: 0; top: auto; bottom: 0; transform: none; width: 100%; max-height: 82vh; border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+}

@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/storefront-premium.css">
   <link rel="stylesheet" href="/storefront-finish.css">
   <link rel="stylesheet" href="/storefront-experience.css">
+  <link rel="stylesheet" href="/storefront-match.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -62,6 +63,7 @@
 
       <!-- Right: Hotline & Cart -->
       <div class="header-right">
+        <button type="button" class="header-track-btn" data-store-action="track"><i class="fa-solid fa-truck-fast"></i><span>Theo dõi<br>đơn hàng</span></button>
         <button class="cart-trigger-btn" id="openCartBtn">
           <div class="cart-icon-wrap">
             <i class="fa-solid fa-bag-shopping"></i>
@@ -508,6 +510,7 @@
   <script src="/dialogs.js"></script>
   <script src="/app.js"></script>
   <script src="/marketplace-home.js"></script>
+  <script src="/category-sheet.js"></script>
   <script src="/favorites.js"></script>
   <script src="/motion.js"></script>
   <script src="/storefront-premium.js"></script>
