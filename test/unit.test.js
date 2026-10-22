@@ -180,3 +180,23 @@ test('Catalog: giá sỉ trong wholesale_price được dùng làm giá vốn kh
   const noLogin = scraper.mapItem(item, { ctx, priceMap: new Map() });
   assert.equal(noLogin.dropbuy_cost, 1000000);
 });
+
+test('Báo cáo: đơn thử bị loại; đơn thiếu giá vốn không được tính cả tiền vào lãi', () => {
+  const { salesReport } = require('../services/reports');
+  const now = new Date();
+  const at = now.toISOString();
+  const orders = [
+    { id: 'T1', is_test: true, status: 'PAID', paid_at: at, created_at: at, total_amount: 2278000, items: [{ price: 1139000, quantity: 2 }] },
+    { id: 'A', status: 'PAID', paid_at: at, created_at: at, total_amount: 500000, subtotal: 500000, items: [{ price: 500000, quantity: 1 }] },
+    { id: 'B', status: 'PAID', paid_at: at, created_at: at, total_amount: 300000, subtotal: 300000, items: [{ price: 300000, quantity: 1, dropbuy_cost: 200000, cost_is_wholesale: true }] },
+    { id: 'C', payment_method: 'COD', status: 'PROCESSING', created_at: at, total_amount: 99000, items: [{ price: 99000, quantity: 1, dropbuy_cost: 50000 }] }
+  ];
+  const r = salesReport(orders, { now });
+  assert.equal(r.test_orders, 1);
+  assert.equal(r.totals.today.orders, 2);          // A, B (COD C chưa giao → chưa tính)
+  assert.equal(r.totals.today.revenue, 800000);
+  assert.equal(r.totals.today.profit, 100000);     // chỉ B; A thiếu vốn → 0, không phải 500.000
+  assert.equal(r.totals.today.cost_unknown_orders, 1);
+  assert.equal(r.totals.today.cost_unknown_revenue, 500000);
+  assert.equal(r.pipeline.PAID, 2);                // đơn thử không vào "đã nhận tiền chưa đặt kho"
+});

@@ -678,6 +678,14 @@ app.post('/api/admin/auto-order', requireAdmin, (req, res) => {
   res.json({ success: true, data: { autoOrder: dropbuyOrderFulfillment.normalizeAutoOrder(cfg.autoOrder), payments: paymentOptions(cfg) } });
 });
 
+// Đánh dấu đơn thử (loại khỏi báo cáo, không tự đặt DropBuy)
+app.post('/api/admin/orders/:id/test-flag', requireAdmin, (req, res) => {
+  const o = orderStore.updateOrder(req.params.id, { is_test: req.body?.is_test !== false });
+  if (!o) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
+  io.emit('ADMIN_ORDER_CHANGED', { orderId: o.id, status: o.status });
+  res.json({ success: true, data: o });
+});
+
 app.get('/api/admin/report', requireAdmin, (req, res) => {
   const days = Math.min(90, Math.max(7, parseInt(req.query.days, 10) || 30));
   res.json({ success: true, data: reports.salesReport(orderStore.getOrders(), { days }) });

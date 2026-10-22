@@ -109,10 +109,12 @@ async function loadData() {
 
     if (ordRes.success && ordRes.data) {
       const orders = ordRes.data;
-      statOrders.innerText = orders.length;
+      const real = orders.filter(o => !o.is_test);
+      statOrders.innerText = real.length;
 
-      const revenue = orders
-        .filter(o => ['PAID', 'PROCESSING', 'COMPLETED'].includes(o.status))
+      // Giống báo cáo: chuyển khoản đã nhận tiền, COD đã giao xong; bỏ đơn thử
+      const revenue = real
+        .filter(o => (o.payment_method === 'COD' ? o.status === 'COMPLETED' : ['PAID', 'PROCESSING', 'COMPLETED'].includes(o.status)))
         .reduce((sum, o) => sum + (o.total_amount || 0), 0);
       statRevenue.innerText = formatPrice(revenue);
 
@@ -175,8 +177,8 @@ function renderOrders(orders) {
       </td>
       <td class="order-items-cell">${items}${o.shipping_fee != null ? `<br>Ship: ${o.shipping_fee ? formatPrice(o.shipping_fee) : 'miễn phí'}${o.customer?.province ? ` (${esc(o.customer.province)})` : ''}` : ''}${cost ? `<br><strong>Lãi gộp hàng: ${formatPrice((o.subtotal ?? o.total_amount) - cost)}</strong>` : ''}</td>
       <td><strong style="color: #e11d48;">${formatPrice(o.total_amount)}</strong><br><small style="color:${o.payment_method === 'COD' ? '#38bdf8' : '#94a3b8'};">${o.payment_method === 'COD' ? 'COD – thu khi giao' : 'Chuyển khoản'}</small>${ds.spend ? `<br><small style="color:#10b981;">Lãi ${formatPrice(o.total_amount - ds.spend)}</small>` : ''}${o.payment_via ? `<br><small style="color:#10b981;">${o.payment_via === 'admin' ? 'xác nhận tay' : `tự động: ${esc(o.payment_via)}`}</small>` : ''}${o.late_payment ? `<br><small style="color:#ef4444;">Tiền về sau khi huỷ: ${formatPrice(o.late_payment.amount)}</small>` : ''}</td>
-      <td><span class="status-pill ${cls}">${label}</span>${o.needs_attention && o.status === 'PAYMENT_REPORTED' ? '<br><small style="color:#ef4444;">⚠ Khách báo CK đã lâu – cần đối soát</small>' : ''}${o.cancel_reason ? `<br><small style="color:#94a3b8;">${esc(o.cancel_reason)}</small>` : ''}</td>
-      <td>${actions}</td>
+      <td>${o.is_test ? '<span class="status-pill cancelled">ĐƠN THỬ</span><br>' : ''}<span class="status-pill ${cls}">${label}</span>${o.needs_attention && o.status === 'PAYMENT_REPORTED' ? '<br><small style="color:#ef4444;">⚠ Khách báo CK đã lâu – cần đối soát</small>' : ''}${o.cancel_reason ? `<br><small style="color:#94a3b8;">${esc(o.cancel_reason)}</small>` : ''}</td>
+      <td>${actions}<br><a href="#" style="font-size:11px;" onclick="toggleTestOrder('${esc(o.id)}', ${!o.is_test}); return false;">${o.is_test ? 'Bỏ đánh dấu đơn thử' : 'Đánh dấu là đơn thử'}</a></td>
     </tr>`;
   }).join('');
 }
@@ -194,6 +196,14 @@ async function pushToDropbuyCart(orderId) {
   } catch (e) {
     uiAlert('Lỗi: ' + e.message);
   }
+}
+
+async function toggleTestOrder(orderId, isTest) {
+  if (isTest && !(await uiConfirm(`Đánh dấu #${orderId} là đơn thử? Đơn sẽ bị loại khỏi báo cáo doanh thu và không tự đặt sang DropBuy.`))) return;
+  const json = await (await adminFetch(`/api/admin/orders/${orderId}/test-flag`, { method: 'POST', body: JSON.stringify({ is_test: isTest }) })).json();
+  if (!json.success) uiAlert('Lỗi: ' + json.error);
+  loadData();
+  loadReport();
 }
 
 async function placeOnDropbuy(orderId) {
@@ -860,9 +870,10 @@ async function loadReport() {
     document.getElementById('reportChart').innerHTML = r.daily.map(d =>
       `<div class="report-bar" style="height:${Math.max(2, Math.round(d.revenue / max * 100))}%;" title="${d.day}: ${formatPrice(d.revenue)} · ${d.orders} đơn · lãi ${formatPrice(d.profit)}"></div>`).join('');
     const t = r.totals.last30;
-    const notes = ['Tính theo ngày nhận tiền, chỉ đơn đã thanh toán. Lãi gộp = tiền hàng − giá vốn DropBuy lúc đặt, chưa trừ phí ship thật của kho.'];
+    const notes = ['Tính theo ngày nhận tiền: chuyển khoản đã nhận tiền, COD đã giao xong. Lãi gộp = tiền khách trả − số DropBuy trừ quỹ (hàng + ship thật); đơn chưa đặt kho tạm tính bằng tiền hàng − giá vốn.'];
+    if (t.cost_unknown_orders) notes.push(`⚠ ${t.cost_unknown_orders} đơn thiếu giá vốn (${formatPrice(t.cost_unknown_revenue)}) – không tính vào lãi.`);
+    if (r.test_orders) notes.push(`Đã loại ${r.test_orders} đơn thử khỏi báo cáo.`);
     if (t.cost_public_orders) notes.push(`⚠ ${t.cost_public_orders} đơn tính vốn theo giá công khai (lúc đặt chưa đăng nhập DropBuy) – lãi thật có thể cao hơn.`);
-    if (t.cost_unknown_orders) notes.push(`⚠ ${t.cost_unknown_orders} đơn thiếu giá vốn.`);
     document.getElementById('reportNote').innerText = notes.join(' ');
     document.getElementById('reportTop').innerHTML = r.top_products.length
       ? `<table class="orders-table"><thead><tr><th>Sản phẩm</th><th>SL</th><th>Doanh thu</th><th>Lãi</th></tr></thead><tbody>${r.top_products.map(x =>

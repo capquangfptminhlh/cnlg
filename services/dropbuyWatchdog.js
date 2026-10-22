@@ -33,6 +33,7 @@ function alertOnce(key, text) {
 }
 
 function isReady(o) {
+  if (o.is_test) return false;
   return o.payment_method === 'COD' ? o.status === 'CONFIRMED' : o.status === 'PAID';
 }
 

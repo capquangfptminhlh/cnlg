@@ -5,6 +5,8 @@ const { vnDate } = require('./backup');
  * Chỉ tính đơn đã có tiền: chuyển khoản đã nhận (PAID / PROCESSING / COMPLETED), COD đã giao xong (COMPLETED).
  * Lãi gộp: nếu đơn đã đặt trên DropBuy → khách trả − số DropBuy trừ quỹ (hàng + ship thật);
  * chưa đặt → tiền hàng − giá vốn lúc đặt (ship tính riêng).
+ * Đơn thiếu giá vốn: tính doanh thu nhưng KHÔNG cộng vào lãi (không coi vốn = 0).
+ * Đơn thử (is_test) bị loại khỏi mọi số liệu.
  */
 const PAID_STATUSES = new Set(['PAID', 'PROCESSING', 'COMPLETED']);
 
@@ -23,11 +25,11 @@ function orderMoney(o) {
   if (Number.isFinite(spend) && spend > 0) {
     return { goods, shipping: o.shipping_fee || 0, total, cost: spend, costKnown: true, costWholesale: true, profit: total - spend };
   }
-  return { goods, shipping: o.shipping_fee || 0, total, cost, costKnown, costWholesale, profit: goods - cost };
+  return { goods, shipping: o.shipping_fee || 0, total, cost, costKnown, costWholesale, profit: costKnown ? goods - cost : 0 };
 }
 
 function emptyBucket() {
-  return { orders: 0, revenue: 0, goods: 0, shipping: 0, cost: 0, profit: 0, items: 0, cost_unknown_orders: 0, cost_public_orders: 0 };
+  return { orders: 0, revenue: 0, goods: 0, shipping: 0, cost: 0, profit: 0, items: 0, cost_unknown_orders: 0, cost_unknown_revenue: 0, cost_public_orders: 0 };
 }
 
 function add(bucket, m, o) {
@@ -38,7 +40,10 @@ function add(bucket, m, o) {
   bucket.cost += m.cost;
   bucket.profit += m.profit;
   bucket.items += (o.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
-  if (!m.costKnown) bucket.cost_unknown_orders += 1;
+  if (!m.costKnown) {
+    bucket.cost_unknown_orders += 1;
+    bucket.cost_unknown_revenue += m.total;
+  }
   else if (!m.costWholesale) bucket.cost_public_orders += 1;
 }
 
@@ -52,7 +57,9 @@ function salesReport(orders, { days = 30, now = new Date() } = {}) {
   const products = new Map();
   const pipeline = { PENDING_PAYMENT: 0, PAYMENT_REPORTED: 0, CONFIRMED: 0, PAID: 0, PROCESSING: 0, COMPLETED: 0, CANCELLED: 0 };
 
+  let testOrders = 0;
   for (const o of orders) {
+    if (o.is_test) { testOrders++; continue; }
     if (o.status in pipeline) pipeline[o.status] += 1;
     if (!isPaid(o)) continue;
     const m = orderMoney(o);
@@ -75,6 +82,7 @@ function salesReport(orders, { days = 30, now = new Date() } = {}) {
   }
 
   return {
+    test_orders: testOrders,
     today,
     totals,
     pipeline,
