@@ -38,41 +38,27 @@
   more.after(end);
 
   function renderHead() {
-    const isAll = String(state.currentCategory) === 'all';
     const cat = catById(state.currentCategory);
-    let parent = null;
-    let root = null;
-    let kids = [];
-    let title = 'Tất cả sản phẩm';
-    let icon = 'fa-border-all';
-    let total = state.totalProducts ?? (Array.isArray(state.products) ? state.products.length : 0);
-
-    if (isAll) {
-      kids = cats().filter(c => !c.parent_id && (c.product_count ?? 1) > 0).sort((a, b) => (b.product_count || 0) - (a.product_count || 0));
-    } else if (cat) {
-      parent = cat.parent_id ? catById(cat.parent_id) : null;
-      root = parent || cat;
-      kids = cats().filter(c => c.parent_id === root.id && (c.product_count ?? 1) > 0).sort((a, b) => (b.product_count || 0) - (a.product_count || 0));
-      title = cat.name;
-      icon = iconOf(root.name);
-      total = state.totalProducts ?? cat.product_count;
-    }
-
+    if (!cat) { head.hidden = true; return; }
+    const parent = cat.parent_id ? catById(cat.parent_id) : null;
+    const root = parent || cat;
+    const kids = cats().filter(c => c.parent_id === root.id && (c.product_count ?? 1) > 0).sort((a, b) => (b.product_count || 0) - (a.product_count || 0));
+    const total = state.totalProducts ?? cat.product_count;
     head.innerHTML = `
       <nav class="cat-crumbs" aria-label="Đường dẫn">
         <a href="/" data-cat-go="all"><i class="fa-solid fa-house"></i> Trang chủ</a>
-        ${cat ? `<i class="fa-solid fa-chevron-right"></i>` : ''}
+        <i class="fa-solid fa-chevron-right"></i>
         ${parent ? `<a href="?danh-muc=${parent.id}" data-cat-go="${parent.id}">${escH(parent.name)}</a><i class="fa-solid fa-chevron-right"></i>` : ''}
-        ${cat ? `<strong>${escH(cat.name)}</strong>` : `<i class="fa-solid fa-chevron-right"></i><strong>Tất cả sản phẩm</strong>`}
+        <strong>${escH(cat.name)}</strong>
       </nav>
       <div class="cat-view-title">
-        <span class="cat-view-icon"><i class="fa-solid ${icon}"></i></span>
-        <div><h1>${escH(title)}</h1><p>${fmt(total)} sản phẩm${state.minPrice || state.maxPrice ? ' (đang lọc theo giá)' : ''}</p></div>
+        <span class="cat-view-icon"><i class="fa-solid ${iconOf(root.name)}"></i></span>
+        <div><h1>${escH(cat.name)}</h1><p>${fmt(total)} sản phẩm${state.minPrice || state.maxPrice ? ' (đang lọc theo giá)' : ''}</p></div>
         <button type="button" class="cat-view-all" data-store-action="categories"><i class="fa-solid fa-border-all"></i> Tất cả danh mục</button>
       </div>
       ${kids.length ? `<div class="cat-subs" role="list">
-        <button type="button" class="cat-sub ${isAll ? 'active' : (root && String(root.id) === String(cat?.id) ? 'active' : '')}" data-cat-go="${isAll ? 'all' : (root ? root.id : 'all')}">Tất cả</button>
-        ${kids.map(k => `<button type="button" class="cat-sub ${cat && String(k.id) === String(cat.id) ? 'active' : ''}" data-cat-go="${k.id}">${escH(k.name)} <small>${fmt(k.product_count)}</small></button>`).join('')}
+        <button type="button" class="cat-sub ${String(root.id) === String(cat.id) ? 'active' : ''}" data-cat-go="${root.id}">Tất cả</button>
+        ${kids.map(k => `<button type="button" class="cat-sub ${String(k.id) === String(cat.id) ? 'active' : ''}" data-cat-go="${k.id}">${escH(k.name)} <small>${fmt(k.product_count)}</small></button>`).join('')}
       </div>` : ''}`;
     head.hidden = false;
     head.querySelector('.cat-sub.active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
@@ -82,7 +68,7 @@
     const id = String(state.currentCategory);
     const inView = id !== 'all' && !!catById(id) && !state.searchQuery;
     document.body.classList.toggle('is-category-view', inView);
-    renderHead();
+    if (inView) renderHead(); else head.hidden = true;
     // Hết mục
     const loaded = state.products.length;
     const total = state.totalProducts ?? loaded;

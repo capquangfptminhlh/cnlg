@@ -98,10 +98,10 @@ body.cat-sheet-open { overflow: hidden; }
 /* ==========================================================================
    Trang danh mục (body.is-category-view) + cuộn vô hạn + chuyển cảnh
    ========================================================================== */
-#discovery,
-.market-shortcuts,
-#featuredSection,
-.premium-catalog-heading { display: none !important; }
+body.is-category-view #discovery,
+body.is-category-view .market-shortcuts,
+body.is-category-view #featuredSection,
+body.is-category-view .premium-catalog-heading { display: none !important; }
 #pagination { display: none !important; } /* thay bằng cuộn vô hạn */
 
 .cat-view-head { margin: 14px 0 10px; padding: 14px 16px; background: #fff; border: 1px solid #eef0f4; border-radius: 14px; box-shadow: 0 4px 18px rgba(30, 38, 65, .04); }
