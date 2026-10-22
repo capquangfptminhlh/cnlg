@@ -49,10 +49,23 @@ function hit(key, windowMs, max) {
   return { allowed: b.count <= max, retryAfter: Math.ceil((b.reset - now) / 1000) };
 }
 
+/**
+ * IP thật của khách. Qua Cloudflare Tunnel, mọi request tới từ cloudflared chạy trên chính máy này (127.0.0.1)
+ * → nếu dùng IP kết nối thì cả web chung 1 IP: chung hạn mức đặt đơn, và 1 kẻ dò mật khẩu admin khoá luôn chủ shop.
+ * Chỉ tin header CF-Connecting-IP khi kết nối tới từ máy này (ngoài mạng không giả được).
+ */
+function clientIp(req) {
+  const peer = String(req.socket?.remoteAddress || '');
+  const local = peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1';
+  const cf = String(req.headers?.['cf-connecting-ip'] || '').trim();
+  if (local && cf && /^[0-9a-f.:]{3,45}$/i.test(cf)) return cf;
+  return req.ip || peer;
+}
+
 /** rateLimit('checkout', 10 * 60e3, 8) → tối đa 8 request / 10 phút / IP */
 function rateLimit(name, windowMs, max) {
   return (req, res, next) => {
-    const r = hit(`${name}:${req.ip}`, windowMs, max);
+    const r = hit(`${name}:${clientIp(req)}`, windowMs, max);
     if (r.allowed) return next();
     res.set('Retry-After', String(r.retryAfter));
     return res.status(429).json({ success: false, error: `Bạn thao tác quá nhanh, vui lòng thử lại sau ${Math.ceil(r.retryAfter / 60)} phút.` });
@@ -68,9 +81,10 @@ const ADMIN_MAX_WRONG = 10;
 
 function requireAdmin(req, res, next) {
   const now = Date.now();
-  let f = adminFails.get(req.ip);
+  const ip = clientIp(req);
+  let f = adminFails.get(ip);
   if (f && f.reset < now) {
-    adminFails.delete(req.ip);
+    adminFails.delete(ip);
     f = null;
   }
   if (f && f.keys.size >= ADMIN_MAX_WRONG) {
@@ -79,7 +93,7 @@ function requireAdmin(req, res, next) {
   const key = req.get('x-admin-key') || (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
   if (key && safeEqual(key, getAdminPassword())) return next();
   if (key) {
-    if (!f) adminFails.set(req.ip, (f = { keys: new Set(), reset: now + ADMIN_LOCK_MS }));
+    if (!f) adminFails.set(ip, (f = { keys: new Set(), reset: now + ADMIN_LOCK_MS }));
     f.keys.add(crypto.createHash('sha256').update(key).digest('hex'));
   }
   return res.status(401).json({ success: false, error: 'Cần đăng nhập quản trị (sai hoặc thiếu mật khẩu admin).' });
@@ -110,4 +124,4 @@ function maskPhone(phone) {
   return s.length > 6 ? `${s.slice(0, 3)}****${s.slice(-3)}` : s;
 }
 
-module.exports = { getAdminPassword, requireAdmin, rateLimit, securityHeaders, sanitizeHtml, maskPhone };
+module.exports = { clientIp, getAdminPassword, requireAdmin, rateLimit, securityHeaders, sanitizeHtml, maskPhone };

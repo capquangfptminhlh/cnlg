@@ -226,3 +226,13 @@ test('Tin nhắn cho khách: đúng giai đoạn, đủ mã vận đơn, không 
   assert.equal(zaloLink('+84 901 234 567'), 'https://zalo.me/0901234567');
   assert.equal(zaloLink('123'), null);
 });
+
+test('IP khách sau Cloudflare Tunnel: tin CF-Connecting-IP chỉ khi kết nối từ máy này', () => {
+  const { clientIp } = require('../services/security');
+  const req = (peer, cf) => ({ ip: peer, socket: { remoteAddress: peer }, headers: cf ? { 'cf-connecting-ip': cf } : {} });
+  assert.equal(clientIp(req('127.0.0.1', '203.0.113.7')), '203.0.113.7');
+  assert.equal(clientIp(req('::ffff:127.0.0.1', '2001:db8::1')), '2001:db8::1');
+  assert.equal(clientIp(req('198.51.100.9', '203.0.113.7')), '198.51.100.9'); // từ ngoài → không tin header
+  assert.equal(clientIp(req('127.0.0.1', 'bad<ip>')), '127.0.0.1');
+  assert.equal(clientIp(req('127.0.0.1')), '127.0.0.1');
+});
