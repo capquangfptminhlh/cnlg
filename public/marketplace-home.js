@@ -143,9 +143,7 @@
       action(actionButton.dataset.storeAction);
       return;
     }
-    if (event.target.closest('#categoriesContainer .cat-btn') && matchMedia('(max-width:700px)').matches) {
-      jumpToCatalog();
-    }
+    // Bấm danh mục: category-sheet.js cuộn tới danh sách sau khi sản phẩm vẽ xong (mọi khổ màn hình)
   });
 
   function updateMobileCartCount() {

@@ -64,6 +64,16 @@
     document.body.classList.remove('cat-sheet-open');
   }
 
+  // Cuộn tới danh sách SAU khi lưới sản phẩm vẽ xong (cuộn sớm bị việc vẽ lại lưới làm gián đoạn)
+  function scrollToCatalogAfterRender() {
+    const target = document.getElementById('catalog');
+    if (!target) return;
+    let done = false;
+    const go = () => { if (done) return; done = true; target.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    window.addEventListener('storefront:products', () => setTimeout(go, 50), { once: true });
+    setTimeout(go, 2500); // dự phòng khi mạng chậm / lỗi
+  }
+
   function choose(id) {
     if (typeof state === 'undefined' || typeof fetchProducts !== 'function') return;
     // Danh mục cha có sẵn chip/nút → bấm nút đó để giữ đúng trạng thái giao diện; danh mục con → lọc trực tiếp
@@ -78,13 +88,7 @@
       fetchProducts();
     }
     close();
-    // Cuộn SAU khi lưới sản phẩm vẽ xong (cuộn sớm bị việc vẽ lại lưới làm gián đoạn)
-    const target = document.getElementById('catalog');
-    if (!target) return;
-    let done = false;
-    const go = () => { if (done) return; done = true; target.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-    window.addEventListener('storefront:products', () => setTimeout(go, 50), { once: true });
-    setTimeout(go, 2500); // dự phòng khi mạng chậm / lỗi
+    scrollToCatalogAfterRender();
   }
 
   sheet.addEventListener('click', e => {
@@ -113,6 +117,10 @@
     close();
     if (location.hash) history.replaceState(null, '', '/');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  document.addEventListener('click', e => {
+    if (e.target.closest('#categoriesContainer .cat-btn')) scrollToCatalogAfterRender();
   });
 
   window.openCategorySheet = open;
