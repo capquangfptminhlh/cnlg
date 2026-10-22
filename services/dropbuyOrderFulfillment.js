@@ -14,7 +14,8 @@ const { vnDate } = require('./backup');
  *   → tính phí ship từng kho → kiểm tra hạn mức, số dư quỹ, lãi
  *   → orders/{fx}/normal-submit (dropship, payment_method "P" = trừ quỹ DropBuy; cod_amount = tiền shipper thu của khách)
  *   → PROCESSING, lưu mã đơn DropBuy.
- * Tắt tự đặt: chỉ đưa vào giỏ, admin đặt tay rồi dán mã đơn DropBuy.
+ * Tắt tự đặt (mặc định): đơn chờ nhân viên đặt tay trên DropBuy rồi dán mã đơn DropBuy; admin có thể bấm
+ * "Chỉ đưa vào giỏ" hoặc "Đặt DropBuy ngay" để đỡ thao tác.
  * Mỗi 2 phút đọc orders/history: D/F → COMPLETED; C/B/X/N → huỷ (COD) hoặc báo hoàn tiền (đã chuyển khoản).
  *
  * Request đặt đơn được đối chiếu với 1 đơn thật đặt từ giao diện DropBuy (20/10/2026).
@@ -218,17 +219,20 @@ async function handOff(orderId, io) {
   const config = scraper.getConfig();
   const order = orderStore.getOrderById(orderId);
   if (!order || !readyStatus(order)) return { success: false, mode: 'NOT_READY' };
+  if (!normalizeAutoOrder(config.autoOrder).enabled) {
+    // Nhân viên tự đặt trên DropBuy: chỉ đánh dấu chờ xử lý, không đụng giỏ DropBuy dùng chung
+    setSync(orderId, { status: 'WAITING_STAFF', note: 'Chờ nhân viên đặt đơn dropship trên DropBuy.' }, { needs_attention: true });
+    emit(io, order, order.status);
+    return { success: true, mode: 'STAFF' };
+  }
   if (!config.dropbuy?.cookieHeader) {
     setSync(orderId, { status: 'WAITING_DROPBUY_LOGIN', note: 'Chưa đăng nhập DropBuy trong admin.' }, { needs_attention: true });
     notify.paymentIssue(`Đơn ${orderId} chờ đặt kho nhưng admin chưa đăng nhập DropBuy.`);
     emit(io, order, order.status);
     return { success: false, mode: 'NO_SESSION' };
   }
-  if (normalizeAutoOrder(config.autoOrder).enabled) {
-    const r = await placeOrderOnDropbuy(orderId, io);
-    return { ...r, mode: 'AUTO_ORDER' };
-  }
-  return fulfillOrderOnDropbuy(orderId, io);
+  const r = await placeOrderOnDropbuy(orderId, io);
+  return { ...r, mode: 'AUTO_ORDER' };
 }
 
 /** Tắt tự đặt: đưa các món vào giỏ DropBuy để admin đặt tay. */

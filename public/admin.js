@@ -138,7 +138,8 @@ function renderOrders(orders) {
     const cost = (o.items || []).reduce((s, i) => s + (i.dropbuy_cost || 0) * i.quantity, 0);
     const canConfirm = o.payment_method !== 'COD' && ['PENDING_PAYMENT', 'PAYMENT_REPORTED'].includes(o.status);
     const ds = o.dropbuy_sync || {};
-    const dbNote = ds.status === 'WAITING_DROPBUY_LOGIN' ? '<br><small style="color:#ef4444;">⚠ Chưa đăng nhập DropBuy</small>'
+    const dbNote = ds.status === 'WAITING_STAFF' ? '<br><small style="color:#f59e0b;">⏳ Chờ nhân viên đặt trên DropBuy</small>'
+      : ds.status === 'WAITING_DROPBUY_LOGIN' ? '<br><small style="color:#ef4444;">⚠ Chưa đăng nhập DropBuy</small>'
       : ds.status === 'FAILED' ? `<br><small style="color:#ef4444;">⚠ ${esc(ds.error || 'Lỗi DropBuy')}</small>`
       : ds.status === 'SUBMIT_UNKNOWN' ? `<br><small style="color:#ef4444;">⚠ ${esc(ds.error)}</small>`
       : ds.status === 'SUBMITTING' ? '<br><small style="color:#f59e0b;">Đang gửi sang DropBuy...</small>'
@@ -154,11 +155,14 @@ function renderOrders(orders) {
         <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="setOrderStatus('${esc(o.id)}', 'CANCELLED')">Huỷ đơn</button>`;
     } else if (readyForKho) {
       const locked = ['SUBMITTING', 'SUBMIT_UNKNOWN'].includes(ds.status);
-      actions = `${locked ? '' : `<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="placeOnDropbuy('${esc(o.id)}')"><i class="fa-solid fa-bolt"></i> Đặt DropBuy ngay (trừ quỹ)</button><br>`}
-        <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="pushToDropbuyCart('${esc(o.id)}')"><i class="fa-solid fa-cart-arrow-down"></i> Chỉ đưa vào giỏ</button>
-        ${o.payment_method === 'COD' ? `<button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="setOrderStatus('${esc(o.id)}', 'CANCELLED')">Huỷ đơn</button>` : ''}
-        <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="copyReceiver('${esc(o.id)}')"><i class="fa-regular fa-copy"></i> Sao chép người nhận</button>
-        <button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="attachDropbuyCode('${esc(o.id)}')">Đã đặt – nhập mã DropBuy</button>
+      actions = `${staffBox(o)}
+        <button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="copyReceiver('${esc(o.id)}')"><i class="fa-regular fa-copy"></i> Sao chép thông tin đặt</button><br>
+        <button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="attachDropbuyCode('${esc(o.id)}')"><i class="fa-solid fa-check"></i> Đã đặt – nhập mã DropBuy</button>
+        <details style="margin-top:6px; font-size:11px;"><summary style="cursor:pointer;">Thao tác khác</summary>
+          <button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="pushToDropbuyCart('${esc(o.id)}')"><i class="fa-solid fa-cart-arrow-down"></i> Đưa các món vào giỏ DropBuy</button>
+          ${locked ? '' : `<button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="placeOnDropbuy('${esc(o.id)}')"><i class="fa-solid fa-bolt"></i> Hệ thống đặt hộ (trừ quỹ)</button>`}
+          ${o.payment_method === 'COD' ? `<button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="setOrderStatus('${esc(o.id)}', 'CANCELLED')">Huỷ đơn</button>` : ''}
+        </details>
         ${dbNote}`;
     } else if (o.status === 'PROCESSING') {
       actions = `${o.dropbuy_sync?.problem ? `<small style="color:#ef4444;">⚠ ${esc(o.dropbuy_sync.problem)}</small><br>` : ''}${(ds.orders || []).length || ds.order_id ? `<button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-bottom: 4px;" onclick="cancelOnDropbuy('${esc(o.id)}')">Huỷ trên DropBuy</button><br>` : ''}<button class="btn-check-paid" style="padding: 4px 8px; font-size: 11px;" onclick="setOrderStatus('${esc(o.id)}', 'COMPLETED')">Đã giao xong</button>`;
@@ -241,10 +245,32 @@ async function attachDropbuyCode(orderId) {
   }
 }
 
+// Số tiền nhân viên nhập ô "Thu hộ (COD)" trên DropBuy: đơn COD = tổng khách trả; đơn đã chuyển khoản = 0
+function codToCollect(o) {
+  return o.payment_method === 'COD' ? (o.total_amount || 0) : 0;
+}
+
+/** Khung tóm tắt để nhân viên đặt đơn dropship trên DropBuy */
+function staffBox(o) {
+  const live = o.shipping_live;
+  const carriers = { V: 'Viettel Post', S: 'SPX' };
+  const shipDb = live?.fee != null ? `${formatPrice(live.fee)}${live.depots?.length ? ` (${[...new Set(live.depots.map(d => carriers[d.method] || d.method))].join(' + ')}${live.depots.length > 1 ? `, ${live.depots.length} kho` : ''})` : ''}` : 'chưa có';
+  const cost = (o.items || []).reduce((s, i) => s + (i.dropbuy_cost || 0) * i.quantity, 0);
+  const profit = cost && live?.fee != null ? (o.total_amount || 0) - cost - live.fee : null;
+  return `<div class="staff-box">
+    <div><span>Thu hộ (COD) nhập trên DropBuy:</span> <strong>${formatPrice(codToCollect(o))}</strong></div>
+    <div><span>Phí ship DropBuy dự kiến:</span> ${shipDb}</div>
+    <div><span>Giao tới:</span> ${esc(o.customer?.ward_name || '')}${o.customer?.ward_name ? ', ' : ''}${esc(o.customer?.province_name || o.customer?.province || '')}</div>
+    ${profit != null ? `<div><span>Lãi dự kiến:</span> <strong style="color:${profit >= 0 ? '#067647' : '#d92d20'};">${formatPrice(profit)}</strong></div>` : ''}
+  </div>`;
+}
+
 function copyReceiver(orderId, silent = false) {
   const o = lastOrders.find(x => x.id === orderId);
   if (!o) return;
-  const text = `${o.customer?.name}\n${o.customer?.phone}\n${o.customer?.address}${o.customer?.ward_name ? `, ${o.customer.ward_name}` : ""}${o.customer?.province ? `, ${o.customer.province}` : ''}${o.customer?.note ? `\nGhi chú: ${o.customer.note}` : ''}`;
+  const c = o.customer || {};
+  const items = (o.items || []).map(i => `- ${i.name}${i.variant_name ? ` [${i.variant_name}]` : ''} x${i.quantity}${i.sku ? ` (SKU ${i.sku})` : ''}`).join('\n');
+  const text = `Người nhận: ${c.name}\nSĐT: ${c.phone}\nĐịa chỉ: ${c.address}${c.ward_name ? `, ${c.ward_name}` : ''}${c.province_name || c.province ? `, ${c.province_name || c.province}` : ''}\nThu hộ (COD): ${codToCollect(o).toLocaleString('vi-VN')}\nĐơn shop: ${o.id}${c.note ? `\nGhi chú: ${c.note}` : ''}\nSản phẩm:\n${items}`;
   navigator.clipboard.writeText(text).then(() => { if (!silent) uiAlert('Đã sao chép:\n\n' + text); }).catch(() => uiPrompt('Sao chép thông tin người nhận:', { value: text, readOnly: true }));
 }
 

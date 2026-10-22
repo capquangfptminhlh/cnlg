@@ -208,14 +208,21 @@ test('Thiếu phường/xã → không đặt tự động', async () => {
   assert.equal(db.calls.length, 0);
 });
 
-test('Tắt tự đặt → handOff chỉ đưa vào giỏ', async () => {
+test('Tắt tự đặt → đơn chờ nhân viên đặt, không gọi DropBuy, không đụng giỏ', async () => {
   const db = fakeDropbuy();
   config.autoOrder.enabled = false;
   const o = makeOrder();
   const r = await fulfillment.handOff(o.id, null);
-  assert.equal(r.mode, 'CART');
-  assert.equal(db.submits.length, 0);
-  assert.equal(orderStore.getOrderById(o.id).dropbuy_sync.status, 'IN_DROPBUY_CART');
+  assert.equal(r.mode, 'STAFF');
+  assert.equal(db.calls.length, 0);
+  const after = orderStore.getOrderById(o.id);
+  assert.equal(after.dropbuy_sync.status, 'WAITING_STAFF');
+  assert.equal(after.needs_attention, true);
+  assert.equal(after.status, 'CONFIRMED');
+  // Nhân viên đặt xong, dán mã → theo dõi như thường
+  const done = fulfillment.attachDropbuyCode(o.id, 'D-261022-1', null);
+  assert.equal(done.status, 'PROCESSING');
+  assert.equal(done.needs_attention, false);
 });
 
 test('Hết phiên DropBuy → WAITING_DROPBUY_LOGIN, không gửi', async () => {

@@ -277,3 +277,8 @@
   .admin-action-bar > div:last-child, .admin-action-bar [style*="display: flex"] { flex-wrap: wrap; width: 100%; }
   .auth-badge { max-width: 100%; overflow-wrap: anywhere; }
 }
+
+/* Khung thông tin để nhân viên đặt đơn trên DropBuy */
+.staff-box { margin-bottom: 8px; padding: 8px 10px; border-radius: 8px; background: #fff7f4; border: 1px solid #fde0d7; font-size: 12px; line-height: 1.6; color: var(--text-primary); min-width: 220px; }
+.staff-box span { color: var(--text-muted); }
+.staff-box strong { color: #c8321f; }

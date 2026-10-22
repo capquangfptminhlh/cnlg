@@ -48,7 +48,7 @@ Truy cập:
 
 ## 🚀 Triển khai thật (khách ngoài Internet đặt được hàng)
 
-Mô hình hiện tại: khách trả **COD**, hệ thống tự đặt đơn **dropship** trên DropBuy và trừ quỹ DropBuy của shop
+Mô hình hiện tại: khách trả **COD**; **nhân viên tự đặt đơn dropship** trên DropBuy theo thông tin admin hiện sẵn (thu hộ, phí ship, người nhận). DropBuy được dùng để lấy giá sỉ, tồn kho và phí ship thật. Có thể bật *Tự đặt đơn* (trừ quỹ DropBuy) trong admin
 (xem `AGENT_INSTRUCTIONS.md` mục 9). Không cần tài khoản ngân hàng hay webhook nếu chỉ bán COD.
 
 ### 0. Cấu hình (`copy .env.example .env`)
