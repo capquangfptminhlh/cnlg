@@ -17,7 +17,7 @@
   <header class="admin-header">
     <div class="container flex-between">
       <div class="brand">
-        <a href="/" class="brand-logo"><span class="logo-bold">HOANGMINH</span><span class="logo-accent">.COM</span></a>
+        <a href="/" class="brand-logo"><span class="logo-bold">Hoàng Minh</span> <span class="logo-accent">Store</span></a>
         <span class="admin-tag"><i class="fa-solid fa-gauge-high"></i> Quản trị cửa hàng</span>
       </div>
       <div>
@@ -33,29 +33,29 @@
       <div class="stat-card">
         <div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
         <div class="stat-info">
-          <div class="stat-label">Tổng SP Đồng Bộ Từ DropBuy</div>
+          <div class="stat-label">Sản phẩm đang bán</div>
           <div class="stat-val" id="statProducts">0</div>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon"><i class="fa-solid fa-receipt"></i></div>
         <div class="stat-info">
-          <div class="stat-label">Tổng Đơn Hàng</div>
+          <div class="stat-label">Đơn hàng (không tính đơn thử)</div>
           <div class="stat-val" id="statOrders">0</div>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon"><i class="fa-solid fa-money-bill-transfer"></i></div>
         <div class="stat-info">
-          <div class="stat-label">Doanh Thu Đã Thanh Toán</div>
+          <div class="stat-label">Doanh thu đã thu tiền</div>
           <div class="stat-val price" id="statRevenue">0 đ</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon"><i class="fa-solid fa-bolt"></i></div>
+        <div class="stat-icon"><i class="fa-solid fa-user-clock"></i></div>
         <div class="stat-info">
-          <div class="stat-label">Trạng Thái Relay DropBuy</div>
-          <div class="stat-val status-online" id="statStatus">Sẵn sàng</div>
+          <div class="stat-label">Đơn chờ nhân viên đặt kho</div>
+          <div class="stat-val" id="statWaiting">0</div>
         </div>
       </div>
     </div>
@@ -78,6 +78,29 @@
         <button class="btn-sync-now" id="syncNowBtn">
           <i class="fa-solid fa-rotate"></i> Đồng Bộ Lại Toàn Bộ Kho DropBuy
         </button>
+      </div>
+    </div>
+
+    <!-- Đơn hàng: rộng hết trang, việc nhân viên làm nhiều nhất -->
+    <div class="admin-card" id="ordersSection" style="margin-bottom: 24px;">
+      <h3><i class="fa-solid fa-list-check"></i> Đơn hàng mới nhất</h3>
+      <div class="orders-table-wrapper">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>Mã Đơn HM</th>
+              <th>Mã DropBuy</th>
+              <th>Khách Hàng</th>
+              <th>Sản Phẩm (giá vốn)</th>
+              <th>Tổng Tiền</th>
+              <th>Trạng Thái</th>
+              <th>Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTableBody">
+            <!-- Injected via JS -->
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -201,27 +224,6 @@
           <summary style="cursor:pointer; color:#cbd5e1;">Sản phẩm bán chạy (30 ngày)</summary>
           <div id="reportTop" style="margin-top:6px;"></div>
         </details>
-      </div>
-      <div class="admin-card">
-        <h3><i class="fa-solid fa-list-check"></i> Đơn Hàng Mới Nhất & Trạng Thái Đồng Bộ DropBuy</h3>
-        <div class="orders-table-wrapper">
-          <table class="orders-table">
-            <thead>
-              <tr>
-                <th>Mã Đơn HM</th>
-                <th>Mã DropBuy</th>
-                <th>Khách Hàng</th>
-                <th>Sản Phẩm (giá vốn)</th>
-                <th>Tổng Tiền</th>
-                <th>Trạng Thái</th>
-                <th>Thao Tác</th>
-              </tr>
-            </thead>
-            <tbody id="ordersTableBody">
-              <!-- Injected via JS -->
-            </tbody>
-          </table>
-        </div>
       </div>
       </div>
     </div>

@@ -111,6 +111,12 @@ async function loadData() {
       const orders = ordRes.data;
       const real = orders.filter(o => !o.is_test);
       statOrders.innerText = real.length;
+      const waiting = real.filter(o => o.dropbuy_sync?.status === 'WAITING_STAFF' && o.status !== 'CANCELLED').length;
+      const statWaiting = document.getElementById('statWaiting');
+      if (statWaiting) {
+        statWaiting.innerText = waiting;
+        statWaiting.style.color = waiting ? '#e8462c' : '#16a34a';
+      }
 
       // Giống báo cáo: chuyển khoản đã nhận tiền, COD đã giao xong; bỏ đơn thử
       const revenue = real
@@ -171,18 +177,18 @@ function renderOrders(orders) {
     }
     return `
     <tr>
-      <td><strong>#${esc(o.id)}</strong><br><small style="color:#6b7280;">${new Date(o.created_at).toLocaleString('vi-VN')}</small></td>
-      <td><code>${esc((ds.orders || []).map(x => x.code).join(', ') || ds.order_code || 'Chưa đặt')}</code>${ds.spend ? `<br><small style="color:#94a3b8;">Trừ quỹ ${formatPrice(ds.spend)}</small>` : ''}${o.dropbuy_sync?.current_label ? `<br><small style="color:#10b981;">${esc(o.dropbuy_sync.current_label)}</small>` : ''}${o.dropbuy_sync?.shipping_ref_code ? `<br><small style="color:#6b7280;">VĐ: ${esc(o.dropbuy_sync.shipping_ref_code)}</small>` : ''}</td>
-      <td>
+      <td data-label="Mã đơn"><strong>#${esc(o.id)}</strong><br><small style="color:#6b7280;">${new Date(o.created_at).toLocaleString('vi-VN')}</small></td>
+      <td data-label="Mã DropBuy"><code>${esc((ds.orders || []).map(x => x.code).join(', ') || ds.order_code || 'Chưa đặt')}</code>${ds.spend ? `<br><small style="color:#94a3b8;">Trừ quỹ ${formatPrice(ds.spend)}</small>` : ''}${o.dropbuy_sync?.current_label ? `<br><small style="color:#10b981;">${esc(o.dropbuy_sync.current_label)}</small>` : ''}${o.dropbuy_sync?.shipping_ref_code ? `<br><small style="color:#6b7280;">VĐ: ${esc(o.dropbuy_sync.shipping_ref_code)}</small>` : ''}</td>
+      <td data-label="Khách hàng">
         <strong>${esc(o.customer?.name)}</strong><br>
         <small style="color: #6b7280;">${esc(o.customer?.phone)}</small><br>
         <small style="color: #6b7280;">${esc(o.customer?.address)}${o.customer?.ward_name ? `, ${esc(o.customer.ward_name)}` : ""}${o.customer?.province ? `, ${esc(o.customer.province)}` : ''}</small>
         ${o.customer?.note ? `<br><small style="color:#f59e0b;">Ghi chú: ${esc(o.customer.note)}</small>` : ''}
       </td>
-      <td class="order-items-cell">${items}${o.shipping_fee != null ? `<br>Ship: ${o.shipping_fee ? formatPrice(o.shipping_fee) : 'miễn phí'}${o.customer?.province ? ` (${esc(o.customer.province)})` : ''}` : ''}${cost ? `<br><strong>Lãi gộp hàng: ${formatPrice((o.subtotal ?? o.total_amount) - cost)}</strong>` : ''}</td>
-      <td><strong style="color: #e11d48;">${formatPrice(o.total_amount)}</strong><br><small style="color:${o.payment_method === 'COD' ? '#38bdf8' : '#94a3b8'};">${o.payment_method === 'COD' ? 'COD – thu khi giao' : 'Chuyển khoản'}</small>${ds.spend ? `<br><small style="color:#10b981;">Lãi ${formatPrice(o.total_amount - ds.spend)}</small>` : ''}${o.payment_via ? `<br><small style="color:#10b981;">${o.payment_via === 'admin' ? 'xác nhận tay' : `tự động: ${esc(o.payment_via)}`}</small>` : ''}${o.late_payment ? `<br><small style="color:#ef4444;">Tiền về sau khi huỷ: ${formatPrice(o.late_payment.amount)}</small>` : ''}</td>
-      <td>${o.is_test ? '<span class="status-pill cancelled">ĐƠN THỬ</span><br>' : ''}<span class="status-pill ${cls}">${label}</span>${o.needs_attention && o.status === 'PAYMENT_REPORTED' ? '<br><small style="color:#ef4444;">⚠ Khách báo CK đã lâu – cần đối soát</small>' : ''}${o.cancel_reason ? `<br><small style="color:#94a3b8;">${esc(o.cancel_reason)}</small>` : ''}</td>
-      <td>${actions}${o.status !== 'PENDING_PAYMENT' && !o.is_test ? `<br><button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 6px;" onclick="customerMessageFor('${esc(o.id)}')"><i class="fa-regular fa-comment-dots"></i> Tin nhắn cho khách</button>` : ''}<br><a href="#" style="font-size:11px;" onclick="toggleTestOrder('${esc(o.id)}', ${!o.is_test}); return false;">${o.is_test ? 'Bỏ đánh dấu đơn thử' : 'Đánh dấu là đơn thử'}</a></td>
+      <td data-label="Sản phẩm" class="order-items-cell">${items}${o.shipping_fee != null ? `<br>Ship: ${o.shipping_fee ? formatPrice(o.shipping_fee) : 'miễn phí'}${o.customer?.province ? ` (${esc(o.customer.province)})` : ''}` : ''}${cost ? `<br><strong>Lãi gộp hàng: ${formatPrice((o.subtotal ?? o.total_amount) - cost)}</strong>` : ''}</td>
+      <td data-label="Tổng tiền"><strong style="color: #e11d48;">${formatPrice(o.total_amount)}</strong><br><small style="color:${o.payment_method === 'COD' ? '#38bdf8' : '#94a3b8'};">${o.payment_method === 'COD' ? 'COD – thu khi giao' : 'Chuyển khoản'}</small>${ds.spend ? `<br><small style="color:#10b981;">Lãi ${formatPrice(o.total_amount - ds.spend)}</small>` : ''}${o.payment_via ? `<br><small style="color:#10b981;">${o.payment_via === 'admin' ? 'xác nhận tay' : `tự động: ${esc(o.payment_via)}`}</small>` : ''}${o.late_payment ? `<br><small style="color:#ef4444;">Tiền về sau khi huỷ: ${formatPrice(o.late_payment.amount)}</small>` : ''}</td>
+      <td data-label="Trạng thái">${o.is_test ? '<span class="status-pill cancelled">ĐƠN THỬ</span><br>' : ''}<span class="status-pill ${cls}">${label}</span>${o.needs_attention && o.status === 'PAYMENT_REPORTED' ? '<br><small style="color:#ef4444;">⚠ Khách báo CK đã lâu – cần đối soát</small>' : ''}${o.cancel_reason ? `<br><small style="color:#94a3b8;">${esc(o.cancel_reason)}</small>` : ''}</td>
+      <td data-label="Thao tác">${actions}${o.status !== 'PENDING_PAYMENT' && !o.is_test ? `<br><button class="btn-ghost" style="padding: 4px 8px; font-size: 11px; margin-top: 6px;" onclick="customerMessageFor('${esc(o.id)}')"><i class="fa-regular fa-comment-dots"></i> Tin nhắn cho khách</button>` : ''}<br><a href="#" style="font-size:11px;" onclick="toggleTestOrder('${esc(o.id)}', ${!o.is_test}); return false;">${o.is_test ? 'Bỏ đánh dấu đơn thử' : 'Đánh dấu là đơn thử'}</a></td>
     </tr>`;
   }).join('');
 }
