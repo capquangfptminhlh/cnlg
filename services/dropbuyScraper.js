@@ -152,9 +152,8 @@ async function fetchAllSearchItems(config = getConfig(), { maxPages = 200, pageS
   const seen = new Set();
   const unique = raw.filter(i => (seen.has(i.unique_id || i.product_id) ? false : seen.add(i.unique_id || i.product_id)));
   const complete = failed === 0 && pages * pageSize >= totalRecords && unique.length >= totalRecords * 0.98;
-  // Bỏ hàng "kho ảo" (product_type V): cần luồng đặt hàng riêng mà cửa hàng chưa hỗ trợ
-  const items = unique.filter(i => (i.product_type || 'P') === 'P');
-  return { items, totalRecords, complete, skippedVirtual: unique.length - items.length, failedPages: failed };
+  // Gồm cả hàng "kho ảo" (product_type V): đã thử – vào giỏ, có giá F1, kho & phí ship như hàng thường
+  return { items: unique, totalRecords, complete, failedPages: failed };
 }
 
 /**
