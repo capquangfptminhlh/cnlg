@@ -9,13 +9,16 @@ if not exist tools\hm-tunnel.exe (
   echo [%date% %time%] Thieu tools\hm-tunnel.exe - khong mo tunnel. >> data\tunnel.log
   exit /b 1
 )
-if not exist "%USERPROFILE%\.cloudflared\hoangminh-store.yml" (
-  echo [%date% %time%] Thieu cau hinh %USERPROFILE%\.cloudflared\hoangminh-store.yml - khong mo tunnel. >> data\tunnel.log
+REM Cau hinh tunnel: uu tien data\tunnel (may chu chay bang tai khoan SYSTEM), khong co thi lay trong %USERPROFILE%\.cloudflared
+set "TUNNEL_CFG=%~dp0data\tunnel\hoangminh-store.yml"
+if not exist "%TUNNEL_CFG%" set "TUNNEL_CFG=%USERPROFILE%\.cloudflared\hoangminh-store.yml"
+if not exist "%TUNNEL_CFG%" (
+  echo [%date% %time%] Thieu cau hinh tunnel hoangminh-store.yml - khong mo tunnel. >> data\tunnel.log
   exit /b 1
 )
 :loop
 echo [%date% %time%] Mo tunnel besi.vn... >> data\tunnel.log
-tools\hm-tunnel.exe --no-autoupdate --loglevel warn tunnel --config "%USERPROFILE%\.cloudflared\hoangminh-store.yml" run >> data\tunnel.log 2>&1
+tools\hm-tunnel.exe --no-autoupdate --loglevel warn tunnel --config "%TUNNEL_CFG%" run >> data\tunnel.log 2>&1
 echo [%date% %time%] Tunnel dung, mo lai sau 10 giay... >> data\tunnel.log
 ping -n 11 127.0.0.1 >nul
 goto loop

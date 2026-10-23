@@ -24,3 +24,5 @@ data/dropbuy-cred.json.tmp
 
 # Ban sao cloudflared cho tunnel cua hang (~60 MB, khong dua len git)
 tools/*.exe
+# Khoa + cau hinh tunnel khi chay tren may chu (bi mat)
+data/tunnel/
