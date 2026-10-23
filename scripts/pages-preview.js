@@ -106,7 +106,7 @@
     }
     const hint=document.createElement('p');
     hint.className='demo-checkout-note';
-    hint.textContent='CHẾ ĐỘ XEM THỬ. Sản phẩm và giá lấy từ bộ nhớ đệm đã lưu trên GitHub, không cập nhật tức thời. Không nhập dữ liệu khách hàng và không chuyển tiền.';
+    hint.textContent='CHẾ ĐỘ XEM THỬ. Đây là bản trưng bày: giá lấy từ bản lưu, không cập nhật tức thời và không nhận đơn. Đặt hàng thật tại besi.vn.';
     document.getElementById('checkoutForm')?.prepend(hint);
     snapshotPromise.then(x=>{
       const ribbon=document.querySelector('.pages-demo-ribbon span');

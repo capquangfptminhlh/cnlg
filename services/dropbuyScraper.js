@@ -49,7 +49,7 @@ function dropbuyHeaders(config = getConfig()) {
 
 // Format image URL from Dropbuy relative path
 function formatImageUrl(pathOrUrl, size = '256x256') {
-  if (!pathOrUrl) return 'https://dropbuy.vn/d/logo.png';
+  if (!pathOrUrl) return ''; // không gán logo DropBuy làm ảnh thay thế: lộ nguồn hàng cho khách
   if (pathOrUrl.startsWith('http')) return pathOrUrl;
 
   // Dropbuy CDN only supports _128x128, _256x256, _1024x1024
@@ -369,7 +369,14 @@ function getCategories() {
   return [];
 }
 
+/** SP có ảnh thật (không trống, không phải logo DropBuy mà bản quét cũ từng gán làm ảnh thay thế) */
+function hasRealPhoto(p) {
+  const url = String(p?.image || '');
+  return !!url && !/dropbuy\.vn\/d\/logo/i.test(url);
+}
+
 module.exports = {
+  hasRealPhoto,
   syncCategories,
   syncCatalog,
   fetchAllSearchItems,

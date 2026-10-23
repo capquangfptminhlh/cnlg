@@ -109,7 +109,7 @@ app.get('/sp/:slugId', async (req, res) => {
   res.type('html').send(seo.renderProductPage(req, product, detail, readConfig()));
 });
 
-app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemapXml(req, scraper.getProducts())));
+app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemapXml(req, scraper.getProducts().filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p)))));
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(seo.robotsTxt(req)));
 
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
@@ -214,7 +214,7 @@ app.get('/api/categories', (req, res) => {
     // Đếm đúng như /api/products đang bán (bỏ SP chưa có giá / đã gỡ) để số trên menu khớp số trong trang danh mục
     const perCat = new Map();
     for (const p of scraper.getProducts()) {
-      if (!(Number(p.price) > 0) || p.removed_from_dropbuy) continue;
+      if (!(Number(p.price) > 0) || p.removed_from_dropbuy || !scraper.hasRealPhoto(p)) continue;
       perCat.set(p.category_id, (perCat.get(p.category_id) || 0) + 1);
     }
     const cats = scraper.getCategories();
@@ -253,8 +253,8 @@ app.get('/api/products', (req, res) => {
   try {
     const { category, search, page = 1, limit = 24, sort = 'default', minPrice, maxPrice, inStock } = req.query;
     let products = scraper.getProducts();
-    // Không bán SP chưa có giá (DropBuy đôi khi để giá 0 khi ẩn giá / ngừng bán)
-    products = products.filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy);
+    // Không bán SP chưa có giá (DropBuy đôi khi để giá 0 khi ẩn giá / ngừng bán) hoặc chưa có ảnh thật
+    products = products.filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p));
 
     if (category && category !== 'all') {
       const ids = categoryIdsFor(parseInt(category, 10));
