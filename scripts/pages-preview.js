@@ -77,8 +77,9 @@
         case 'price-asc':filtered.sort((a,b)=>a.price-b.price);break;
         case 'price-desc':filtered.sort((a,b)=>b.price-a.price);break;
         case 'name-asc':filtered.sort((a,b)=>a.name.localeCompare(b.name,'vi'));break;
-        default:filtered=filtered.filter(p=>p.in_stock!==false).concat(filtered.filter(p=>p.in_stock===false));
       }
+      // Mọi kiểu sắp xếp: món còn hàng đứng trước (giống máy chủ thật)
+      filtered=filtered.filter(p=>p.in_stock!==false).concat(filtered.filter(p=>p.in_stock===false));
       const total=filtered.length;
       return respond({success:true,data:filtered.slice((page-1)*limit,page*limit),
         total,page,totalPages:Math.max(1,Math.ceil(total/limit))});

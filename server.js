@@ -303,11 +303,12 @@ app.get('/api/products', (req, res) => {
       products.sort((a, b) => b.price - a.price);
     } else if (sort === 'name-asc') {
       products.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-    } else {
-      // Mặc định: còn hàng lên trước; đang tìm kiếm thì trong mỗi nhóm xếp theo độ khớp
-      if (relevance) products.sort((a, b) => relevance.get(b.id) - relevance.get(a.id));
-      products = [...products.filter(p => p.in_stock !== false), ...products.filter(p => p.in_stock === false)];
+    } else if (relevance) {
+      // Mặc định khi tìm kiếm: xếp theo độ khớp
+      products.sort((a, b) => relevance.get(b.id) - relevance.get(a.id));
     }
+    // Mọi kiểu sắp xếp: món còn hàng đứng trước (trước đây "giá thấp → cao" để 10/24 món đầu là món hết hàng)
+    products = [...products.filter(p => p.in_stock !== false), ...products.filter(p => p.in_stock === false)];
 
     const total = products.length;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);

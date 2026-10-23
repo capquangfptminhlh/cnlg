@@ -40,7 +40,7 @@ const puppeteer=require('puppeteer-core');
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const port=server.address().port;
-  const chrome=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/opt/google/chrome/chrome'].find(existsSync);
+  const chrome=process.env.CHROME_PATH||['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/opt/google/chrome/chrome'].find(existsSync);
   if(!chrome)throw new Error('Chrome not available in runner');
   let browser;
   async function revealAll(page){
@@ -81,10 +81,12 @@ const puppeteer=require('puppeteer-core');
     assert.equal(snapshot.demo,'true','DEMO must be visible');
     assert.ok(snapshot.disabledPayment,'payment must be disabled');
     await revealAll(page);
-    const galleryHealth=await page.evaluate(()=>{
-      const cards=[...document.querySelectorAll('#productGrid .luxury-card')];
+    // Cuộn tới đáy làm trang tự tải thêm (cuộn vô hạn); thẻ mới chỉ hiện dần khi được cuộn tới,
+    // nên kiểm tra các thẻ của trang đầu – đã đi qua màn hình trong lúc cuộn
+    const galleryHealth=await page.evaluate(initial=>{
+      const cards=[...document.querySelectorAll('#productGrid .luxury-card')].slice(0,initial);
       const imgs=[...document.querySelectorAll('#productGrid .card-media img')];
-      const last=cards.at(-1)?.getBoundingClientRect();
+      const last=[...document.querySelectorAll('#productGrid .luxury-card')].at(-1)?.getBoundingClientRect();
       const gridBottom=document.getElementById('productGrid')?.getBoundingClientRect().bottom;
       return {
         visible:cards.filter(card=>Number.parseFloat(getComputedStyle(card).opacity)>.94).length,
@@ -92,7 +94,7 @@ const puppeteer=require('puppeteer-core');
         total:cards.length,
         bottomGap:last&&gridBottom?Math.round(gridBottom-last.bottom):9999
       };
-    });
+    },snapshot.cards);
     assert.ok(galleryHealth.visible===galleryHealth.total,
       'some product cards are invisible after scroll: '+JSON.stringify(galleryHealth));
     assert.ok(galleryHealth.loaded>=Math.min(18,galleryHealth.total-2),
@@ -114,8 +116,11 @@ const puppeteer=require('puppeteer-core');
     assert.ok((await page.$$('#productGrid .luxury-card')).length>0);
     console.log('Category navigation: PASS');
 
-    await page.click('#categoriesContainer .cat-btn[data-id="all"]');
-    await page.waitForFunction(()=>String(state.currentCategory)==='all'&&state.products.length>10);
+    // Trong trang danh mục, cột danh mục trang chủ được ẩn; khách quay lại bằng "Trang chủ" trên dải đường dẫn
+    assert.ok(await page.evaluate(()=>document.body.classList.contains('is-category-view')),'category page mode');
+    await page.click('#categoryViewHead [data-cat-go="all"]');
+    await page.waitForFunction(()=>String(state.currentCategory)==='all'&&state.products.length>10&&!document.body.classList.contains('is-category-view'));
+    console.log('Back to home from category page: PASS');
     await page.click('.price-pill[data-min="0"][data-max="500000"]');
     await page.waitForFunction(()=>String(state.maxPrice)==='500000'&&state.products.every(p=>p.price<=500000));
     await page.select('#sortSelect','price-asc');
