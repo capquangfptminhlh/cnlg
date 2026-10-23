@@ -236,3 +236,17 @@ test('IP khách sau Cloudflare Tunnel: tin CF-Connecting-IP chỉ khi kết nố
   assert.equal(clientIp(req('127.0.0.1', 'bad<ip>')), '127.0.0.1');
   assert.equal(clientIp(req('127.0.0.1')), '127.0.0.1');
 });
+
+test('Link tuyệt đối (canonical, sitemap, link tra cứu) dùng https khi khách vào qua Cloudflare', () => {
+  const { baseUrl } = require('../services/seo');
+  const req = (peer, headers) => ({ protocol: 'http', socket: { remoteAddress: peer }, get: h => headers[h.toLowerCase()] || (h.toLowerCase() === 'host' ? 'shop.example' : undefined) });
+  const saved = process.env.PUBLIC_BASE_URL; delete process.env.PUBLIC_BASE_URL;
+  try {
+    assert.equal(baseUrl(req('127.0.0.1', { 'cf-visitor': '{"scheme":"https"}' })), 'https://shop.example');
+    assert.equal(baseUrl(req('::1', { 'x-forwarded-proto': 'https' })), 'https://shop.example');
+    assert.equal(baseUrl(req('198.51.100.9', { 'x-forwarded-proto': 'https' })), 'http://shop.example'); // từ ngoài → không tin
+    assert.equal(baseUrl(req('127.0.0.1', {})), 'http://shop.example');
+    process.env.PUBLIC_BASE_URL = 'https://hoangminhstore.vn/';
+    assert.equal(baseUrl(req('127.0.0.1', {})), 'https://hoangminhstore.vn');
+  } finally { if (saved === undefined) delete process.env.PUBLIC_BASE_URL; else process.env.PUBLIC_BASE_URL = saved; }
+});

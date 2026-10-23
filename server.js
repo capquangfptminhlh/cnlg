@@ -160,7 +160,8 @@ function categoryIdsFor(catId) {
 }
 
 /** Không để chữ "DropBuy" (nguồn hàng) lọt ra phía khách */
-const customerSafe = t => (t ? String(t).replace(/(trên|từ|của)?\s*drop\s*buy(\.vn)?/gi, '').replace(/\s{2,}/g, ' ').trim() || 'Đã huỷ' : t);
+// Chữ khách xem: bỏ tên nguồn hàng, đổi "Admin" (từ nội bộ, có ở đơn cũ) thành "Cửa hàng"
+const customerSafe = t => (t ? String(t).replace(/(trên|từ|của)?\s*drop\s*buy(\.vn)?/gi, '').replace(/\badmin\b/gi, 'Cửa hàng').replace(/\s{2,}/g, ' ').trim() || 'Đã huỷ' : t);
 
 /** Dữ liệu đơn trả cho khách: che bớt thông tin cá nhân, không lộ thông tin nội bộ. */
 function publicOrder(o) {
@@ -722,7 +723,7 @@ app.post('/api/admin/auto-order', requireAdmin, (req, res) => {
 app.get('/api/admin/orders/:id/customer-message', requireAdmin, (req, res) => {
   const order = orderStore.getOrderById(req.params.id);
   if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
-  const base = (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  const base = seo.baseUrl(req);
   const cfg = readConfig();
   const msg = customerMessage.buildCustomerMessage(order, { storeName: cfg.store?.name || 'Hoàng Minh Store', trackUrl: `${base}/?tra-cuu=${encodeURIComponent(order.id)}` });
   res.json({ success: true, data: { ...msg, zalo: customerMessage.zaloLink(order.customer?.phone), phone: order.customer?.phone || null, local_link: !process.env.PUBLIC_BASE_URL } });

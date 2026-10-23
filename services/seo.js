@@ -24,7 +24,12 @@ const stripHtml = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/
 
 function baseUrl(req) {
   if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/+$/, '');
-  return `${req.protocol}://${req.get('host')}`;
+  // Qua Cloudflare Tunnel: cloudflared nói chuyện với máy chủ bằng http, nhưng khách vào bằng https →
+  // link chuẩn / sitemap / link tra cứu phải là https (chỉ tin header khi kết nối đến từ chính máy này)
+  const peer = String(req.socket?.remoteAddress || '');
+  const local = peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1';
+  const viaHttps = local && (/"scheme"\s*:\s*"https"/.test(String(req.get('cf-visitor') || '')) || String(req.get('x-forwarded-proto') || '').split(',')[0].trim() === 'https');
+  return `${viaHttps ? 'https' : req.protocol}://${req.get('host')}`;
 }
 
 function productPath(p) {
@@ -108,4 +113,4 @@ function robotsTxt(req) {
   return `User-agent: *\nAllow: /\nDisallow: /admin.html\nDisallow: /api/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`;
 }
 
-module.exports = { renderProductPage, renderHomePage, sitemapXml, robotsTxt, productPath };
+module.exports = { renderProductPage, renderHomePage, sitemapXml, robotsTxt, productPath, baseUrl };

@@ -277,3 +277,7 @@ body.is-category-view .premium-catalog-heading { display: none !important; }
 .summary-item-qty { color: #6b7280; }
 .summary-item-price { font-weight: 800; color: #1f2937; white-space: nowrap; }
 #checkoutModal #summaryShippingNote:empty { display: none; }
+
+/* Tra cứu đơn: giá không bị rớt chữ "đ" xuống dòng */
+.track-items .flex-between { gap: 10px; align-items: flex-start; }
+.track-items .flex-between > span:last-child { white-space: nowrap; flex: 0 0 auto; }
