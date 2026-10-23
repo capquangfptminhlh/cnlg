@@ -21,3 +21,6 @@ data/address-v2.json
 data/cred.key
 data/dropbuy-cred.json
 data/dropbuy-cred.json.tmp
+
+# Ban sao cloudflared cho tunnel cua hang (~60 MB, khong dua len git)
+tools/*.exe
