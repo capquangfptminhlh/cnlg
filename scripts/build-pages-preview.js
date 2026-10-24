@@ -29,7 +29,7 @@ html=html.replace('<script src="./app.js"></script>',
 html=html.replace('</head>','  <meta name="robots" content="noindex, nofollow">\n  <link rel="stylesheet" href="./pages-preview.css">\n</head>');
 html=html.replace('<body>','<body data-demo-mode="true">\n'+
   '  <div class="pages-demo-ribbon" role="status" aria-label="Website demo">\n'+
-  '    <strong>CHẾ ĐỘ DEMO</strong><span>Bản trưng bày · Giá có thể thay đổi · Đặt hàng thật tại besi.vn</span>\n'+
+  '    <strong>CHẾ ĐỘ DEMO</strong><span>Bản trưng bày · Giá có thể thay đổi · Đặt hàng thật tại besi.com.vn</span>\n'+
   '  </div>');
 html=html.replace('<title>','<title>[DEMO] ');
 assert.ok(!html.includes('src="/socket.io/'),'Socket.IO must not connect from preview');
@@ -147,7 +147,7 @@ for(const record of originals){
     warranty:cleanText(record.warranty,130),
     // The static preview cannot obtain full variant pricing; no real orders.
     variant_count:1,variation_id:id+10000000,
-    description:'<p>Ảnh, tên và giá bán được lấy từ bộ nhớ đệm sản phẩm của cửa hàng tại thời điểm tạo bản demo. Không phải báo giá thời gian thực và không đặt mua được trên bản trưng bày – vui lòng đặt tại besi.vn.</p>',
+    description:'<p>Ảnh, tên và giá bán được lấy từ bộ nhớ đệm sản phẩm của cửa hàng tại thời điểm tạo bản demo. Không phải báo giá thời gian thực và không đặt mua được trên bản trưng bày – vui lòng đặt tại besi.com.vn.</p>',
     variants:[{id:id+10000000,name:'Chế độ xem thử',sku,price,in_stock:record.in_stock!==false,is_default:true}],
     variation_options:[]
   };

@@ -65,5 +65,5 @@ Start-Sleep 15
 $h = Invoke-RestMethod http://localhost:3000/healthz
 Write-Host ''
 Write-Host "XONG. Cửa hàng chạy với $($h.products) sản phẩm. Nhật ký: data\server.log, data\tunnel.log"
-Write-Host 'Kiểm tra từ điện thoại (4G): https://besi.vn  – và vào admin xem DropBuy còn đăng nhập.'
+Write-Host 'Kiểm tra từ điện thoại (4G): https://besi.com.vn  – và vào admin xem DropBuy còn đăng nhập.'
 Write-Host 'Xoá file zip dữ liệu sau khi chắc chắn mọi thứ chạy.'

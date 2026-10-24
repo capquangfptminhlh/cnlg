@@ -1,6 +1,6 @@
 # Chuyển cửa hàng sang máy chủ riêng (Windows)
 
-Cửa hàng (besi.vn) là một chương trình Node chạy liên tục: nhận đơn, đồng bộ giá/tồn kho DropBuy,
+Cửa hàng (besi.com.vn) là một chương trình Node chạy liên tục: nhận đơn, đồng bộ giá/tồn kho DropBuy,
 tính phí ship. Khách vào qua **Cloudflare Tunnel** `hoangminh-store` – máy chủ không cần IP tĩnh hay mở cổng modem.
 
 ## A. Bạn chuẩn bị máy chủ (làm tay, một lần)
@@ -50,10 +50,10 @@ Chỉ cài thư viện + chạy test. Máy cũ vẫn bán bình thường.
    chạy khi **bật máy** (tài khoản SYSTEM, không cần ai đăng nhập Windows) → bật và kiểm tra.
 
 3. **Kiểm tra**
-   - Điện thoại dùng 4G (không dùng Wi‑Fi nhà) mở https://besi.vn: xem sản phẩm, giỏ, phí ship.
-   - Vào `https://besi.vn/admin.html` (mật khẩu admin như cũ): DropBuy còn "Đã kết nối", đơn cũ còn đủ.
+   - Điện thoại dùng 4G (không dùng Wi‑Fi nhà) mở https://besi.com.vn: xem sản phẩm, giỏ, phí ship.
+   - Vào `https://besi.com.vn/admin.html` (mật khẩu admin như cũ): DropBuy còn "Đã kết nối", đơn cũ còn đủ.
      Nếu DropBuy đòi đăng nhập lại: nhập lại mật khẩu DropBuy trong admin (tick "Ghi nhớ").
-   - Khởi động lại máy chủ một lần → sau ~1 phút besi.vn tự chạy lại.
+   - Khởi động lại máy chủ một lần → sau ~1 phút besi.com.vn tự chạy lại.
 4. Xoá file zip trên USB và Desktop máy cũ.
 
 ## Quay lại máy cũ (nếu máy chủ trục trặc)
