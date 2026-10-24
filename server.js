@@ -12,7 +12,7 @@ const orderStore = require('./services/orderStore');
 const relay = require('./services/dropbuyRelay');
 const dropbuyAuth = require('./services/dropbuyAuth');
 const realtimeSync = require('./services/realtimeSync');
-const { requireAdmin, rateLimit, securityHeaders, getAdminPassword, sanitizeHtml, maskPhone } = require('./services/security');
+const { requireAdmin, rateLimit, securityHeaders, forceHttps, getAdminPassword, sanitizeHtml, maskPhone } = require('./services/security');
 const pricing = require('./services/pricing');
 const { checkDropbuy } = require('./services/dropbuyHealth');
 const variants = require('./services/variants');
@@ -85,6 +85,7 @@ const MAX_QTY_PER_ITEM = 50;
 // Sau reverse proxy (nginx / Cloudflare) đặt TRUST_PROXY=1 để lấy đúng IP khách cho giới hạn tần suất
 if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
 app.disable('x-powered-by');
+app.use(forceHttps);
 app.use(securityHeaders);
 app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
 app.use(express.json({ limit: '100kb' }));

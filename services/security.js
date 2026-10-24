@@ -62,6 +62,21 @@ function clientIp(req) {
   return req.ip || peer;
 }
 
+/**
+ * Khách vào bằng http:// qua Cloudflare → chuyển sang https:// (không thì giỏ hàng, số điện thoại đi qua mạng không mã hoá).
+ * Chỉ xét header Cloudflare khi kết nối đến từ cloudflared trên chính máy này; truy cập thẳng http://localhost giữ nguyên.
+ */
+function forceHttps(req, res, next) {
+  const peer = String(req.socket?.remoteAddress || '');
+  const local = peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1';
+  const visitor = String(req.headers?.['cf-visitor'] || '');
+  const host = String(req.headers?.host || '');
+  if (local && /"scheme"\s*:\s*"http"/.test(visitor) && /^[a-z0-9.-]+$/i.test(host) && !/^(localhost|127\.0\.0\.1)$/i.test(host)) {
+    return res.redirect(301, `https://${host}${req.originalUrl || req.url || '/'}`);
+  }
+  next();
+}
+
 /** rateLimit('checkout', 10 * 60e3, 8) → tối đa 8 request / 10 phút / IP */
 function rateLimit(name, windowMs, max) {
   return (req, res, next) => {
@@ -124,4 +139,4 @@ function maskPhone(phone) {
   return s.length > 6 ? `${s.slice(0, 3)}****${s.slice(-3)}` : s;
 }
 
-module.exports = { clientIp, getAdminPassword, requireAdmin, rateLimit, securityHeaders, sanitizeHtml, maskPhone };
+module.exports = { clientIp, forceHttps, getAdminPassword, requireAdmin, rateLimit, securityHeaders, sanitizeHtml, maskPhone };

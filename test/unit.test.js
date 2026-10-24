@@ -250,3 +250,17 @@ test('Link tuyệt đối (canonical, sitemap, link tra cứu) dùng https khi k
     assert.equal(baseUrl(req('127.0.0.1', {})), 'https://hoangminhstore.vn');
   } finally { if (saved === undefined) delete process.env.PUBLIC_BASE_URL; else process.env.PUBLIC_BASE_URL = saved; }
 });
+
+test('Khách vào http:// qua Cloudflare được chuyển sang https://, truy cập nội bộ giữ nguyên', () => {
+  const { forceHttps } = require('../services/security');
+  const run = (peer, headers, url = '/sp/1-a?x=1') => {
+    let redirected = null, passed = false;
+    forceHttps({ socket: { remoteAddress: peer }, headers, originalUrl: url }, { redirect: (code, to) => { redirected = [code, to]; } }, () => { passed = true; });
+    return redirected || (passed ? 'next' : 'none');
+  };
+  assert.deepEqual(run('127.0.0.1', { 'cf-visitor': '{"scheme":"http"}', host: 'besi.com.vn' }), [301, 'https://besi.com.vn/sp/1-a?x=1']);
+  assert.equal(run('127.0.0.1', { 'cf-visitor': '{"scheme":"https"}', host: 'besi.com.vn' }), 'next');
+  assert.equal(run('127.0.0.1', { host: 'localhost:3000' }), 'next');                                        // mở thẳng trên máy
+  assert.equal(run('198.51.100.9', { 'cf-visitor': '{"scheme":"http"}', host: 'besi.com.vn' }), 'next');   // từ ngoài → không tin header
+  assert.equal(run('127.0.0.1', { 'cf-visitor': '{"scheme":"http"}', host: 'evil.com/"><x' }), 'next');    // host lạ → không chuyển
+});
