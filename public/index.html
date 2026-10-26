@@ -4,10 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#ee4d2d">
-  <title>Hoàng Minh Store | Mua sắm công nghệ, phụ kiện và gia dụng</title>
+  <title>Hoàng Minh Store | Tổng Kho Giá Sỉ • Flash Sale Phụ Kiện, Công Nghệ & Gia Dụng</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/marketplace.css">
@@ -17,6 +19,7 @@
   <link rel="stylesheet" href="/storefront-finish.css">
   <link rel="stylesheet" href="/storefront-experience.css">
   <link rel="stylesheet" href="/storefront-match.css">
+  <link rel="stylesheet" href="/flash-sale.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -25,11 +28,11 @@
   <div class="top-bar">
     <div class="container flex-between">
       <div class="top-perks">
-        <span><i class="fa-solid fa-truck-fast"></i> Giao hàng toàn quốc</span>
+        <span class="top-perk-hot"><i class="fa-solid fa-bolt"></i> TỔNG KHO GIÁ SỈ — MUA LẺ 1 MÓN CŨNG TÍNH GIÁ SỈ</span>
         <span class="perk-divider">•</span>
-        <span><i class="fa-solid fa-truck-fast"></i> Thanh toán khi nhận hàng</span>
+        <span><i class="fa-solid fa-fire"></i> Rẻ hơn thị trường tới 70%</span>
         <span class="perk-divider">•</span>
-        <span><i class="fa-solid fa-box"></i> Theo dõi đơn hàng dễ dàng</span>
+        <span><i class="fa-solid fa-shield-halved"></i> Kiểm hàng ưng ý mới trả tiền (COD)</span>
       </div>
       <div class="top-links">
         <a href="#" class="admin-link" id="openTrackBtn"><i class="fa-solid fa-magnifying-glass-location"></i> Tra cứu đơn hàng</a>
@@ -42,10 +45,10 @@
     <div class="container flex-between">
       <div class="header-left">
         <a href="/" class="brand-logo">
-          <span class="logo-mark" aria-hidden="true"><i class="fa-solid fa-bag-shopping"></i></span>
+          <span class="logo-mark" aria-hidden="true"><img src="/logo.svg" alt="" width="46" height="46" class="logo-mark-img"></span>
           <span class="logo-stack">
             <span class="logo-text"><span class="logo-bold">Hoàng Minh</span> <span class="logo-accent">Store</span></span>
-            <span class="logo-sub">Uy tín • Chất lượng • Giá tốt</span>
+            <span class="logo-sub"><i class="fa-solid fa-bolt"></i> Tổng Kho Giá Sỉ • Lẻ Rẻ Như Buôn • Chính Hãng</span>
           </span>
         </a>
       </div>
@@ -54,7 +57,7 @@
       <div class="search-wrapper">
         <div class="search-box">
           <i class="fa-solid fa-magnifying-glass search-icon"></i>
-          <input type="text" id="searchInput" placeholder="Tìm phụ kiện, đồ công nghệ, đồ gia dụng..." autocomplete="off">
+          <input type="text" id="searchInput" placeholder="Săn deal giá sỉ tận kho: tai nghe, cáp sạc, pin dự phòng, gia dụng từ 9K..." autocomplete="off">
           <button id="searchClearBtn" class="search-clear hidden">&times;</button>
           <button id="searchBtn" class="search-submit">Tìm Kiếm</button>
         </div>
@@ -86,48 +89,99 @@
     </aside>
     <div class="market-discovery">
       <nav class="market-links" aria-label="Điều hướng cửa hàng">
-        <a class="active" href="/">Trang chủ</a><a href="#featuredSection">Gợi ý hôm nay</a><button type="button" data-store-action="favorites"><i class="fa-regular fa-heart"></i> Yêu thích</button><a href="#catalog">Sản phẩm</a><a href="#categoryPanel">Danh mục</a><button type="button" data-store-action="track">Tra cứu đơn hàng</button>
+        <a class="active" href="/">Trang chủ</a><a href="#flashSaleSection" class="nav-flash-link"><i class="fa-solid fa-bolt"></i> Flash Sale</a><button type="button" class="nav-hot-link" data-store-action="under99"><i class="fa-solid fa-fire"></i> Xả Kho &lt; 99K</button><button type="button" data-store-action="sort-discount"><i class="fa-solid fa-gem"></i> Giảm Sâu Nhất</button><a href="#featuredSection">Gợi ý sỉ</a><a href="#categoryPanel">Danh mục</a><button type="button" data-store-action="favorites"><i class="fa-regular fa-heart"></i> Yêu thích</button><button type="button" data-store-action="track">Tra cứu đơn</button>
       </nav>
       <section class="market-hero" aria-label="Giới thiệu cửa hàng">
         <div class="market-main-banner">
           <div class="premium-orbit orbit-one" aria-hidden="true"></div><div class="premium-orbit orbit-two" aria-hidden="true"></div>
           <div class="market-banner-copy">
-            <div class="market-banner-label"><i class="fa-solid fa-star"></i> HOÀNG MINH STORE</div>
-            <span class="banner-overline">KHÁM PHÁ ĐIỀU HAY</span>
-            <h1>Mọi thứ bạn cần,<span><em>ở ngay đây.</em></span></h1>
-            <p>Phụ kiện, công nghệ và tiện ích cho mỗi ngày.</p>
-            <a href="#catalog" class="banner-shop-btn">Xem sản phẩm <i class="fa-solid fa-arrow-right"></i></a>
-            <div class="banner-catalog-count">Đang có <strong id="heroTotalProd">—</strong> sản phẩm trong danh mục</div>
+            <div class="market-banner-label"><i class="fa-solid fa-bolt"></i> TỔNG KHO GIÁ SỈ HOÀNG MINH</div>
+            <span class="banner-overline">MUA LẺ 1 MÓN · TÍNH GIÁ SỈ TẬN GỐC</span>
+            <h1>Giá sỉ tận kho,<span><em>rẻ vô địch!</em></span></h1>
+            <p>Nhập trực tiếp tổng kho không qua trung gian — tiết kiệm tới 70% mỗi đơn hàng.</p>
+            <a href="#flashSaleSection" class="banner-shop-btn">Săn Giá Sỉ Ngay <i class="fa-solid fa-bolt"></i></a>
+            <div class="hero-si-pills"><span><i class="fa-solid fa-circle-check"></i> Lẻ = Giá sỉ</span><span><i class="fa-solid fa-fire"></i> Rẻ hơn tới 70%</span><span><i class="fa-solid fa-box-open"></i> Đồng kiểm COD</span></div>
+            <div class="banner-catalog-count">Kho sỉ sẵn có <strong id="heroTotalProd">—</strong> mặt hàng giá gốc tận xưởng</div>
             <div class="banner-slides" aria-hidden="true"><span class="active"></span><span></span><span></span></div>
           </div>
           <div class="market-banner-art premium-gallery" aria-hidden="true">
             <div class="premium-gallery-backdrop"></div>
-            <div class="premium-product-shot primary has-photo"><span class="premium-shot-glow"></span><span class="premium-fallback-icon"><i class="fa-solid fa-headphones-simple"></i></span><img class="premium-product-image" id="heroProductImageA" src="./images/products/141008/photo_3.png" alt="" loading="eager"></div>
+            <div class="premium-product-shot primary has-photo"><span class="premium-shot-glow"></span><span class="premium-fallback-icon"><i class="fa-solid fa-headphones-simple"></i></span><img class="premium-product-image" id="heroProductImageA" src="/images/products/141008/photo_3.png" alt="" loading="eager"></div>
             <div class="premium-product-shot secondary"><span class="premium-fallback-icon"><i class="fa-solid fa-mobile-screen-button"></i></span><img class="premium-product-image" id="heroProductImageB" alt="" loading="eager"></div>
             <div class="premium-product-shot tertiary"><span class="premium-fallback-icon"><i class="fa-solid fa-gift"></i></span><img class="premium-product-image" id="heroProductImageC" alt="" loading="eager"></div>
-            <div class="premium-float-label"><i class="fa-solid fa-sparkles"></i> GỢI Ý CHO BẠN</div>
+            <div class="premium-float-label"><i class="fa-solid fa-bolt"></i> GIÁ SỈ TỪ 1 MÓN · GIẢM TỚI 70%</div>
+            <div class="hero-si-stamp" aria-hidden="true"><strong>100%</strong><span>GIÁ SỈ KHO</span></div>
           </div>
         </div>
         <div class="market-banner-side">
-          <a class="market-mini-promo promo-blue" href="#catalog"><span>CHỌN ĐÚNG NHU CẦU</span><strong>Phụ kiện & công nghệ</strong><small>Xem danh mục <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i></a>
-          <a class="market-mini-promo promo-coral" href="#catalog"><span>MUA SẮM DỄ DÀNG</span><strong>Giá rõ ràng, dễ chọn</strong><small>Lọc theo giá <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-tags" aria-hidden="true"></i></a>
-          <button type="button" class="market-mini-promo promo-apricot" data-store-action="track"><span>ĐÃ ĐẶT HÀNG?</span><strong>Tra cứu đơn hàng</strong><small>Xem tình trạng đơn <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-box-open" aria-hidden="true"></i></button>
+          <button type="button" class="market-mini-promo promo-coral" data-store-action="flash-sale"><span>⚡ ĐANG NỔ DEAL KHUNG GIỜ</span><strong>Flash Sale Giá Sỉ</strong><small id="promoFlashCount">1.900+ deal giảm tới 70% <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-bolt" aria-hidden="true"></i></button>
+          <button type="button" class="market-mini-promo promo-apricot" data-store-action="under99"><span>🔥 XẢ KHO ĐỒNG GIÁ</span><strong>Săn Hàng Dưới 99K</strong><small id="promoUnder99Count">3.100+ món siêu rẻ <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i></button>
+          <button type="button" class="market-mini-promo promo-blue" data-store-action="sort-low"><span>💎 BẢNG GIÁ TỔNG KHO</span><strong>Xếp Giá Rẻ Nhất Lên</strong><small>Mua 1 món cũng giá sỉ <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-tags" aria-hidden="true"></i></button>
         </div>
       </section>
       <section class="market-shortcuts" aria-label="Tiện ích mua sắm">
-        <a href="#catalog" class="market-shortcut"><span class="shortcut-icon shortcut-hot"><i class="fa-solid fa-bolt"></i></span><span>Khám phá</span></a>
-        <button type="button" class="market-shortcut" data-store-action="under500"><span class="shortcut-icon shortcut-voucher"><i class="fa-solid fa-tags"></i></span><span>Dưới 500K</span></button>
+        <a href="#flashSaleSection" class="market-shortcut"><span class="shortcut-icon shortcut-hot"><b class="shortcut-pop">HOT</b><i class="fa-solid fa-bolt"></i></span><span>Flash Sale</span></a>
+        <button type="button" class="market-shortcut" data-store-action="under99"><span class="shortcut-icon shortcut-voucher"><b class="shortcut-pop">99K</b><i class="fa-solid fa-fire-flame-curved"></i></span><span>Dưới 99K</span></button>
         <a href="#categoryPanel" class="market-shortcut"><span class="shortcut-icon shortcut-ship"><i class="fa-solid fa-layer-group"></i></span><span>Danh mục</span></a>
-        <button type="button" class="market-shortcut" data-store-action="sort-low"><span class="shortcut-icon shortcut-new"><i class="fa-solid fa-coins"></i></span><span>Giá tốt</span></button>
+        <button type="button" class="market-shortcut" data-store-action="sort-low"><span class="shortcut-icon shortcut-new"><b class="shortcut-pop is-gold">SỈ</b><i class="fa-solid fa-coins"></i></span><span>Rẻ Nhất Kho</span></button>
         <a href="#featuredSection" class="market-shortcut"><span class="shortcut-icon shortcut-cup"><i class="fa-solid fa-star"></i></span><span>Gợi ý</span></a>
         <button type="button" class="market-shortcut" data-store-action="track"><span class="shortcut-icon shortcut-brand"><i class="fa-solid fa-box"></i></span><span>Đơn hàng</span></button>
-        <button type="button" class="market-shortcut" data-store-action="cart"><span class="shortcut-icon shortcut-combo"><i class="fa-solid fa-cart-shopping"></i></span><span>Giỏ hàng</span></button>
+        <button type="button" class="market-shortcut" data-store-action="sort-discount"><span class="shortcut-icon shortcut-combo"><b class="shortcut-pop">-70%</b><i class="fa-solid fa-percent"></i></span><span>Giảm Sâu</span></button>
         <button type="button" class="market-shortcut" data-store-action="favorites"><span class="shortcut-icon shortcut-more"><i class="fa-regular fa-heart"></i></span><span>Yêu thích</span></button>
       </section>
     </div>
   </div>
+  <!-- Cam kết Tổng Kho Giá Sỉ (4 Trụ cột Taobao × Shopee) -->
+  <section class="container si-guarantee-bar" id="siGuaranteeBar" aria-label="Cam kết giá sỉ tận kho">
+    <div class="si-guarantee-item">
+      <span class="si-guarantee-icon"><i class="fa-solid fa-tags"></i></span>
+      <div><strong>Mua 1 Món Cũng Giá Sỉ</strong><small>Giá xuất thẳng tổng kho, không qua trung gian</small></div>
+    </div>
+    <div class="si-guarantee-item">
+      <span class="si-guarantee-icon is-fire"><i class="fa-solid fa-fire-flame-curved"></i></span>
+      <div><strong>Rẻ Hơn Lẻ Tới 70%</strong><small>5.800+ sản phẩm giảm sâu thực tế mỗi ngày</small></div>
+    </div>
+    <div class="si-guarantee-item">
+      <span class="si-guarantee-icon is-bolt"><i class="fa-solid fa-bolt"></i></span>
+      <div><strong>Quét Giá Sỉ Tự Động</strong><small>Đồng bộ tồn kho &amp; hạ giá Flash Sale mỗi 10 phút</small></div>
+    </div>
+    <div class="si-guarantee-item">
+      <span class="si-guarantee-icon is-shield"><i class="fa-solid fa-shield-halved"></i></span>
+      <div><strong>Đồng Kiểm Mới Trả Tiền</strong><small>Mở hộp kiểm tra ưng ý mới thanh toán COD</small></div>
+    </div>
+  </section>
+
+  <!-- ⚡ FLASH SALE KHUNG GIỜ (Shopee × Taobao Style) -->
+  <section class="container flash-sale-section" id="flashSaleSection" aria-label="Flash Sale Giá Sỉ" hidden>
+    <div class="fs-header">
+      <div class="fs-brand-cluster">
+        <div class="fs-emblem">
+          <span class="fs-bolt-icon" aria-hidden="true"><i class="fa-solid fa-bolt"></i></span>
+          <span class="fs-logo-word">FLASH SALE</span>
+          <span class="fs-si-pill">GIÁ SỈ KHO</span>
+        </div>
+        <span class="fs-slot-pill" id="fsSlotBadge"><span class="fs-live-dot"></span> Đang diễn ra</span>
+        <div class="fs-countdown" role="timer" aria-label="Thời gian còn lại của khung giờ Flash Sale">
+          <span class="fs-cd-label">Kết thúc sau</span>
+          <b class="fs-cd-box" id="fsHours">00</b><span class="fs-cd-sep">:</span>
+          <b class="fs-cd-box" id="fsMinutes">00</b><span class="fs-cd-sep">:</span>
+          <b class="fs-cd-box" id="fsSeconds">00</b>
+        </div>
+      </div>
+      <div class="fs-header-right">
+        <span class="fs-header-promise"><i class="fa-solid fa-check-double"></i> Lẻ 1 món = Giá buôn</span>
+        <button type="button" class="fs-view-all-btn" id="fsViewAllBtn">Xem tất cả Deal <i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    </div>
+    <div class="fs-carousel-wrap">
+      <button type="button" class="fs-nav-btn prev" id="fsPrevBtn" aria-label="Xem deal trước"><i class="fa-solid fa-chevron-left"></i></button>
+      <div class="fs-track" id="fsTrack" role="list"></div>
+      <button type="button" class="fs-nav-btn next" id="fsNextBtn" aria-label="Xem deal tiếp theo"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+  </section>
+
   <section class="container featured-section" id="featuredSection" hidden>
-    <div class="featured-header"><div class="premium-section-heading"><h2>Sản phẩm nổi bật</h2></div><a href="#catalog">Xem tất cả <i class="fa-solid fa-chevron-right"></i></a></div>
+    <div class="featured-header"><div class="premium-section-heading"><span class="si-section-kicker"><i class="fa-solid fa-gem"></i> TUYỂN CHỌN TỔNG KHO</span><h2>Top Deal Giá Sỉ Hôm Nay</h2></div><a href="#catalog">Xem toàn bộ kho <i class="fa-solid fa-chevron-right"></i></a></div>
     <div class="featured-grid" id="featuredProducts"></div>
   </section>
 
@@ -137,7 +191,7 @@
     <!-- Filter & Sort Bar -->
     <div class="filter-bar">
       <div class="filter-left">
-        <div class="premium-catalog-heading"><span class="premium-heading-kicker">KHÁM PHÁ CỬA HÀNG</span><h2 class="catalog-title" id="catalogTitle">Tất Cả Sản Phẩm</h2></div>
+        <div class="premium-catalog-heading"><span class="premium-heading-kicker">TỔNG KHO GIÁ SỈ TRỰC TIẾP</span><h2 class="catalog-title" id="catalogTitle">Bảng Giá Sỉ Toàn Kho</h2></div>
         <span class="catalog-badge" id="catalogCount">Đang tải...</span>
       </div>
 
@@ -145,6 +199,8 @@
         <!-- Price range pills -->
         <div class="price-filters">
           <button class="price-pill active" data-min="" data-max="">Tất cả giá</button>
+          <button class="price-pill pill-flash" data-flash="1" data-min="" data-max=""><i class="fa-solid fa-bolt"></i> Flash Sale</button>
+          <button class="price-pill pill-hot" data-min="0" data-max="99000"><i class="fa-solid fa-fire"></i> &lt; 99K</button>
           <button class="price-pill" data-min="0" data-max="500000">&lt; 500K</button>
           <button class="price-pill" data-min="500000" data-max="1000000">500K - 1TR</button>
           <button class="price-pill" data-min="1000000" data-max="2000000">1TR - 2TR</button>
@@ -154,7 +210,8 @@
         <!-- Sort dropdown -->
         <div class="sort-wrapper">
           <select id="sortSelect" class="custom-select">
-            <option value="default">Sắp xếp: Mặc định</option>
+            <option value="default">Sắp xếp: Đề xuất giá tốt</option>
+            <option value="discount-desc">🔥 Giảm sâu nhất (Giá sỉ)</option>
             <option value="price-asc">Giá: Thấp đến Cao</option>
             <option value="price-desc">Giá: Cao đến Thấp</option>
             <option value="name-asc">Tên: A - Z</option>
@@ -182,8 +239,8 @@
   </main>
 
   <section class="container market-footer-offers" aria-label="Hỗ trợ mua sắm">
-    <div class="market-footer-offer offer-red"><span><i class="fa-solid fa-bolt-lightning"></i> MUA SẮM THÔNG MINH</span><strong>Chọn đúng món, xem đúng giá</strong><a href="#catalog">XEM SẢN PHẨM <i class="fa-solid fa-arrow-right"></i></a></div>
-    <div class="market-footer-offer offer-peach"><span><i class="fa-solid fa-gift"></i> HOÀNG MINH STORE</span><strong>Khám phá hàng ngàn tiện ích</strong><button type="button" data-store-action="track">TRA CỨU ĐƠN <i class="fa-solid fa-arrow-right"></i></button></div>
+    <div class="market-footer-offer offer-red"><span><i class="fa-solid fa-bolt-lightning"></i> CAM KẾT GIÁ SỈ 100%</span><strong>Mua lẻ 1 món vẫn tính giá sỉ tận gốc</strong><a href="#flashSaleSection">SĂN FLASH SALE <i class="fa-solid fa-arrow-right"></i></a></div>
+    <div class="market-footer-offer offer-peach"><span><i class="fa-solid fa-shield-halved"></i> NHẬN HÀNG ĐỒNG KIỂM COD</span><strong>Kiểm tra hàng chuẩn mới thanh toán tiền</strong><button type="button" data-store-action="track">TRA CỨU ĐƠN <i class="fa-solid fa-arrow-right"></i></button></div>
   </section>
 
   <!-- FULL PRODUCT DETAIL MODAL (QUICK VIEW & FULL SPECS) -->
@@ -364,7 +421,6 @@
 
         <div class="qr-codes-info">
           <div>Mã Đơn Hoàng Minh: <strong id="qrHmCode">...</strong></div>
-          <div style="display:none;">Mã kho: <strong id="qrDbCode">...</strong></div>
         </div>
 
         <div class="qr-content-grid">
@@ -489,7 +545,7 @@
     <div class="container footer-content flex-between">
       <div class="footer-brand">
         <div class="brand-logo">
-          <span class="logo-bold">Hoàng Minh</span> <span class="logo-accent">Store</span>
+          <img src="/favicon.svg" alt="" width="30" height="30" class="footer-logo-img"><span class="logo-bold">Hoàng Minh</span> <span class="logo-accent">Store</span>
         </div>
         <p>Cửa hàng phụ kiện, công nghệ và tiện ích Hoàng Minh. Chọn sản phẩm trực tuyến, kiểm tra hàng rồi thanh toán khi nhận (COD), tra cứu đơn hàng bằng mã đơn.</p>
         <p class="copyright">© 2026 Hoàng Minh Store. All rights reserved.</p>
@@ -517,5 +573,6 @@
   <script src="/favorites.js"></script>
   <script src="/motion.js"></script>
   <script src="/storefront-premium.js"></script>
+  <script src="/flash-sale.js"></script>
 </body>
 </html>

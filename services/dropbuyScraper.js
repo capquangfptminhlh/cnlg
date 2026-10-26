@@ -184,9 +184,22 @@ async function fetchWholesalePrices(items, config = getConfig()) {
         return;
       }
       for (const p of json.data) {
-        // fe_price_group = giá theo nhóm đại lý (không tính flash sale có thời hạn)
-        const cost = Number(p.fe_price_group || p.fe_price_override || 0);
-        if (cost > 0) map.set(p.variation_id, { cost, source: p.fe_price_override_source || 'F1' });
+        // fe_price_override = giá thực tế DropBuy hiển thị cho CTV (gồm cả Flash Sale hoặc F1)
+        const override = Number(p.fe_price_override || 0);
+        const group = Number(p.fe_price_group || 0);
+        const cost = override > 0 ? override : group;
+        const fsCode = p.fe_price_override_source === 'FS' && p.fs_program_code && (group === 0 || override <= group)
+          ? p.fs_program_code
+          : null;
+        if (cost > 0) {
+          map.set(p.variation_id, {
+            cost,
+            group_cost: group || cost,
+            public_price: Number(p.fe_price_public || 0),
+            source: p.fe_price_override_source || 'F1',
+            fs_program_code: fsCode
+          });
+        }
       }
     } catch (e) {
       console.warn('[Scraper] Lỗi lấy giá sỉ:', e.message);
@@ -199,17 +212,28 @@ async function fetchWholesalePrices(items, config = getConfig()) {
  * Chuyển 1 item tìm kiếm của DropBuy thành sản phẩm của hoangminh.com.
  * opts: { ctx: getPricingContext(), priceMap, previous (SP cũ), keepWholesale (đang đăng nhập nhưng lô giá lỗi → giữ giá sỉ cũ) }
  */
+function formatWarranty(warrantyType, warrantyDuration) {
+  const dur = Number(warrantyDuration);
+  const wt = String(warrantyType || '').trim().toUpperCase();
+  if (!wt || wt === 'N' || !Number.isFinite(dur) || dur <= 0) return 'Không bảo hành';
+  if (dur >= 999) return 'Bảo hành trọn đời';
+  const units = { D: 'ngày', W: 'tuần', M: 'tháng', Y: 'năm' };
+  return `Bảo hành ${dur} ${units[wt] || 'tháng'}`;
+}
+
 function mapItem(item, { ctx = getPricingContext(), priceMap, previous, keepWholesale } = {}) {
   const pid = item.product_id || item.id;
   const publicPrice = Number(item.price_public || item.regular_price || 0);
   const live = priceMap?.get(item.unique_id);
   const wholesale = live ? live.cost : keepWholesale && previous?.wholesale_price ? previous.wholesale_price : null;
+  const fsCode = live ? (live.fs_program_code || null) : (keepWholesale && previous?.fs_program_code ? previous.fs_program_code : null);
+  const isFlashSale = item.is_flash_sale === 'T' || item.is_flash_sale === true || live?.source === 'FS';
   const base = {
     id: pid,
     dropbuy_id: pid,
     variation_id: item.unique_id || null,
     sku: item.sku || `DB-${pid}`,
-    name: item.product_name || item.name,
+    name: String(item.product_name || item.name || '').replace(/[\uFFFC\uFFFD]+/g, '').trim(),
     slug: item.slug || `san-pham-${pid}`,
     dropbuy_url: `https://dropbuy.vn/${item.slug}_p${pid}`,
     category_id: item.category_id,
@@ -219,10 +243,13 @@ function mapItem(item, { ctx = getPricingContext(), priceMap, previous, keepWhol
     image: formatImageUrl(item.res_thumbnail_url, '256x256'),
     image_hd: formatImageUrl(item.res_thumbnail_url, '1024x1024'),
     in_stock: item.in_stock !== false,
-    warranty: item.warranty_duration ? `${item.warranty_duration} tháng` : 'Bảo hành chính hãng',
+    warranty_type: item.warranty_type || null,
+    warranty_duration: Number(item.warranty_duration) || 0,
+    warranty: formatWarranty(item.warranty_type, item.warranty_duration),
     is_mall: !!item.shop_is_mall,
     shop_name: item.shop_name || null,
-    is_flash_sale: !!item.is_flash_sale,
+    is_flash_sale: isFlashSale,
+    fs_program_code: fsCode,
     variant_count: Number(item.total_variations) || 1,
     updated_at: new Date().toISOString()
   };
@@ -325,6 +352,7 @@ async function fetchStockMap(ids, config = getConfig(), batchSize = 700, { retri
 
 /** Tra 1 sản phẩm trực tiếp trên DropBuy theo SKU (dùng khi khách đặt hàng / mở chi tiết). */
 async function searchBySku(sku, config = getConfig()) {
+  if (config.dropbuy?.cookieHeader) await dropbuySession.ensureSession(config).catch(() => null);
   const res = await fetch(DROPBUY_API_SEARCH, { method: 'POST', headers: dropbuyHeaders(config), body: JSON.stringify({ page_num: 1, page_size: 5, in_stock_mode: 'ALL', keyword: sku }) });
   if (!res.ok) throw new Error(`search HTTP ${res.status}`);
   const json = await res.json();
@@ -393,5 +421,6 @@ module.exports = {
   saveProducts,
   getCategories,
   formatImageUrl,
+  formatWarranty,
   cleanCategoryName
 };

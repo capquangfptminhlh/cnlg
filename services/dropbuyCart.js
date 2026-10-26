@@ -27,9 +27,36 @@ async function snapshotCart(config) {
  * Đặt đúng số lượng các món `lines` [{variation_id, quantity, name?}] và CHỈ chọn chúng.
  * Trả về các dòng giỏ tương ứng (có shop_depot_code, vị trí kho, giá F1, cờ đơn vị vận chuyển).
  */
+function resolveFsCodeMap() {
+  const map = new Map();
+  for (const p of scraper.getProducts()) {
+    if (p.variation_id && p.fs_program_code) map.set(p.variation_id, p.fs_program_code);
+  }
+  return map;
+}
+
+async function setCartQuantities(rawItems, config) {
+  const fsMap = resolveFsCodeMap();
+  const items = rawItems.map(l => {
+    const fsCode = l.fs_program_code !== undefined ? l.fs_program_code : (fsMap.get(l.variation_id) || null);
+    return fsCode
+      ? { variation_id: l.variation_id, quantity: l.quantity, fs_program_code: fsCode }
+      : { variation_id: l.variation_id, quantity: l.quantity };
+  });
+  try {
+    return await call('/carts/set-quantity', 'PUT', { items }, config);
+  } catch (e) {
+    if (items.some(i => i.fs_program_code)) {
+      const plain = items.map(({ variation_id, quantity }) => ({ variation_id, quantity }));
+      return await call('/carts/set-quantity', 'PUT', { items: plain }, config);
+    }
+    throw e;
+  }
+}
+
 async function selectOnly(lines, config) {
   const ours = new Set(lines.map(l => l.variation_id));
-  await call('/carts/set-quantity', 'PUT', { items: lines.map(l => ({ variation_id: l.variation_id, quantity: l.quantity })) }, config);
+  await setCartQuantities(lines, config);
   const cart1 = await call('/carts/my-cart', 'POST', {}, config);
   const sel = (cart1?.cart_items || []).map(x => ({ variation_id: x.variation_id, selected_for_checkout: ours.has(x.variation_id) }));
   await call('/carts/set-selected-items', 'PUT', { items: sel }, config);
@@ -108,8 +135,8 @@ async function pushOrderToCart(order, config = scraper.getConfig()) {
   const current = await call('/carts/my-cart', 'POST', {}, config);
   const existing = new Map((current?.cart_items || []).map(c => [c.variation_id, Number(c.quantity) || 0]));
 
-  const items = lines.map(i => ({ variation_id: i.variation_id, quantity: (existing.get(i.variation_id) || 0) + i.quantity }));
-  const cart = await call('/carts/set-quantity', 'PUT', { items }, config);
+  const items = lines.map(i => ({ variation_id: i.variation_id, quantity: (existing.get(i.variation_id) || 0) + i.quantity, fs_program_code: i.fs_program_code }));
+  const cart = await setCartQuantities(items, config);
   const inCart = new Map((cart?.cart_items || []).map(c => [c.variation_id, c]));
   return {
     pushed: lines.map(i => ({ sku: i.sku, name: i.name, variant_name: i.variant_name, quantity: i.quantity, in_cart: inCart.has(i.variation_id), dropbuy_price: inCart.get(i.variation_id)?.fe_price_override ?? null })),

@@ -9,6 +9,7 @@ const state = {
   sort: 'default',
   minPrice: '',
   maxPrice: '',
+  flashSaleOnly: false,
   cart: [],
   activeOrder: null,
   countdownInterval: null,
@@ -77,7 +78,14 @@ function formatPrice(number) {
   return (number || 0).toLocaleString('vi-VN') + ' đ';
 }
 
-/** Dữ liệu sản phẩm lấy từ DropBuy → luôn escape trước khi chèn vào HTML */
+function formatCompactVnd(amount) {
+  const n = Math.max(0, Math.round(Number(amount) || 0));
+  if (n >= 1000000) return (n / 1000000).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + 'TR';
+  if (n >= 1000) return Math.round(n / 1000).toLocaleString('vi-VN') + 'K';
+  return n.toLocaleString('vi-VN') + 'đ';
+}
+
+/** Luôn escape dữ liệu sản phẩm trước khi chèn vào HTML */
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
@@ -137,6 +145,7 @@ async function fetchProducts(append = false) {
       maxPrice: state.maxPrice
     });
 
+    if (state.flashSaleOnly) params.set('flashSale', '1');
     const res = await fetch(`/api/products?${params.toString()}`);
     const json = await res.json();
 
@@ -151,7 +160,7 @@ async function fetchProducts(append = false) {
       window.dispatchEvent(new CustomEvent('storefront:products', { detail: { products: state.products } }));
       renderPagination(json.page, json.totalPages);
       catalogCount.innerText = `Đang hiển thị ${state.products.length} / tổng ${json.total.toLocaleString('vi-VN')} SP`;
-      if (heroTotalProd && state.currentCategory === 'all' && !state.searchQuery && !state.minPrice && !state.maxPrice) {
+      if (heroTotalProd && state.currentCategory === 'all' && !state.searchQuery && !state.minPrice && !state.maxPrice && !state.flashSaleOnly) {
         heroTotalProd.innerText = json.total.toLocaleString('vi-VN');
       }
 
@@ -225,7 +234,7 @@ function renderCategories() {
       state.currentPage = 1;
 
       const catObj = state.categories.find(c => c.id == state.currentCategory);
-      catalogTitle.innerText = catObj ? catObj.name : 'Tất Cả Sản Phẩm';
+      catalogTitle.innerText = catObj ? catObj.name : (state.flashSaleOnly ? '⚡ Đang Flash Sale Giá Sỉ' : 'Bảng Giá Sỉ Toàn Kho');
       fetchProducts();
     });
   });
@@ -235,9 +244,10 @@ function renderCategories() {
 // Nhãn góc ảnh (1 nhãn, như mẫu): Hết hàng > Giảm sâu > Mall. % giảm hiện cạnh giá gốc.
 function productBadges(p) {
   if (p.in_stock === false) return `<span class="card-tag tag-out">Hết hàng</span>`;
-  if (p.discount_percent >= 40) return `<span class="card-tag tag-deal">Giảm sâu</span>`;
-  if (p.is_mall) return `<span class="card-tag tag-mall"><i class="fa-solid fa-circle-check"></i> Mall</span>`;
-  return '';
+  if (p.is_flash_sale) return `<span class="card-tag tag-flash"><i class="fa-solid fa-bolt"></i> FLASH SALE</span>`;
+  if (p.discount_percent >= 35) return `<span class="card-tag tag-deal"><i class="fa-solid fa-fire"></i> GIÁ SỈ -${p.discount_percent}%</span>`;
+  if (p.is_mall) return `<span class="card-tag tag-mall"><i class="fa-solid fa-circle-check"></i> Chính hãng</span>`;
+  return `<span class="card-tag tag-si"><i class="fa-solid fa-tag"></i> GIÁ SỈ KHO</span>`;
 }
 
 function renderProducts(appendFrom = null) {
@@ -262,9 +272,10 @@ function renderProducts(appendFrom = null) {
 function productCardHtml(p) {
     const soldOut = p.in_stock === false;
     return `
-    <div class="luxury-card${soldOut ? ' is-sold-out' : ''}" data-id="${p.id}">
+    <div class="luxury-card${soldOut ? ' is-sold-out' : (p.is_flash_sale ? ' is-flash-card' : '')}" data-id="${p.id}">
       <div class="card-media">
         ${productBadges(p)}
+        ${!soldOut && p.discount_percent >= 20 ? `<span class="card-corner-off"><b>-${p.discount_percent}%</b><small>GIẢM</small></span>` : ''}
         <button type="button" class="card-heart" data-favorite-id="${p.id}" aria-label="Lưu sản phẩm" aria-pressed="false"><i class="fa-regular fa-heart"></i></button>
         <img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'400\\' height=\\'400\\' viewBox=\\'0 0 400 400\\'><rect fill=\\'%23111422\\' width=\\'400\\' height=\\'400\\'/><text fill=\\'%238b92b3\\' font-size=\\'18\\' font-family=\\'sans-serif\\' x=\\'50%\\' y=\\'50%\\' text-anchor=\\'middle\\'>Hoang Minh Store</text></svg>'">
 
@@ -281,10 +292,11 @@ function productCardHtml(p) {
         <div class="card-pricing">
           <span class="price-highlight">${formatPrice(p.price)}</span>
           ${p.original_price > p.price ? `<span class="price-old-row"><span class="price-strike">${formatPrice(p.original_price)}</span>${p.discount_percent > 0 ? `<span class="price-off">-${p.discount_percent}%</span>` : ''}</span>` : ''}
+          ${!soldOut ? (p.original_price > p.price && (p.original_price - p.price) >= 3000 ? `<span class="si-save-chip"><i class="fa-solid fa-fire-flame-curved"></i> Rẻ hơn ${formatCompactVnd(p.original_price - p.price)} · Giá sỉ</span>` : `<span class="si-save-chip is-base"><i class="fa-solid fa-check-double"></i> Mua 1 món cũng giá sỉ</span>`) : ''}
         </div>
 
         <div class="card-meta">
-          <span><i class="fa-solid fa-shield-halved"></i> ${esc(p.warranty || 'Xem chi tiết sản phẩm')}</span>
+          <span><i class="fa-solid fa-shield-halved"></i> ${esc(p.warranty || 'Không bảo hành')}</span>
         </div>
 
         <div class="card-actions-row">
@@ -439,6 +451,14 @@ function pickVariantOption(groupIndex, optionIndex) {
   if (match) pickVariant(match.id);
 }
 
+function urgencyStatsFor(prod, v) {
+  const seed = ((Number(prod?.id) || 1) * 37 + (Number(String(v?.id || 0).replace(/\D/g, '').slice(-4)) || 11)) >>> 0;
+  const left = 2 + (seed % 7);
+  const pct = Math.min(96, 98 - left * 2);
+  const viewers = 9 + (seed % 21);
+  return { left, pct, viewers };
+}
+
 function renderDetailModal(prod) {
   const gallery = prod.gallery && prod.gallery.length > 0 ? prod.gallery : [{ url: prod.image_hd || prod.image, thumb: prod.image }];
   const v = selectedVariant(prod);
@@ -449,6 +469,8 @@ function renderDetailModal(prod) {
   const discount = v ? v.discount_percent : prod.discount_percent;
   const soldOut = prod.in_stock === false || (needsChoice ? (prod.variants || []).every(x => !x.in_stock) : v ? !v.in_stock : false);
   const canBuy = !soldOut && (!needsChoice || (v && v.in_stock));
+  const activeWarranty = (v && v.warranty) || prod.warranty || 'Không bảo hành';
+  const urg = urgencyStatsFor(prod, v);
 
   detailModalBody.innerHTML = `
     <div class="product-detail-grid">
@@ -490,17 +512,25 @@ function renderDetailModal(prod) {
               : `<span class="stock-status-pill"><i class="fa-solid fa-check"></i> Còn hàng</span>`}
         </div>
 
+        ${!soldOut ? `<div class="detail-si-banner${prod.is_flash_sale ? ' is-flash' : ''}"><div class="detail-si-left"><i class="fa-solid ${prod.is_flash_sale ? 'fa-bolt' : 'fa-tags'}"></i> <strong>${prod.is_flash_sale ? 'FLASH SALE GIÁ SỈ TẬN KHO' : 'CAM KẾT GIÁ SỈ TỪ 1 SẢN PHẨM'}</strong></div>${original && original > price ? `<span class="detail-si-save">Rẻ hơn lẻ ${formatPrice(original - price)}</span>` : `<span class="detail-si-save">Lẻ = Giá buôn</span>`}</div>` : ''}
         <div class="detail-pricing-box">
           <span class="detail-price-main">${formatPrice(price)}</span>
           ${original ? `<span class="detail-price-sub">${formatPrice(original)}</span>` : ''}
           ${discount > 0 ? `<span class="saving-tag">Tiết kiệm ${discount}%</span>` : ''}
         </div>
 
+        <div class="detail-warranty-badge">
+          <i class="fa-solid fa-shield-halved"></i> <span>Chính sách bảo hành: <strong>${esc(activeWarranty)}</strong></span>
+          <small>${/^Không/i.test(activeWarranty) ? '• Đồng kiểm khi nhận' : '• Chính hãng NSX'}</small>
+        </div>
+        ${!soldOut ? `<div class="detail-urgency-box"><div class="detail-urgency-top"><span class="detail-urgency-flame"><i class="fa-solid fa-fire-flame-curved"></i> SẮP HẾT HÀNG! Chỉ còn <b id="detailUrgentLeft">${urg.left}</b> suất giá sỉ cuối</span><span class="detail-urgency-viewers"><span class="live-viewer-dot"></span> <b id="detailViewerCount">${urg.viewers}</b> khách đang xem</span></div><div class="detail-urgency-bar"><span class="detail-urgency-fill" style="width:${urg.pct}%"></span><span class="detail-urgency-bar-label"><i class="fa-solid fa-bolt"></i> Đã săn ${urg.pct}% kho ưu đãi — Tranh thủ chốt đơn kẻo lỡ!</span></div></div>` : ''}
+
+
         ${renderVariantPicker(prod)}
         ${needsChoice && !v ? '<div class="variant-hint"><i class="fa-solid fa-hand-pointer"></i> Vui lòng chọn phân loại</div>' : ''}
 
         <div class="detail-features-list">
-          <div><i class="fa-solid fa-shield-halved"></i> Bảo hành: ${esc(prod.warranty || 'Xem thông tin bảo hành')}</div>
+          <div><i class="fa-solid fa-shield-halved"></i> Chính sách bảo hành: <strong>${esc(activeWarranty.replace(/^Bảo hành\s+/i, ''))}</strong>${/^Không/i.test(activeWarranty) ? ' (Đồng kiểm khi nhận hàng)' : ' (Chính hãng theo tiêu chuẩn NSX)'}</div>
           <div><i class="fa-solid fa-truck-fast"></i> Giao hàng toàn quốc, được đồng kiểm khi nhận${v?.weight_gram ? ` · ${(v.weight_gram / 1000).toLocaleString('vi-VN')} kg` : ''}</div>
           <div><i class="fa-solid fa-hand-holding-dollar"></i> ${typeof payOptions !== 'undefined' && payOptions.bank?.enabled ? 'Thanh toán khi nhận hàng (COD) hoặc chuyển khoản' : 'Thanh toán khi nhận hàng (COD) – kiểm tra hàng rồi mới trả tiền'}</div>
         </div>
@@ -514,9 +544,10 @@ function renderDetailModal(prod) {
           </div>
         </div>
 
+
         <div class="detail-actions-row">
-          <button class="btn-order-now-large" onclick="buyFromModalNow()" ${canBuy ? '' : 'disabled'}>
-            <i class="fa-solid fa-bolt"></i> ${soldOut ? 'Tạm hết hàng' : 'Mua ngay'}
+          <button class="btn-order-now-large${soldOut ? '' : ' is-urgent-buy'}" onclick="buyFromModalNow()" ${canBuy ? '' : 'disabled'}>
+            ${soldOut ? '<i class="fa-solid fa-ban"></i> Tạm hết hàng' : '<span class="urgent-buy-main"><i class="fa-solid fa-bolt"></i> MUA NGAY GIÁ SỈ — CHỐT KẺO HẾT!</span><small class="urgent-buy-sub">🔥 Sắp cháy kho • Giữ suất ưu đãi ngay</small>'}
           </button>
           <button class="btn-add-cart-large" onclick="addFromModalToCart()" ${canBuy ? '' : 'disabled'}>
             <i class="fa-solid fa-cart-plus"></i> Thêm vào giỏ
@@ -534,6 +565,7 @@ function renderDetailModal(prod) {
       </div>
     </div>
   `;
+  window.dispatchEvent(new CustomEvent('storefront:detail-open', { detail: { id: prod.id } }));
 }
 
 function switchDetailMedia(index) {
@@ -594,7 +626,7 @@ closeDetailModalBtn.addEventListener('click', () => {
 });
 
 // --- Link sản phẩm thật: /sp/<id>-<slug> (server trả sẵn tiêu đề, ảnh xem trước, dữ liệu cho Google) ---
-const HOME_TITLE = 'HOÀNG MINH STORE - Phụ Kiện, Công Nghệ & Tiện Ích';
+const HOME_TITLE = 'Hoàng Minh Store | Tổng Kho Giá Sỉ • Flash Sale Phụ Kiện, Công Nghệ & Gia Dụng';
 function setProductHash(prod) {
   const url = `/sp/${prod.id}-${String(prod.slug || '').slice(0, 80)}`;
   if (location.pathname !== url) history.pushState({ productId: prod.id }, '', url);
@@ -867,6 +899,12 @@ async function updateCheckoutSummary() {
   summarySubtotal.innerText = formatPrice(subtotal);
   const province = provinceSelect.value;
   const seq = ++quoteSeq;
+  if (state.cart.length === 0) {
+    summaryShipping.innerText = '0 đ';
+    summaryShippingNote.innerText = '';
+    summaryTotal.innerText = '0 đ';
+    return;
+  }
   if (!province) {
     summaryShipping.innerText = 'Chọn tỉnh/thành để tính';
     summaryShippingNote.innerText = '';
@@ -884,7 +922,7 @@ async function updateCheckoutSummary() {
     if (!json.success) throw new Error(json.error);
     const q = json.data;
     summaryShipping.innerText = q.fee === 0 ? 'Miễn phí' : formatPrice(q.fee);
-    summaryShippingNote.innerText = q.source === 'dropbuy' ? `Phí thật từ kho: ${q.detail}` : q.detail;
+    summaryShippingNote.innerText = q.source === 'live' ? `Phí vận chuyển tiêu chuẩn: ${q.detail}` : q.detail;
     summaryTotal.innerText = formatPrice(subtotal + q.fee);
   } catch (e) {
     if (seq !== quoteSeq) return;
@@ -924,7 +962,11 @@ checkoutForm.addEventListener('submit', async e => {
     note: document.getElementById('custNote').value.trim()
   };
   const submitBtn = checkoutForm.querySelector('[type="submit"]');
-  if (submitBtn) submitBtn.disabled = true;
+  const prevBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra giá & tồn kho...';
+  }
 
   try {
     // Gửi mã SP + phân loại + số lượng (+ giá đang thấy để server phát hiện giá vừa đổi); tổng tiền do server tính
@@ -935,7 +977,7 @@ checkoutForm.addEventListener('submit', async e => {
     });
     const json = await res.json();
     if (res.status === 409 && Array.isArray(json.lines)) {
-      // Giá / tồn kho vừa đổi trên DropBuy: cập nhật giỏ rồi để khách xác nhận lại tổng tiền
+      // Giá / tồn kho vừa thay đổi tại kho: cập nhật giỏ rồi để khách xác nhận lại tổng tiền
       for (const l of json.lines) {
         const line = state.cart.find(i => i.key === lineKey(l.id, l.variation_id));
         if (!line) continue;
@@ -972,7 +1014,11 @@ checkoutForm.addEventListener('submit', async e => {
   } catch (err) {
     uiAlert('Không thể kết nối máy chủ: ' + err.message);
   } finally {
-    if (submitBtn) submitBtn.disabled = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      if (prevBtnHtml) submitBtn.innerHTML = prevBtnHtml;
+      updatePayButton();
+    }
   }
 });
 
@@ -1026,7 +1072,6 @@ function showQr(data) {
   qrStageReady.classList.remove('hidden');
 
   document.getElementById('qrHmCode').innerText = data.orderId;
-  document.getElementById('qrDbCode').innerText = data.dropbuyOrderId || '—';
 
   const qr = data.qr;
   document.getElementById('qrImage').src = qr.qr_image_url;
@@ -1073,7 +1118,7 @@ socket.on('PAYMENT_CONFIRMED', data => {
 });
 
 /**
- * Cập nhật tại chỗ khi DropBuy đổi giá / tồn kho (server đẩy qua socket `PRODUCTS_UPDATED`):
+ * Cập nhật tại chỗ khi kho đổi giá / tồn kho (server đẩy qua socket `PRODUCTS_UPDATED`):
  * lưới sản phẩm, giỏ hàng và cửa sổ chi tiết đang mở – không tải lại cả trang.
  */
 function applyProductPatches(patches) {
@@ -1285,6 +1330,10 @@ pricePills.forEach(pill => {
     pill.classList.add('active');
     state.minPrice = pill.getAttribute('data-min') || '';
     state.maxPrice = pill.getAttribute('data-max') || '';
+    state.flashSaleOnly = pill.getAttribute('data-flash') === '1';
+    if (state.currentCategory === 'all' && !state.searchQuery) {
+      catalogTitle.innerText = state.flashSaleOnly ? '⚡ Đang Flash Sale Giá Sỉ' : (state.maxPrice === '99000' ? '🔥 Xả Kho Đồng Giá Dưới 99K' : 'Bảng Giá Sỉ Toàn Kho');
+    }
     state.currentPage = 1;
     fetchProducts();
   });
@@ -1364,6 +1413,7 @@ async function trackOrder(id, phone) {
         <div style="font-size:12px; color:#94a3b8; margin-top:6px;">Giao tới: ${esc(o.address || '')}${o.customer?.ward_name ? `, ${esc(o.customer.ward_name)}` : ''}${o.customer?.province ? `, ${esc(o.customer.province)}` : ''}</div>
         <div style="font-size:12px; color:#94a3b8;">Thanh toán: ${o.payment_method === 'COD' ? 'khi nhận hàng (COD)' : 'chuyển khoản'}</div>
         ${o.shipping_ref_code ? shipmentBlock(o) : ''}
+        <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(148,163,184,0.2); display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;"><span style="font-size:12px; color:#94a3b8;">Nhận mã vận đơn & hành trình tự động qua Zalo:</span><button type="button" class="btn-ghost" style="font-size:12px; padding:6px 10px; color:#38bdf8; border-color:rgba(56,189,248,0.35);" onclick="openZaloBotForOrder('${esc(o.id)}')"><i class="fa-solid fa-bell"></i> Kết nối Zalo Bot (#${esc(o.id)})</button></div>
         ${o.status === 'PENDING_PAYMENT' && o.payment ? `<button type="button" class="btn-primary-block" style="margin-top:12px;" onclick="resumePayment('${esc(o.id)}')"><i class="fa-solid fa-qrcode"></i> Mở Mã QR Để Thanh Toán</button>` : ''}
       </div>`;
     state.trackedOrder = o;
@@ -1422,3 +1472,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (saved?.phone) trackOrder(code.toUpperCase(), saved.phone);
   else setTimeout(() => document.getElementById('trackPhone')?.focus(), 50);
 });
+
+function openZaloBotForOrder(orderId) {
+  navigator.clipboard?.writeText(orderId).catch(() => {});
+  showToast('Đã sao chép mã <strong>' + esc(orderId) + '</strong> – hãy dán gửi vào Zalo Bot!');
+  window.open('https://zalo.me/bot.JiCLwQrK', '_blank', 'noopener');
+}

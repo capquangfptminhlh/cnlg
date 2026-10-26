@@ -4,418 +4,792 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Quản trị | Hoàng Minh Store</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
-  <link rel="stylesheet" href="/admin-theme.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin-portal.css?v=20261025v6">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body class="admin-body">
 
-  <header class="admin-header">
-    <div class="container flex-between">
-      <div class="brand">
-        <a href="/" class="brand-logo"><span class="logo-bold">Hoàng Minh</span> <span class="logo-accent">Store</span></a>
-        <span class="admin-tag"><i class="fa-solid fa-gauge-high"></i> Quản trị cửa hàng</span>
-      </div>
-      <div>
-        <a href="/" class="btn-back-store"><i class="fa-solid fa-store"></i> Xem Cửa Hàng</a>
-      </div>
-    </div>
-  </header>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleAdminSidebar(false)"></div>
 
-  <div class="container admin-main">
-    
-    <!-- Stats Cards -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
-        <div class="stat-info">
-          <div class="stat-label">Sản phẩm đang bán</div>
-          <div class="stat-val" id="statProducts">0</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon"><i class="fa-solid fa-receipt"></i></div>
-        <div class="stat-info">
-          <div class="stat-label">Đơn hàng (không tính đơn thử)</div>
-          <div class="stat-val" id="statOrders">0</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon"><i class="fa-solid fa-money-bill-transfer"></i></div>
-        <div class="stat-info">
-          <div class="stat-label">Doanh thu đã thu tiền</div>
-          <div class="stat-val price" id="statRevenue">0 đ</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon"><i class="fa-solid fa-user-clock"></i></div>
-        <div class="stat-info">
-          <div class="stat-label">Đơn chờ nhân viên đặt kho</div>
-          <div class="stat-val" id="statWaiting">0</div>
-        </div>
-      </div>
-    </div>
+  <div class="admin-shell">
 
-    <!-- Actions Bar -->
-    <div class="admin-action-bar flex-between" style="gap: 16px; flex-wrap: wrap;">
-      <div>
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
-          <h3 style="margin: 0;">Đồng Bộ Kho DropBuy.vn</h3>
-          <span class="auth-badge badge-connected" id="daemonStatusBadge" style="font-size: 11px;">
-            <i class="fa-solid fa-bolt"></i> <span id="daemonBadgeText">Realtime: tồn kho 30 giây · giá 2 phút</span>
+    <!-- ==================== MENU TRÁI (SIDEBAR) ==================== -->
+    <aside class="admin-sidebar" id="adminSidebar">
+      <a href="/admin.html" class="sidebar-brand">
+        <img src="/favicon.svg" alt="HM">
+        <div>
+          <div class="sidebar-brand-title">Hoàng Minh Store</div>
+          <div class="sidebar-brand-sub">Hệ thống Quản trị</div>
+        </div>
+      </a>
+
+      <nav class="sidebar-nav" id="adminModuleNav" aria-label="Menu quản trị">
+        <div class="sidebar-group-label">Bán hàng &amp; Đơn hàng</div>
+        <button type="button" class="admin-tab-btn" data-target="overview" onclick="switchAdminModule('overview')">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Tổng quan &amp; Doanh thu</span>
+        </button>
+        <button type="button" class="admin-tab-btn active" data-target="orders" onclick="switchAdminModule('orders')">
+          <i class="fa-solid fa-receipt"></i>
+          <span>Quản lý Đơn hàng</span>
+          <span class="tab-badge" id="navBadgeOrders">0</span>
+        </button>
+
+        <div class="sidebar-group-label">Hàng hoá &amp; Giá bán</div>
+        <button type="button" class="admin-tab-btn" data-target="pricing-rules" onclick="switchAdminModule('pricing-rules')">
+          <i class="fa-solid fa-percent"></i>
+          <span>Công thức Tính giá</span>
+        </button>
+        <button type="button" class="admin-tab-btn" data-target="pricing-products" onclick="switchAdminModule('pricing-products')">
+          <i class="fa-solid fa-tags"></i>
+          <span>Bảng giá Sản phẩm</span>
+        </button>
+
+        <div class="sidebar-group-label">Cấu hình Vận hành</div>
+        <button type="button" class="admin-tab-btn" data-target="auto-order" onclick="switchAdminModule('auto-order')">
+          <i class="fa-solid fa-robot"></i>
+          <span>Tự đặt đơn &amp; Thanh toán</span>
+        </button>
+        <button type="button" class="admin-tab-btn" data-target="shipping" onclick="switchAdminModule('shipping')">
+          <i class="fa-solid fa-truck-fast"></i>
+          <span>Cấu hình Vận chuyển</span>
+        </button>
+        <button type="button" class="admin-tab-btn" data-target="payments" onclick="switchAdminModule('payments')">
+          <i class="fa-solid fa-building-columns"></i>
+          <span>Ngân hàng &amp; Đối soát CK</span>
+        </button>
+        <button type="button" class="admin-tab-btn" data-target="dropbuy" onclick="switchAdminModule('dropbuy')">
+          <i class="fa-solid fa-plug-circle-bolt"></i>
+          <span>Kết nối Kho DropBuy</span>
+        </button>
+              <button type="button" class="admin-tab-btn" data-target="techmall" onclick="switchAdminModule('techmall')">
+          <i class="fa-solid fa-store"></i>
+          <span>Kho TechMall.vn &amp; Giá riêng</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer" style="display:flex; flex-direction:column; gap:8px;">
+        <a href="/" target="_blank" rel="noopener" class="btn-sidebar-store">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Xem Cửa Hàng
+        </a>
+        <button type="button" class="btn-sidebar-store" onclick="logoutAdminPortal()" style="background:rgba(239,68,68,0.12); color:#fca5a5; border:1px solid rgba(239,68,68,0.24); cursor:pointer; font-family:inherit;">
+          <i class="fa-solid fa-lock"></i> Khoá Phiên Quản Trị
+        </button>
+      </div>
+    </aside>
+
+    <!-- ==================== KHUNG LÀM VIỆC CHÍNH ==================== -->
+    <div class="admin-workspace">
+
+      <!-- Thanh Header trên cùng -->
+      <header class="admin-topbar">
+        <div class="topbar-left">
+          <button type="button" class="mobile-menu-btn" onclick="toggleAdminSidebar(true)" aria-label="Mở menu">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <div>
+            <h1 class="topbar-title" id="topbarModuleTitle">Quản lý Đơn hàng</h1>
+            <p class="topbar-subtitle" id="topbarModuleSub">Theo dõi, lọc trạng thái và đặt đơn khách sang kho DropBuy</p>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <span class="topbar-sync-pill" onclick="switchAdminModule('dropbuy')" title="Xem chi tiết kết nối & đồng bộ kho">
+            <i class="fa-solid fa-bolt"></i>
+            <span id="daemonBadgeText">Realtime: tồn kho 30s · giá 10p</span>
           </span>
+          <a href="/" class="btn-back-store"><i class="fa-solid fa-store"></i> Trang Khách Hàng</a>
         </div>
-        <p style="margin: 0;" id="daemonStatusText">Đang tải trạng thái đồng bộ...</p>
-      </div>
-      <div style="display: flex; gap: 10px;">
-        <button class="btn-sync-now" id="downloadAllImagesBtn" style="background: #0f172a;">
-          <i class="fa-solid fa-cloud-arrow-down"></i> Tải Full Album Ảnh Về Ổ Đĩa Server
-        </button>
-        <button class="btn-sync-now" id="syncNowBtn">
-          <i class="fa-solid fa-rotate"></i> Đồng Bộ Lại Toàn Bộ Kho DropBuy
-        </button>
-      </div>
-    </div>
+      </header>
 
-    <!-- Đơn hàng: rộng hết trang, việc nhân viên làm nhiều nhất -->
-    <div class="admin-card" id="ordersSection" style="margin-bottom: 24px;">
-      <h3><i class="fa-solid fa-list-check"></i> Đơn hàng mới nhất</h3>
-      <div class="orders-table-wrapper">
-        <table class="orders-table">
-          <thead>
-            <tr>
-              <th>Mã Đơn HM</th>
-              <th>Mã DropBuy</th>
-              <th>Khách Hàng</th>
-              <th>Sản Phẩm (giá vốn)</th>
-              <th>Tổng Tiền</th>
-              <th>Trạng Thái</th>
-              <th>Thao Tác</th>
-            </tr>
-          </thead>
-          <tbody id="ordersTableBody">
-            <!-- Injected via JS -->
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <main class="admin-content">
 
-    <div class="admin-two-cols">
-      <!-- Left: Settings -->
-      <div>
-        <!-- Wholesale Login Card -->
-        <div class="admin-card" style="border: 1px solid rgba(245, 158, 11, 0.4); background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(15, 23, 42, 0.95)); margin-bottom: 24px;">
-          <div class="flex-between" style="margin-bottom: 12px;">
-            <h3><i class="fa-solid fa-key" style="color: #f59e0b;"></i> Đăng Nhập DropBuy (Kích Hoạt Giá Sỉ)</h3>
-            <span id="dropbuyAuthBadge" class="auth-badge badge-disconnected">Chưa kết nối</span>
+        <!-- =================================================================
+             MODULE 1: TỔNG QUAN & BÁO CÁO DOANH THU (overview)
+             ================================================================= -->
+        <section class="admin-module-pane" data-module="overview">
+          <div class="stats-grid">
+            <div class="stat-card" style="cursor:pointer;" onclick="switchAdminModule('pricing-products')">
+              <div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+              <div class="stat-info">
+                <div class="stat-label">Sản phẩm đang bán</div>
+                <div class="stat-val" id="statProducts">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor:pointer;" onclick="switchAdminModule('orders'); setOrderQuickFilter('all');">
+              <div class="stat-icon"><i class="fa-solid fa-receipt"></i></div>
+              <div class="stat-info">
+                <div class="stat-label">Đơn hàng thực tế</div>
+                <div class="stat-val" id="statOrders">0</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon"><i class="fa-solid fa-sack-dollar"></i></div>
+              <div class="stat-info">
+                <div class="stat-label">Doanh thu đã thu tiền</div>
+                <div class="stat-val price" id="statRevenue">0 đ</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor:pointer;" onclick="switchAdminModule('orders'); setOrderQuickFilter('waiting');">
+              <div class="stat-icon"><i class="fa-solid fa-user-clock"></i></div>
+              <div class="stat-info">
+                <div class="stat-label">Đơn chờ đặt kho</div>
+                <div class="stat-val" id="statWaiting">0</div>
+              </div>
+            </div>
           </div>
-          <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">
-            Đăng nhập tài khoản DropBuy để hệ thống tự động đồng bộ theo <strong>giá sỉ đại lý (F1)</strong> thay vì giá bán lẻ thị trường.
-          </p>
 
-          <div id="dropbuyLoginForm">
-            <div class="form-group">
-              <label>Số điện thoại / Email / Tên truy cập DropBuy</label>
-              <input type="text" id="dropbuyLoginUser" placeholder="Tài khoản đăng nhập DropBuy của bạn">
+          <div class="admin-card" id="reportSection">
+            <div class="flex-between" style="flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+              <div>
+                <h3><i class="fa-solid fa-chart-line"></i> Báo Cáo Doanh Thu &amp; Lợi Nhuận</h3>
+                <p class="help-text" style="margin:2px 0 0;">Thống kê đơn thực tế (đã loại đơn thử), tính lãi ròng dựa trên giá vốn + ship kho.</p>
+              </div>
+              <div style="display:flex; gap:10px; align-items:center;">
+                <small id="backupInfo" class="help-text"></small>
+                <button type="button" class="btn btn-outline" id="backupNowBtn"><i class="fa-solid fa-floppy-disk"></i> Sao lưu dữ liệu</button>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Mật khẩu DropBuy</label>
-              <input type="password" id="dropbuyLoginPass" placeholder="Mật khẩu DropBuy của bạn" autocomplete="current-password">
+
+            <div class="report-grid" id="reportTotals"></div>
+            <div id="reportPipeline" style="margin:12px 0; font-size:13px; color:#475569;"></div>
+            <div class="report-chart" id="reportChart" title="Doanh thu 30 ngày gần nhất"></div>
+            <div id="reportNote" class="help-text" style="margin-top:10px;"></div>
+
+            <hr class="divider">
+
+            <h4><i class="fa-solid fa-trophy"></i> Top sản phẩm bán chạy (30 ngày qua)</h4>
+            <div id="reportTop"></div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             MODULE 2: QUẢN LÝ ĐƠN HÀNG (orders - Mặc định)
+             ================================================================= -->
+        <section class="admin-module-pane active" data-module="orders">
+          <div class="admin-card" id="ordersSection" style="margin-bottom:0;">
+            <div class="flex-between" style="flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+              <div>
+                <h3><i class="fa-solid fa-list-check"></i> Danh Sách Đơn Hàng</h3>
+                <p class="help-text" style="margin:2px 0 0;">Xác nhận chuyển khoản, sao chép địa chỉ nhận hàng hoặc bấm đặt tự động sang kho DropBuy.</p>
+              </div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-outline" onclick="switchAdminModule('auto-order')">
+                  <i class="fa-solid fa-robot"></i> Cài đặt Tự đặt đơn
+                </button>
+                <button type="button" class="btn-sync-now" onclick="loadData()">
+                  <i class="fa-solid fa-arrows-rotate"></i> Làm mới danh sách
+                </button>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Mã xác minh 2 bước (chỉ khi tài khoản bật)</label>
-              <input type="text" id="dropbuyLoginTotp" placeholder="Bỏ trống nếu không bật" inputmode="numeric" autocomplete="one-time-code">
+
+            <div class="order-filter-bar">
+              <div class="order-filter-pills" id="orderFilterPills">
+                <button type="button" class="order-pill active" data-filter="all" onclick="setOrderQuickFilter('all')">
+                  Tất cả <span id="cntOrderAll">0</span>
+                </button>
+                <button type="button" class="order-pill" data-filter="waiting" onclick="setOrderQuickFilter('waiting')">
+                  Chờ đặt kho <span id="cntOrderWaiting">0</span>
+                </button>
+                <button type="button" class="order-pill" data-filter="unpaid" onclick="setOrderQuickFilter('unpaid')">
+                  Chờ CK / Báo CK <span id="cntOrderUnpaid">0</span>
+                </button>
+                <button type="button" class="order-pill" data-filter="processing" onclick="setOrderQuickFilter('processing')">
+                  Đang giao <span id="cntOrderProcessing">0</span>
+                </button>
+                <button type="button" class="order-pill" data-filter="completed" onclick="setOrderQuickFilter('completed')">
+                  Hoàn tất <span id="cntOrderCompleted">0</span>
+                </button>
+                <button type="button" class="order-pill" data-filter="cancelled" onclick="setOrderQuickFilter('cancelled')">
+                  Đã huỷ <span id="cntOrderCancelled">0</span>
+                </button>
+              </div>
+              <div class="order-filter-search">
+                <input type="search" id="orderSearchInput" placeholder="Tìm mã đơn, tên khách, SĐT, sản phẩm...">
+                <label class="hide-test-toggle">
+                  <input type="checkbox" id="orderHideTest" checked> Ẩn đơn thử
+                </label>
+              </div>
             </div>
-            <div class="form-group checkbox-group">
-              <label><input type="checkbox" id="dropbuyRemember" checked> Ghi nhớ để tự đăng nhập lại khi phiên (~2 ngày) hết hạn</label>
-              <small class="help-text">Mật khẩu được mã hoá và chỉ lưu trên máy chạy cửa hàng (thư mục data/, không lên git). Không áp dụng cho tài khoản bật mã 2 bước.</small>
+
+            <div class="orders-table-wrapper">
+              <table class="orders-table">
+                <thead>
+                  <tr>
+                    <th>Đơn hàng</th>
+                    <th>Khách hàng</th>
+                    <th>Sản phẩm</th>
+                    <th>Thanh toán</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersTableBody"></tbody>
+              </table>
             </div>
-            <div id="dropbuyRememberInfo" class="help-text" style="display:none;"></div>
-            <div style="display: flex; gap: 8px; margin-top: 14px;">
-              <button type="button" class="btn-sync-now" id="btnDropbuyLogin" style="flex: 1; background: #f59e0b; color: #000; font-weight: 700;">
-                <i class="fa-solid fa-arrow-right-to-bracket"></i> Đăng Nhập & Kích Hoạt Giá Sỉ
+          </div>
+        </section>
+
+        <!-- =================================================================
+             MODULE 3: CÔNG THỨC TÍNH GIÁ BÁN (pricing-rules)
+             ================================================================= -->
+        <section class="admin-module-pane" data-module="pricing-rules">
+          <div class="admin-card" id="pricingSection">
+            <div class="flex-between" style="flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3><i class="fa-solid fa-percent"></i> Quy Tắc &amp; Công Thức Tính Giá Bán</h3>
+                <p class="help-text" id="pricingAuthNote" style="margin:4px 0 0;"></p>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <span id="pricingAuthBadge" class="auth-badge badge-disconnected">...</span>
+                <button type="button" class="btn btn-outline" onclick="switchAdminModule('pricing-products')">
+                  <i class="fa-solid fa-tags"></i> Mở Bảng giá từng SP →
+                </button>
+              </div>
+            </div>
+
+            <div class="pricing-stats" id="pricingStats"></div>
+
+            <form id="pricingForm" class="pricing-grid">
+              <div class="form-group">
+                <label>Giá gốc dùng để cộng lãi</label>
+                <select id="prBase">
+                  <option value="wholesale">Giá CTV/F1 &amp; Flash Sale thực tế trên DropBuy</option>
+                  <option value="public">Giá niêm yết công khai trên DropBuy</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>% lãi mặc định toàn cửa hàng</label>
+                <input type="number" id="prMarkup" min="0" max="300" step="0.5">
+              </div>
+              <div class="form-group">
+                <label>Lãi tối thiểu mỗi sản phẩm (đ)</label>
+                <input type="number" id="prMinProfit" min="0" step="1000">
+              </div>
+              <div class="form-group">
+                <label>Làm tròn giá bán lên</label>
+                <select id="prRoundTo">
+                  <option value="1">Không làm tròn</option>
+                  <option value="100">100 đ</option>
+                  <option value="500">500 đ</option>
+                  <option value="1000">1.000 đ</option>
+                  <option value="5000">5.000 đ</option>
+                  <option value="10000">10.000 đ</option>
+                </select>
+              </div>
+
+              <div class="form-group checkbox-group" style="grid-column: 1 / -1;">
+                <label><input type="checkbox" id="prCapAtPublic"> <strong>Không bán cao hơn giá niêm yết DropBuy</strong> (nếu vẫn đảm bảo có lãi)</label>
+                <span class="help-text">Khi khách bấm Đặt hàng, hệ thống luôn quét lại giá thực tế trên DropBuy một lần nữa để chống lệch giá và chống bán lỗ.</span>
+              </div>
+
+              <div style="grid-column: 1 / -1;">
+                <hr class="divider">
+                <h4><i class="fa-solid fa-layer-group"></i> Thiết lập % lãi riêng theo từng Danh mục <small style="font-weight:500; color:#64748b;">(để trống = dùng % mặc định)</small></h4>
+                <div id="prCategoryList" class="pricing-cat-list"></div>
+              </div>
+
+              <div style="grid-column: 1 / -1; display:flex; gap:12px; align-items:center; margin-top:6px;">
+                <button type="submit" class="btn-submit"><i class="fa-solid fa-floppy-disk"></i> Lưu &amp; Tính Lại Giá Toàn Bộ Sản Phẩm</button>
+                <span id="pricingSaveMsg" class="help-text"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             MODULE 4: BẢNG GIÁ TỪNG SẢN PHẨM (pricing-products)
+             ================================================================= -->
+        <section class="admin-module-pane" data-module="pricing-products">
+          <div class="admin-card">
+            <div class="flex-between" style="flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+              <div>
+                <h3><i class="fa-solid fa-tags"></i> Bảng Giá Chi Tiết &amp; Đặt Giá Riêng Từng Sản Phẩm</h3>
+                <p class="help-text" style="margin:2px 0 0;">Tra cứu giá vốn CTV/Flash Sale, giá bán hiện tại và ghi đè giá cố định hoặc % lãi cho từng sản phẩm.</p>
+              </div>
+              <div style="display:flex; gap:10px; flex-wrap: wrap;">
+                <input type="text" id="prSearch" placeholder="Tìm tên sản phẩm / SKU / mã SP..." style="width:260px;">
+                <select id="prFilter" style="width:220px;">
+                  <option value="">Tất cả sản phẩm</option>
+                  <option value="override">Đang đặt giá riêng</option>
+                  <option value="low">Lãi thấp / lỗ</option>
+                  <option value="abovePublic">Cao hơn niêm yết DropBuy</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="orders-table-wrapper">
+              <table class="orders-table">
+                <thead>
+                  <tr>
+                    <th>Sản phẩm</th>
+                    <th>Niêm yết DropBuy</th>
+                    <th>Giá vốn CTV</th>
+                    <th>Giá bán Web</th>
+                    <th>Lãi gộp</th>
+                    <th>Đặt giá riêng</th>
+                  </tr>
+                </thead>
+                <tbody id="pricingTableBody"></tbody>
+              </table>
+            </div>
+            <div id="pricingPagination" class="pricing-pagination"></div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             MODULE 5: TỰ ĐẶT ĐƠN DROPBUY & HÌNH THỨC THANH TOÁN (auto-order)
+             ================================================================= -->
+        <section class="admin-module-pane" data-module="auto-order">
+          <div class="admin-card" id="autoOrderSection">
+            <div class="flex-between" style="flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3><i class="fa-solid fa-robot"></i> Tự Đặt Đơn Sang Kho DropBuy &amp; Phương Thức Thanh Toán</h3>
+                <p class="help-text" style="margin:4px 0 0;">Tự động đẩy đơn dropship sang DropBuy (trừ quỹ đại lý) ngay khi khách đặt COD hoặc thanh toán VietQR thành công.</p>
+              </div>
+              <div id="autoOrderStatus" style="font-size:13px;"></div>
+            </div>
+
+            <div id="autoOrderAlerts" style="display:none; margin-top:12px; padding:12px; border-radius:8px; background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-size:13px;"></div>
+
+            <hr class="divider">
+
+            <h4><i class="fa-solid fa-bolt"></i> Quy tắc Tự động Đặt đơn</h4>
+            <div class="pricing-grid">
+              <label class="pricing-field" style="grid-column: 1 / -1;">
+                <span><input type="checkbox" id="aoEnabled"> <strong>Bật tự động đặt đơn sang DropBuy</strong></span>
+                <small class="help-text">Khi tắt, đơn mới sẽ nằm ở mục "Chờ đặt kho" để bạn kiểm tra và bấm đặt tay hoặc sao chép địa chỉ.</small>
+              </label>
+              <label class="pricing-field"><span>Hạn mức chi tối đa mỗi đơn (đ)</span><input type="number" id="aoMaxOrder" min="0" step="10000"></label>
+              <label class="pricing-field"><span>Hạn mức chi tối đa mỗi ngày (đ)</span><input type="number" id="aoMaxDaily" min="0" step="100000"></label>
+              <label class="pricing-field"><span>Số dư giữ lại tối thiểu trong quỹ (đ)</span><input type="number" id="aoMinBalance" min="0" step="10000"></label>
+              <label class="pricing-field"><span>Cảnh báo khi quỹ còn dưới (đ)</span><input type="number" id="aoLowBalance" min="0" step="100000"></label>
+              <label class="pricing-field"><span>Đơn vị vận chuyển ưu tiên</span>
+                <select id="aoShipping">
+                  <option value="cheapest">Tự chọn hãng rẻ nhất (VTP / SPX)</option>
+                  <option value="V">Viettel Post</option>
+                  <option value="S">SPX Express</option>
+                </select>
+              </label>
+              <label class="pricing-field" style="justify-content:center;">
+                <span><input type="checkbox" id="aoRequireProfit"> Chặn không tự đặt nếu đơn bị lỗ</span>
+              </label>
+            </div>
+
+            <hr class="divider">
+
+            <h4><i class="fa-solid fa-credit-card"></i> Phương thức thanh toán mở cho Khách hàng</h4>
+            <div class="pricing-grid">
+              <label class="pricing-field">
+                <span><input type="checkbox" id="payCod"> Cho phép Thanh toán khi nhận hàng (COD)</span>
+              </label>
+              <label class="pricing-field">
+                <span>Giá trị COD tối đa mỗi đơn (đ)</span>
+                <input type="number" id="payCodMax" min="0" step="100000">
+              </label>
+              <label class="pricing-field">
+                <span><input type="checkbox" id="payBank"> Cho phép Chuyển khoản ngân hàng (VietQR)</span>
+                <small id="payBankNote" class="help-text" style="color:#d97706;"></small>
+              </label>
+            </div>
+
+            <div style="margin-top:20px; display:flex; gap:12px; align-items:center;">
+              <button type="button" class="btn btn-primary" id="saveAutoOrderBtn"><i class="fa-solid fa-floppy-disk"></i> Lưu Cấu Hình Đặt Đơn</button>
+              <span id="autoOrderMsg" class="help-text"></span>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             MODULE 6: CẤU HÌNH VẬN CHUYỂN & HẠN ĐƠN (shipping)
+             ================================================================= -->
+        <section class="admin-module-pane" data-module="shipping">
+          <div class="admin-card" id="shippingSection">
+            <h3><i class="fa-solid fa-truck-fast"></i> Cấu Hình Phí Vận Chuyển &amp; Thời Hạn Thanh Toán</h3>
+            <p class="help-text" style="margin:4px 0 16px;">Thiết lập cách báo phí ship cho khách khi đặt hàng và thời gian tự động huỷ đơn chuyển khoản quá hạn.</p>
+
+            <form id="shippingForm" class="pricing-grid">
+              <div class="form-group checkbox-group" style="grid-column: 1 / -1;">
+                <label><input type="checkbox" id="shEnabled"> <strong>Tính phí vận chuyển cho khách hàng</strong> (bỏ chọn nếu bạn muốn miễn phí ship toàn bộ đơn)</label>
+              </div>
+              <div class="form-group">
+                <label>Chế độ tính phí ship</label>
+                <select id="shMode">
+                  <option value="live">Phí thật trực tiếp từ kho DropBuy theo Phường/Xã (Khuyên dùng)</option>
+                  <option value="flat">Bảng phí cố định theo 3 miền bên dưới</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Phụ phí cộng thêm vào phí kho (đ)</label>
+                <input type="number" id="shLiveExtra" min="0" step="1000">
+              </div>
+              <div class="form-group">
+                <label>Miễn phí ship cho đơn từ (đ, nhập 0 để tắt)</label>
+                <input type="number" id="shFree" min="0" step="10000">
+              </div>
+
+              <div style="grid-column: 1 / -1;">
+                <hr class="divider">
+                <h4><i class="fa-solid fa-map-location-dot"></i> Bảng phí dự phòng theo Miền <small style="font-weight:500; color:#64748b;">(dùng khi kho DropBuy tạm bảo trì)</small></h4>
+              </div>
+              <div class="form-group"><label>Phí cơ bản – Miền Bắc (đ)</label><input type="number" id="shNorth" min="0" step="1000"></div>
+              <div class="form-group"><label>Phí cơ bản – Miền Trung (đ)</label><input type="number" id="shCentral" min="0" step="1000"></div>
+              <div class="form-group"><label>Phí cơ bản – Miền Nam (đ)</label><input type="number" id="shSouth" min="0" step="1000"></div>
+              <div class="form-group"><label>Khối lượng gồm trong phí cơ bản (gram)</label><input type="number" id="shIncluded" min="1" step="100"></div>
+              <div class="form-group"><label>Phụ phí mỗi kg vượt mức (đ)</label><input type="number" id="shPerKg" min="0" step="1000"></div>
+              <div class="form-group"><label>Khối lượng mặc định khi SP chưa rõ (gram)</label><input type="number" id="shDefaultWeight" min="1" step="100"></div>
+
+              <div style="grid-column: 1 / -1;">
+                <hr class="divider">
+                <h4><i class="fa-solid fa-clock"></i> Thời hạn thanh toán đơn Chuyển khoản</h4>
+              </div>
+              <div class="form-group"><label>Tự động huỷ đơn chờ CK sau (phút)</label><input type="number" id="odTimeout" min="5" step="5"></div>
+              <div class="form-group"><label>Cảnh báo đơn "Khách báo đã CK" sau (giờ)</label><input type="number" id="odAlert" min="1" step="1"></div>
+
+              <div style="grid-column: 1 / -1; display:flex; gap:12px; align-items:center; margin-top:6px;">
+                <button type="submit" class="btn-submit"><i class="fa-solid fa-floppy-disk"></i> Lưu Cấu Hình Vận Chuyển</button>
+                <span id="shippingSaveMsg" class="help-text"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             MODULE 7: NGÂN HÀNG & ĐỐI SOÁT CHUYỂN KHOẢN (payments)
+             ================================================================= -->
+        <section class="admin-module-pane" data-module="payments">
+          <div class="admin-two-cols">
+            <div class="admin-card">
+              <h3><i class="fa-solid fa-building-columns"></i> Tài Khoản Ngân Hàng Nhận Tiền (VietQR)</h3>
+              <p class="help-text" style="margin:4px 0 14px;">Thông tin tài khoản dùng để tạo mã QR thanh toán tự động cho khách.</p>
+
+              <form id="configForm">
+                <div id="bankWarning" style="display:none; padding:12px; border-radius:8px; background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-size:13px; margin-bottom:14px;">
+                  <i class="fa-solid fa-triangle-exclamation"></i> <strong>Chú ý:</strong> Số tài khoản đang là số mẫu (0386888999). Hãy đổi sang số tài khoản thật của bạn trước khi bật nhận chuyển khoản!
+                </div>
+                <div class="form-group">
+                  <label>Ngân hàng thụ hưởng</label>
+                  <select id="cfgBankId">
+                    <option value="970422">MBBank (Ngân hàng Quân Đội)</option>
+                    <option value="970436">Vietcombank</option>
+                    <option value="970407">Techcombank</option>
+                    <option value="970418">BIDV</option>
+                    <option value="970415">VietinBank</option>
+                    <option value="970423">TPBank</option>
+                    <option value="970432">VPBank</option>
+                    <option value="970441">VIB</option>
+                    <option value="970405">Agribank</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Số tài khoản</label>
+                  <input type="text" id="cfgAccountNo" placeholder="Nhập số tài khoản nhận tiền">
+                </div>
+                <div class="form-group">
+                  <label>Tên chủ tài khoản (Không dấu)</label>
+                  <input type="text" id="cfgAccountName" placeholder="Ví dụ: LE HOANG MINH">
+                </div>
+
+                <hr class="divider">
+
+                <div class="form-group checkbox-group">
+                  <label>
+                    <input type="checkbox" id="cfgSimulationMode">
+                    <strong>Chế độ Mô phỏng / Sandbox</strong>
+                  </label>
+                  <span class="help-text">Dùng khi muốn thử nghiệm tạo mã VietQR trên web mà không trừ tiền thật.</span>
+                </div>
+
+                <button type="submit" class="btn-submit" style="margin-top:6px;"><i class="fa-solid fa-floppy-disk"></i> Lưu Tài Khoản Ngân Hàng</button>
+              </form>
+            </div>
+
+            <div class="admin-card" id="paymentsSection">
+              <div class="flex-between" style="flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                <h3><i class="fa-solid fa-bolt"></i> Lịch Sử Webhook Ngân Hàng Tự Động</h3>
+                <div id="paymentsConfigured"></div>
+              </div>
+              <details style="margin: 8px 0 14px; font-size: 12.5px; color: #475569;">
+                <summary style="cursor:pointer; font-weight:600; color:#ea580c;"><i class="fa-solid fa-circle-info"></i> Xem địa chỉ Webhook SePay / Casso</summary>
+                <div style="margin-top:8px; padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; line-height:1.7;">
+                  <div>• SePay Webhook URL: <code id="sepayUrl"></code> (Header API Key: <code>SEPAY_WEBHOOK_KEY</code>)</div>
+                  <div>• Casso Webhook URL: <code id="cassoUrl"></code> (Secure Token: <code>CASSO_SECURE_TOKEN</code>)</div>
+                </div>
+              </details>
+              <div class="orders-table-wrapper">
+                <table class="orders-table" style="min-width:560px;">
+                  <thead><tr><th>Thời gian</th><th>Nguồn</th><th>Số tiền</th><th>Nội dung</th><th>Đơn</th><th>Kết quả</th></tr></thead>
+                  <tbody id="paymentsTableBody"><tr><td colspan="6" style="text-align:center; color:#64748b; padding:20px;">Chưa có giao dịch tự động nào</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             MODULE 8: KẾT NỐI KHO DROPBUY & ĐỒNG BỘ (dropbuy)
+             ================================================================= -->
+        <section class="admin-module-pane" data-module="dropbuy">
+          <div class="admin-action-bar flex-between" style="flex-wrap: wrap; gap: 16px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+                <h3 style="margin:0;"><i class="fa-solid fa-arrows-spin"></i> Trạng Thái Đồng Bộ Realtime Kho DropBuy</h3>
+                <span class="auth-badge badge-connected" id="daemonStatusBadge"><i class="fa-solid fa-bolt"></i> Đang chạy tự động</span>
+              </div>
+              <p class="help-text" style="margin:0;" id="daemonStatusText">Đang tải trạng thái đồng bộ...</p>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-outline" id="downloadAllImagesBtn">
+                <i class="fa-solid fa-cloud-arrow-down"></i> Tải Album Ảnh Về Server
               </button>
-              <button type="button" class="btn-sync-now" id="btnDropbuyLogout" style="display: none; background: #ef4444; color: #fff;">
-                <i class="fa-solid fa-power-off"></i> Đăng Xuất
+              <button type="button" class="btn-sync-now" id="syncNowBtn">
+                <i class="fa-solid fa-rotate"></i> Đồng Bộ Lại Toàn Bộ Kho
               </button>
             </div>
           </div>
 
-          <div id="dropbuyAuthMsg" style="display: none; margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 13px;"></div>
+          <div class="admin-two-cols">
+            <div class="admin-card">
+              <div class="flex-between" style="margin-bottom: 10px;">
+                <h3><i class="fa-solid fa-key"></i> Tài Khoản Đại Lý DropBuy</h3>
+                <span id="dropbuyAuthBadge" class="auth-badge badge-disconnected">Chưa kết nối</span>
+              </div>
+              <p class="help-text" style="margin:0 0 16px;">
+                Đăng nhập tài khoản DropBuy để lấy <strong>giá sỉ đại lý (F1) &amp; giá Flash Sale thực tế</strong>, báo phí ship thật theo phường/xã và tự động đặt đơn dropship.
+              </p>
 
-          <details style="margin-top: 14px; font-size: 12px; color: #64748b;">
-            <summary style="cursor: pointer; color: #94a3b8;"><i class="fa-solid fa-cookie"></i> Hoặc dán Session Cookie DropBuy thủ công (Dành cho tài khoản có OTP)</summary>
-            <div style="margin-top: 8px;">
-              <textarea id="dropbuyManualCookie" rows="2" style="width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-family: monospace; font-size: 11px; padding: 6px;" placeholder="Dán next-auth.session-token=..."></textarea>
-              <button type="button" id="btnSaveCookie" style="margin-top: 6px; padding: 6px 12px; font-size: 12px; background: #334155; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Lưu Cookie</button>
+              <div id="dropbuyLoginForm">
+                <div class="form-group">
+                  <label>Tài khoản DropBuy (SĐT / Email / Username)</label>
+                  <input type="text" id="dropbuyLoginUser" placeholder="Nhập tài khoản DropBuy">
+                </div>
+                <div class="form-group">
+                  <label>Mật khẩu DropBuy</label>
+                  <input type="password" id="dropbuyLoginPass" placeholder="Nhập mật khẩu DropBuy" autocomplete="current-password">
+                </div>
+                <div class="form-group">
+                  <label>Mã xác thực 2 bước (Bỏ trống nếu không bật)</label>
+                  <input type="text" id="dropbuyLoginTotp" placeholder="Mã 6 số OTP (nếu có)" inputmode="numeric" autocomplete="one-time-code">
+                </div>
+                <div class="form-group checkbox-group">
+                  <label><input type="checkbox" id="dropbuyRemember" checked> Tự động đăng nhập lại khi phiên hết hạn (~2 ngày)</label>
+                  <span class="help-text">Mật khẩu được mã hoá AES-256-GCM an toàn trên máy chủ.</span>
+                </div>
+                <div id="dropbuyRememberInfo" class="help-text" style="display:none; margin-bottom:10px;"></div>
+                <div style="display: flex; gap: 10px; margin-top: 12px;">
+                  <button type="button" class="btn-sync-now" id="btnDropbuyLogin" style="flex: 1;">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Đăng Nhập &amp; Kích Hoạt Giá Sỉ
+                  </button>
+                  <button type="button" class="btn btn-outline" id="btnDropbuyLogout" style="display: none; color:#dc2626 !important; border-color:#fecaca !important;">
+                    <i class="fa-solid fa-power-off"></i> Đăng Xuất
+                  </button>
+                </div>
+              </div>
+
+              <div id="dropbuyAuthMsg" style="display: none; margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px;"></div>
+
+              <details style="margin-top: 16px; font-size: 12.5px;">
+                <summary style="cursor: pointer; color: #64748b; font-weight:600;"><i class="fa-solid fa-cookie"></i> Hoặc dán Session Cookie thủ công</summary>
+                <div style="margin-top: 10px;">
+                  <textarea id="dropbuyManualCookie" rows="2" placeholder="Dán __Secure-next-auth.session-token=..."></textarea>
+                  <button type="button" class="btn btn-outline" id="btnSaveCookie" style="margin-top: 8px;">Lưu Cookie</button>
+                </div>
+              </details>
             </div>
-          </details>
-        </div>
 
-        <!-- General Config Card -->
-        <div class="admin-card">
-          <h3><i class="fa-solid fa-sliders"></i> Cấu Hình Giá Bán & Cổng Thanh Toán</h3>
-          <form id="configForm">
-            <div class="form-group checkbox-group">
-            <label>
-              <input type="checkbox" id="cfgSimulationMode">
-              <strong>Bật Chế Độ Mô Phỏng / Sandbox (Khuyên dùng khi chưa có tài khoản thật)</strong>
-            </label>
-            <p class="help-text">Ở chế độ Sandbox, hệ thống sẽ tự sinh mã VietQR chuẩn Napas 24/7 để bạn test luồng đặt hàng và thanh toán mà không bị trừ tiền thật trên DropBuy.</p>
+            <div class="admin-card">
+              <div class="flex-between">
+                <h3><i class="fa-solid fa-stethoscope"></i> Kiểm Tra Sức Khoẻ API DropBuy</h3>
+                <button type="button" class="btn-sync-now" id="healthCheckBtn"><i class="fa-solid fa-plug-circle-check"></i> Kiểm tra ngay</button>
+              </div>
+              <div id="healthResult" class="help-text" style="margin-top:14px;">Bấm "Kiểm tra ngay" để kiểm tra toàn bộ API tìm kiếm, giá sỉ, tồn kho, giỏ hàng và số dư quỹ DropBuy.</div>
+            </div>
+          </div>
+        </section>
+
+      
+        <!-- =================================================================
+             MODULE 9: KHO TECHMALL.VN & BẢNG GIÁ RIÊNG (techmall)
+             ================================================================= -->
+        <section class="admin-module-pane" data-module="techmall">
+          <div class="admin-action-bar flex-between" style="flex-wrap: wrap; gap: 16px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+                <h3 style="margin:0;"><i class="fa-solid fa-arrows-spin"></i> Đồng Bộ Realtime Kho TechMall.vn</h3>
+                <span class="auth-badge badge-connected" id="tmDaemonBadge"><i class="fa-solid fa-bolt"></i> 5 phút / lần</span>
+              </div>
+              <p class="help-text" style="margin:0;" id="tmDaemonText">Đang tải trạng thái đồng bộ TechMall...</p>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-outline" id="btnTechmallCrawlAll">
+                <i class="fa-solid fa-cloud-arrow-down"></i> Tải Toàn Bộ Kho TechMall
+              </button>
+              <button type="button" class="btn-sync-now" id="btnTechmallSyncNow">
+                <i class="fa-solid fa-rotate"></i> Đồng Bộ Giá &amp; Tồn Kho Ngay
+              </button>
+            </div>
           </div>
 
-          <hr class="divider">
-
-          <p class="help-text"><i class="fa-solid fa-tags"></i> % lãi và giá bán được thiết lập ở mục <a href="#pricingSection" style="color:#c9a84c;">Thiết Lập Giá Bán</a> bên dưới.</p>
-
-          <hr class="divider">
-
-          <h4><i class="fa-solid fa-building-columns"></i> Thông Tin Ngân Hàng Thụ Hưởng (VietQR)</h4>
-          <div id="bankWarning" style="display:none; padding:10px; border-radius:6px; background:rgba(239,68,68,.15); color:#ef4444; border:1px solid rgba(239,68,68,.35); font-size:13px; margin-bottom:10px;">
-            <i class="fa-solid fa-triangle-exclamation"></i> <strong>Kiểm tra ngay số tài khoản nhận tiền!</strong> Đây đang là số mẫu (0386888999) có sẵn trong mã nguồn – nếu không phải tài khoản của bạn, khách sẽ chuyển tiền vào tài khoản người khác.
-          </div>
-          <div class="form-group">
-            <label>Ngân hàng</label>
-            <select id="cfgBankId">
-              <option value="970422">MBBank (Ngân hàng Quân Đội)</option>
-              <option value="970436">Vietcombank</option>
-              <option value="970407">Techcombank</option>
-              <option value="970418">BIDV</option>
-              <option value="970415">VietinBank</option>
-              <option value="970423">TPBank</option>
-              <option value="970432">VPBank</option>
-              <option value="970441">VIB</option>
-              <option value="970405">Agribank</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Số tài khoản</label>
-            <input type="text" id="cfgAccountNo" placeholder="Ví dụ: 0386888999">
-          </div>
-          <div class="form-group">
-            <label>Tên chủ tài khoản</label>
-            <input type="text" id="cfgAccountName" placeholder="Ví dụ: HOANG MINH STORE">
+          <!-- Thống kê nhanh TechMall -->
+          <div class="stats-grid" style="margin-bottom: 24px;">
+            <div class="stat-card">
+              <div class="stat-label">Tổng SP TechMall</div>
+              <div class="stat-value" id="tmStatTotal">0</div>
+              <div class="stat-trend" style="color:#64748b;">Trong cơ sở dữ liệu</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Đang Mở Bán</div>
+              <div class="stat-value" id="tmStatSellable" style="color:#16a34a;">0</div>
+              <div class="stat-trend" style="color:#16a34a;">Còn hàng trong kho</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Lợi Nhuận Trung Bình</div>
+              <div class="stat-value" id="tmStatAvgProfit" style="color:#ea580c;">0 đ</div>
+              <div class="stat-trend" style="color:#ea580c;">Theo % bảng giá riêng</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Đã Có Giá Sỉ Đại Lý</div>
+              <div class="stat-value" id="tmStatWholesale" style="color:#2563eb;">0</div>
+              <div class="stat-trend" style="color:#2563eb;">Chiết khấu bán buôn</div>
+            </div>
           </div>
 
-          <button type="submit" class="btn-submit"><i class="fa-solid fa-floppy-disk"></i> Lưu Cấu Hình</button>
-        </form>
-      </div>
-      </div>
+          <div class="admin-two-cols">
+            <!-- Cột 1: Tài khoản Đại lý TechMall.vn -->
+            <div class="admin-card">
+              <div class="flex-between" style="margin-bottom: 10px;">
+                <h3><i class="fa-solid fa-key"></i> Tài Khoản Đại Lý TechMall.vn</h3>
+                <span id="tmAuthBadge" class="auth-badge badge-disconnected">Chưa kết nối</span>
+              </div>
+              <p class="help-text" style="margin:0 0 16px;">
+                Đăng nhập tài khoản đại lý TechMall để lấy <strong>giá đại lý / giá sỉ</strong>, tự động chiết khấu và đồng bộ tồn kho mỗi 5 phút.
+              </p>
 
-      <!-- Right: Orders Management -->
-      <div>
-      <div class="admin-card" id="reportSection" style="margin-bottom: 24px;">
-        <div class="flex-between" style="flex-wrap: wrap; gap: 8px;">
-          <h3 style="margin:0;"><i class="fa-solid fa-chart-line" style="color:#c9a84c;"></i> Doanh Thu &amp; Lãi</h3>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <small id="backupInfo" style="color:#94a3b8;"></small>
-            <button class="btn btn-outline" id="backupNowBtn" style="padding:6px 10px; font-size:12px;"><i class="fa-solid fa-floppy-disk"></i> Sao lưu ngay</button>
+              <div id="tmLoginForm">
+                <div class="form-group">
+                  <label>Tài khoản đại lý TechMall (Email / Username)</label>
+                  <input type="text" id="tmLoginUser" placeholder="Nhập tài khoản TechMall">
+                </div>
+                <div class="form-group">
+                  <label>Mật khẩu TechMall</label>
+                  <input type="password" id="tmLoginPass" placeholder="Nhập mật khẩu TechMall" autocomplete="current-password">
+                </div>
+                <div class="form-group checkbox-group">
+                  <label><input type="checkbox" id="tmRemember" checked> Tự động đăng nhập lại khi phiên hết hạn</label>
+                  <span class="help-text">Thông tin được mã hoá AES-256-GCM an toàn tuyệt đối trên máy chủ.</span>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 12px;">
+                  <button type="button" class="btn-sync-now" id="btnTmLogin" style="flex: 1;">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Đăng Nhập &amp; Kích Hoạt Giá Sỉ
+                  </button>
+                  <button type="button" class="btn btn-outline" id="btnTmLogout" style="display: none; color:#dc2626 !important; border-color:#fecaca !important;">
+                    <i class="fa-solid fa-power-off"></i> Đăng Xuất
+                  </button>
+                </div>
+              </div>
+
+              <div id="tmAuthMsg" style="display: none; margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px;"></div>
+            </div>
+
+            <!-- Cột 2: Cấu hình Bảng giá riêng biệt cho TechMall -->
+            <div class="admin-card">
+              <div class="flex-between" style="margin-bottom: 10px;">
+                <h3><i class="fa-solid fa-calculator"></i> Bảng Giá Riêng Cho TechMall</h3>
+                <span class="auth-badge badge-connected" style="background:#f0fdf4; color:#16a34a; border-color:#bbf7d0;">Độc lập với DropBuy</span>
+              </div>
+              <p class="help-text" style="margin:0 0 16px;">
+                Thiết lập công thức tính giá bán cho sản phẩm nguồn TechMall. Hệ thống sẽ áp dụng ngay và phát sóng giá mới tới khách.
+              </p>
+
+              <form id="tmPricingForm" onsubmit="event.preventDefault();">
+                <div class="form-group">
+                  <label>Cơ sở giá vốn tính lãi</label>
+                  <select id="tmPricingBase">
+                    <option value="wholesale">Giá sỉ đại lý (khi đã đăng nhập TechMall)</option>
+                    <option value="public">Giá niêm yết bán lẻ TechMall</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>% Lợi nhuận mặc định cộng thêm</label>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="number" id="tmMarkupPercent" min="0" max="300" step="1" value="15" style="width:120px;">
+                    <span style="font-weight:600; color:#475569;">% trên giá vốn</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Lãi tối thiểu mỗi sản phẩm (đ)</label>
+                  <input type="number" id="tmMinProfit" min="0" step="1000" value="0" placeholder="0 = không bắt buộc">
+                </div>
+                <div class="form-group">
+                  <label>Làm tròn giá bán lên</label>
+                  <select id="tmRoundTo">
+                    <option value="1000">1.000 đ (Ví dụ: 154.200 đ → 155.000 đ)</option>
+                    <option value="5000">5.000 đ</option>
+                    <option value="10000">10.000 đ</option>
+                    <option value="100">100 đ</option>
+                    <option value="1">Không làm tròn</option>
+                  </select>
+                </div>
+                <div class="form-group checkbox-group">
+                  <label><input type="checkbox" id="tmCapAtPublic"> Không bán cao hơn giá niêm yết TechMall</label>
+                </div>
+                <button type="button" class="btn-sync-now" id="btnSaveTmPricing" style="width:100%; margin-top:14px;">
+                  <i class="fa-solid fa-floppy-disk"></i> Lưu &amp; Cập Nhật Giá TechMall Ngay
+                </button>
+              </form>
+            </div>
           </div>
-        </div>
-        <div class="report-grid" id="reportTotals"></div>
-        <div id="reportPipeline" style="margin:10px 0; font-size:13px; color:#cbd5e1;"></div>
-        <div class="report-chart" id="reportChart" title="Doanh thu 30 ngày (theo ngày nhận tiền)"></div>
-        <div id="reportNote" style="font-size:12px; color:#94a3b8; margin-top:8px;"></div>
-        <details style="margin-top:10px; font-size:13px;">
-          <summary style="cursor:pointer; color:#cbd5e1;">Sản phẩm bán chạy (30 ngày)</summary>
-          <div id="reportTop" style="margin-top:6px;"></div>
-        </details>
-      </div>
-      </div>
+
+          <!-- Bảng danh sách sản phẩm TechMall -->
+          <div class="admin-card" style="margin-top: 24px;">
+            <div class="flex-between" style="flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+              <div>
+                <h3 style="margin:0 0 4px;"><i class="fa-solid fa-boxes-stacked"></i> Danh Sách Sản Phẩm TechMall Trong Kho</h3>
+                <p class="help-text" style="margin:0;">Xem giá vốn đại lý, giá bán ra và trạng thái tồn kho 5 phút/lần.</p>
+              </div>
+              <div style="display:flex; gap:10px; align-items:center;">
+                <input type="text" id="tmSearchInput" placeholder="Tìm theo tên hoặc SKU..." style="width:240px; height:38px; padding:0 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+                <button type="button" class="btn btn-outline" id="btnTmSearch" style="height:38px; padding:0 14px;">Tìm</button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th style="width:60px;">Ảnh</th>
+                    <th>Tên Sản Phẩm</th>
+                    <th>Danh Mục</th>
+                    <th style="text-align:right;">Giá Vốn TechMall</th>
+                    <th style="text-align:right;">Giá Bán Ra</th>
+                    <th style="text-align:right;">Lợi Nhuận</th>
+                    <th style="text-align:center;">Tồn Kho</th>
+                  </tr>
+                </thead>
+                <tbody id="tmProductsTableBody">
+                  <tr>
+                    <td colspan="7" style="text-align:center; padding:32px; color:#94a3b8;">Đang tải danh sách sản phẩm TechMall...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="flex-between" style="margin-top:16px;">
+              <div class="help-text" id="tmPageInfo">Đang tải...</div>
+              <div style="display:flex; gap:8px;" id="tmPaginationBtns"></div>
+            </div>
+          </div>
+        </section>
+
+      </main>
     </div>
-
-    <!-- ===================== TỰ ĐẶT ĐƠN DROPBUY (TRỪ QUỸ) ===================== -->
-    <div class="admin-card" id="autoOrderSection" style="margin-top: 24px;">
-      <div class="flex-between" style="flex-wrap: wrap; gap: 8px;">
-        <h3 style="margin:0;"><i class="fa-solid fa-robot" style="color:#c9a84c;"></i> Tự Đặt Đơn DropBuy & Hình Thức Thanh Toán</h3>
-        <div id="autoOrderStatus" style="font-size:13px;"></div>
-      </div>
-      <div id="autoOrderAlerts" style="display:none; margin-top:10px; padding:10px; border-radius:6px; background:rgba(239,68,68,.15); color:#ef4444; border:1px solid rgba(239,68,68,.35); font-size:13px;"></div>
-      <p style="font-size:13px; color:#94a3b8; margin:8px 0 12px;">
-        Bật tự đặt: đơn COD vừa đặt / đơn chuyển khoản vừa nhận tiền sẽ được tạo ngay trên DropBuy dưới dạng <strong>dropship</strong>,
-        <strong>trừ quỹ DropBuy</strong> của bạn (vốn + ship). Đơn COD: shipper thu đúng tổng tiền khách phải trả, DropBuy trả về quỹ khi giao xong.
-        Hệ thống chặn đơn nếu lỗ, vượt hạn mức hoặc quỹ không đủ.
-      </p>
-      <div class="pricing-grid">
-        <label class="pricing-field"><span><input type="checkbox" id="aoEnabled"> <strong>Bật tự đặt đơn</strong></span><small class="help-text">Tắt = nhân viên tự đặt trên DropBuy (đơn mới hiện "Chờ nhân viên đặt" kèm số tiền thu hộ, phí ship). DropBuy vẫn dùng để lấy giá sỉ, tồn kho, phí ship.</small></label>
-        <label class="pricing-field"><span>Tối đa mỗi đơn (đ)</span><input type="number" id="aoMaxOrder" min="0" step="10000"></label>
-        <label class="pricing-field"><span>Tối đa mỗi ngày (đ)</span><input type="number" id="aoMaxDaily" min="0" step="100000"></label>
-        <label class="pricing-field"><span>Giữ lại trong quỹ (đ)</span><input type="number" id="aoMinBalance" min="0" step="10000"></label>
-        <label class="pricing-field"><span>Đơn vị vận chuyển</span>
-          <select id="aoShipping"><option value="cheapest">Rẻ nhất</option><option value="V">Viettel Post</option><option value="S">SPX Express</option></select>
-        </label>
-        <label class="pricing-field"><span><input type="checkbox" id="aoRequireProfit"> Không đặt nếu lỗ</span></label>
-        <label class="pricing-field"><span>Báo khi quỹ dưới (đ)</span><input type="number" id="aoLowBalance" min="0" step="100000"></label>
-      </div>
-      <h4 style="margin:14px 0 6px;">Khách được chọn</h4>
-      <div class="pricing-grid">
-        <label class="pricing-field"><span><input type="checkbox" id="payCod"> Thanh toán khi nhận hàng (COD)</span></label>
-        <label class="pricing-field"><span>COD tối đa mỗi đơn (đ)</span><input type="number" id="payCodMax" min="0" step="100000"></label>
-        <label class="pricing-field"><span><input type="checkbox" id="payBank"> Chuyển khoản VietQR</span><small id="payBankNote" style="color:#f59e0b;"></small></label>
-      </div>
-      <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
-        <button class="btn btn-primary" id="saveAutoOrderBtn"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
-        <small id="autoOrderMsg" style="color:#94a3b8;"></small>
-      </div>
-    </div>
-
-    <!-- ===================== THANH TOÁN TỰ ĐỘNG (WEBHOOK NGÂN HÀNG) ===================== -->
-    <div class="admin-card" id="paymentsSection" style="margin-top: 24px;">
-      <div class="flex-between" style="flex-wrap: wrap; gap: 8px;">
-        <h3 style="margin:0;"><i class="fa-solid fa-building-columns" style="color:#c9a84c;"></i> Thanh Toán Tự Động & Thông Báo</h3>
-        <div id="paymentsConfigured"></div>
-      </div>
-      <details style="margin: 10px 0; font-size: 13px; color: #94a3b8;">
-        <summary style="cursor:pointer; color:#cbd5e1;"><i class="fa-solid fa-circle-info"></i> Cách bật tự xác nhận tiền về (không cần bấm tay)</summary>
-        <ol style="margin: 8px 0 0 18px; line-height: 1.7;">
-          <li>Đăng ký <strong>SePay</strong> (sepay.vn) hoặc <strong>Casso</strong> (casso.vn), liên kết đúng tài khoản ngân hàng nhận tiền ở mục cấu hình VietQR.</li>
-          <li>SePay → Webhook: URL <code id="sepayUrl"></code>, xác thực <strong>API Key</strong>, đặt cùng giá trị vào <code>SEPAY_WEBHOOK_KEY</code> trong file <code>.env</code>.</li>
-          <li>Casso → Webhook: URL <code id="cassoUrl"></code>, <strong>secure-token</strong> = <code>CASSO_SECURE_TOKEN</code> trong <code>.env</code>.</li>
-          <li>Tuỳ chọn báo Telegram: tạo bot với @BotFather, đặt <code>TELEGRAM_BOT_TOKEN</code> và <code>TELEGRAM_CHAT_ID</code>.</li>
-          <li>Khởi động lại server. Server phải truy cập được từ Internet (domain thật hoặc tunnel) để ngân hàng gọi webhook.</li>
-        </ol>
-        <p style="margin-top:6px;">Nội dung chuyển khoản trong mã QR đã chứa mã đơn (HMxxxxxxxx). Tiền về đủ → đơn tự chuyển "Đã thanh toán"; thiếu tiền / đơn đã huỷ / không rõ đơn → hiện ở bảng dưới để bạn xử lý.</p>
-      </details>
-      <div class="orders-table-wrapper">
-        <table class="orders-table">
-          <thead><tr><th>Thời gian</th><th>Nguồn</th><th>Số tiền</th><th>Nội dung CK</th><th>Đơn</th><th>Kết quả</th></tr></thead>
-          <tbody id="paymentsTableBody"><tr><td colspan="6" style="text-align:center; color:#9ca3af;">Chưa có giao dịch</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ===================== PHÍ VẬN CHUYỂN & HẠN THANH TOÁN ===================== -->
-    <div class="admin-card" id="shippingSection" style="margin-top: 24px;">
-      <h3 style="margin:0 0 10px;"><i class="fa-solid fa-truck-fast" style="color:#c9a84c;"></i> Phí Vận Chuyển & Hạn Thanh Toán</h3>
-      <form id="shippingForm" class="pricing-grid">
-        <div class="form-group checkbox-group" style="grid-column: 1 / -1;">
-          <label><input type="checkbox" id="shEnabled"> <strong>Tính phí vận chuyển cho khách</strong> (bỏ chọn = miễn phí ship mọi đơn)</label>
-        </div>
-        <div class="form-group"><label>Cách tính phí ship</label>
-          <select id="shMode">
-            <option value="live">Phí thật của DropBuy theo kho + phường (khuyên dùng)</option>
-            <option value="flat">Bảng phí cố định bên dưới</option>
-          </select>
-        </div>
-        <div class="form-group"><label>Cộng thêm vào phí DropBuy (đ)</label><input type="number" id="shLiveExtra" min="0" step="1000"></div>
-        <div class="form-group" style="grid-column: 1 / -1;"><small class="help-text">Phí thật: hỏi DropBuy đúng các món + phường của khách (cần đăng nhập DropBuy; nhớ 30 phút). Khi chưa đăng nhập hoặc DropBuy lỗi, tự dùng bảng phí cố định và ghi "ước tính". Bảng phí dưới đây là phương án dự phòng.</small></div>
-        <div class="form-group"><label>Phí cơ bản – Miền Bắc (đ)</label><input type="number" id="shNorth" min="0" step="1000"></div>
-        <div class="form-group"><label>Phí cơ bản – Miền Trung (đ)</label><input type="number" id="shCentral" min="0" step="1000"></div>
-        <div class="form-group"><label>Phí cơ bản – Miền Nam (đ)</label><input type="number" id="shSouth" min="0" step="1000"></div>
-        <div class="form-group"><label>Khối lượng đã gồm trong phí cơ bản (gram)</label><input type="number" id="shIncluded" min="1" step="100"></div>
-        <div class="form-group"><label>Phụ phí mỗi kg vượt mức (đ)</label><input type="number" id="shPerKg" min="0" step="1000"></div>
-        <div class="form-group"><label>Miễn phí ship cho đơn từ (đ, 0 = tắt)</label><input type="number" id="shFree" min="0" step="10000"></div>
-        <div class="form-group"><label>Khối lượng mặc định khi chưa rõ (gram)</label><input type="number" id="shDefaultWeight" min="1" step="100"></div>
-        <div class="form-group"><label>Tự huỷ đơn chưa thanh toán sau (phút)</label><input type="number" id="odTimeout" min="5" step="5"></div>
-        <div class="form-group"><label>Cảnh báo đơn "khách báo đã CK" chưa xác nhận sau (giờ)</label><input type="number" id="odAlert" min="1" step="1"></div>
-        <div style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center;">
-          <button type="submit" class="btn-submit" style="width:auto;"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
-          <span id="shippingSaveMsg" class="help-text">Khối lượng lấy theo từng phân loại trên DropBuy. Mã QR hết hạn đúng bằng thời gian tự huỷ.</span>
-        </div>
-      </form>
-    </div>
-
-    <!-- ===================== THIẾT LẬP GIÁ BÁN (như CTV) ===================== -->
-    <div class="admin-card" id="pricingSection" style="margin-top: 24px;">
-      <div class="flex-between" style="flex-wrap: wrap; gap: 10px;">
-        <h3 style="margin:0;"><i class="fa-solid fa-tags" style="color:#c9a84c;"></i> Thiết Lập Giá Bán (Giá gốc DropBuy + % lãi)</h3>
-        <span id="pricingAuthBadge" class="auth-badge badge-disconnected">...</span>
-      </div>
-      <p class="help-text" id="pricingAuthNote" style="margin-top:8px;"></p>
-
-      <div class="pricing-stats" id="pricingStats"></div>
-
-      <form id="pricingForm" class="pricing-grid">
-        <div class="form-group">
-          <label>Giá gốc để tính lãi</label>
-          <select id="prBase">
-            <option value="wholesale">Giá CTV/F1 của tài khoản DropBuy (cần đăng nhập)</option>
-            <option value="public">Giá niêm yết công khai trên DropBuy</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>% lãi mặc định</label>
-          <input type="number" id="prMarkup" min="0" max="300" step="0.5">
-        </div>
-        <div class="form-group">
-          <label>Lãi tối thiểu mỗi sản phẩm (đ)</label>
-          <input type="number" id="prMinProfit" min="0" step="1000">
-        </div>
-        <div class="form-group">
-          <label>Làm tròn giá bán lên</label>
-          <select id="prRoundTo">
-            <option value="1">Không làm tròn</option>
-            <option value="100">100 đ</option>
-            <option value="500">500 đ</option>
-            <option value="1000">1.000 đ</option>
-            <option value="5000">5.000 đ</option>
-            <option value="10000">10.000 đ</option>
-          </select>
-        </div>
-        <div class="form-group checkbox-group" style="grid-column: 1 / -1;">
-          <label><input type="checkbox" id="prCapAtPublic"> <strong>Không bán cao hơn giá niêm yết DropBuy</strong> (nếu vẫn còn lãi)</label>
-          <p class="help-text">Ví dụ: giá CTV 639.000 đ, niêm yết 2.650.000 đ, lãi 15% → bán 735.000 đ. Nếu chưa đăng nhập DropBuy, giá gốc = giá niêm yết nên +15% sẽ cao hơn giá DropBuy đang bán.</p>
-        </div>
-
-        <div style="grid-column: 1 / -1;">
-          <h4 style="margin: 6px 0;"><i class="fa-solid fa-layer-group"></i> % lãi riêng theo danh mục <small style="color:#64748b;">(để trống = dùng % mặc định)</small></h4>
-          <div id="prCategoryList" class="pricing-cat-list"></div>
-        </div>
-
-        <div style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center;">
-          <button type="submit" class="btn-submit" style="width:auto;"><i class="fa-solid fa-floppy-disk"></i> Lưu & Áp Dụng Giá Ngay</button>
-          <span id="pricingSaveMsg" class="help-text"></span>
-        </div>
-      </form>
-
-      <hr class="divider">
-
-      <div class="flex-between" style="flex-wrap: wrap; gap: 8px;">
-        <h4 style="margin:0;"><i class="fa-solid fa-table-list"></i> Bảng giá từng sản phẩm</h4>
-        <div style="display:flex; gap:8px; flex-wrap: wrap;">
-          <input type="text" id="prSearch" placeholder="Tìm tên / SKU / mã SP" style="min-width:220px;">
-          <select id="prFilter">
-            <option value="">Tất cả</option>
-            <option value="override">Đang đặt giá riêng</option>
-            <option value="low">Lãi thấp / lỗ</option>
-            <option value="abovePublic">Bán cao hơn giá niêm yết DropBuy</option>
-          </select>
-        </div>
-      </div>
-      <div class="orders-table-wrapper" style="margin-top:10px;">
-        <table class="orders-table">
-          <thead>
-            <tr>
-              <th>Sản phẩm</th>
-              <th>Niêm yết DropBuy</th>
-              <th>Giá CTV của bạn</th>
-              <th>Giá bán</th>
-              <th>Lãi</th>
-              <th>Giá riêng</th>
-            </tr>
-          </thead>
-          <tbody id="pricingTableBody"></tbody>
-        </table>
-      </div>
-      <div id="pricingPagination" class="pricing-pagination"></div>
-    </div>
-
-    <!-- ===================== KIỂM TRA KẾT NỐI DROPBUY ===================== -->
-    <div class="admin-card" style="margin-top: 24px;">
-      <div class="flex-between">
-        <h3 style="margin:0;"><i class="fa-solid fa-stethoscope"></i> Kiểm Tra Kết Nối API DropBuy</h3>
-        <button type="button" class="btn-sync-now" id="healthCheckBtn"><i class="fa-solid fa-plug-circle-check"></i> Kiểm tra ngay</button>
-      </div>
-      <div id="healthResult" class="help-text" style="margin-top:10px;">Bấm "Kiểm tra ngay" để thử toàn bộ các API DropBuy đang dùng.</div>
-    </div>
-
   </div>
 
-  <script src="/dialogs.js"></script>
-  <script src="admin.js"></script>
+  <script src="/dialogs.js?v=20261025v7"></script>
+  <script src="/admin.js?v=20261025v7"></script>
 </body>
 </html>

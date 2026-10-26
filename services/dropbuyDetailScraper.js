@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { stripSupplierText } = require('./security');
+const { formatWarranty } = require('./dropbuyScraper');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DETAILS_DIR = path.join(DATA_DIR, 'products_detail');
@@ -12,7 +14,7 @@ if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
 const CDN_BASE = 'https://r6i.pen.dropbuy.vn';
 // Bản cache chi tiết hết hạn sau 6 giờ (trước đây cache vĩnh viễn → biến thể/ảnh/mô tả cũ mãi)
 const DETAIL_TTL_MS = Number(process.env.DETAIL_CACHE_HOURS || 6) * 3600 * 1000;
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 /**
  * Format media item to full URL
@@ -74,7 +76,9 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
     try {
       const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
       const fresh = Date.now() - new Date(cached.cached_at || 0).getTime() < DETAIL_TTL_MS;
-      if (fresh && cached.cache_version === CACHE_VERSION) return cached;
+      const validVariations = Array.isArray(cached.variations) && cached.variations.length > 0;
+      const validDesc = !String(cached.description || '').trim().startsWith('{"lien-he"');
+      if (fresh && cached.cache_version === CACHE_VERSION && validVariations && validDesc) return cached;
     } catch (e) {}
   }
 
@@ -82,12 +86,17 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
   console.log(`[DetailScraper] Đang cào full chi tiết SP #${productId} (${dropbuyUrl})...`);
 
   try {
-    const res = await fetch(dropbuyUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      }
-    });
+    let cookieHeader = '';
+    try {
+      const cfgPath = path.join(DATA_DIR, 'config.json');
+      if (fs.existsSync(cfgPath)) cookieHeader = JSON.parse(fs.readFileSync(cfgPath, 'utf8'))?.dropbuy?.cookieHeader || '';
+    } catch (e) {}
+    const reqHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    };
+    if (cookieHeader) reqHeaders['Cookie'] = cookieHeader;
+    const res = await fetch(dropbuyUrl, { headers: reqHeaders });
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const html = await res.text();
@@ -117,7 +126,7 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
     if (!description || description.length < 100) {
       const candidates = [];
       for (const chunk of rscChunks) {
-        if (chunk.length > 80 && !chunk.startsWith('{"') && !chunk.startsWith('["$') && !chunk.includes('"$undefined"')) {
+        if (chunk.length > 80 && !chunk.trim().startsWith('{') && !chunk.startsWith('["$') && !chunk.includes('"$undefined"') && !chunk.includes('thong-tin-ho-tro')) {
           const cleanChunk = chunk
             .replace(/\\"/g, '"')
             .replace(/\\\\/g, '\\')
@@ -145,6 +154,7 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
     let variations = [];
     let variationOptions = [];
     let specs = {};
+    let liveWarranty = null;
 
     const rawIdx = unescaped.indexOf('"rawProduct":');
     if (rawIdx !== -1) {
@@ -203,6 +213,7 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
                 public_price: Number(v.price_f1 || raw.price_public || 0),
                 weight_gram: Number(v.specs?.variation_weight_vtp || v.specs?.variation_weight || 0),
                 image: media ? formatMediaUrl(media.res_location, media.res_med_file_name || media.res_origin_file_name) : null,
+                warranty: (v.warranty_type && Number(v.warranty_duration) > 0) ? formatWarranty(v.warranty_type, v.warranty_duration) : null,
                 specs: v.specs || {}
               };
             });
@@ -211,6 +222,9 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
           variationOptions = raw.variation_set_metadata.map(g => ({ display: g.display, options: (g.options || []).map(o => o.name) }));
         }
 
+        if ('warranty_type' in raw || 'warranty_duration' in raw) {
+          liveWarranty = formatWarranty(raw.warranty_type, raw.warranty_duration);
+        }
         if (raw.body_content && !raw.body_content.startsWith('$')) {
           description = raw.body_content;
         }
@@ -255,6 +269,12 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
       }
     }
 
+    if (!liveWarranty) {
+      const plainDom = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      const wm = plainDom.match(/Bảo hành\s+(\d+)\s*(ngày|tuần|tháng|năm)/i);
+      if (wm) liveWarranty = Number(wm[1]) >= 999 ? 'Bảo hành trọn đời' : `Bảo hành ${wm[1]} ${wm[2].toLowerCase()}`;
+      else if (/Bảo hành\s+Sản phẩm thuộc/i.test(plainDom)) liveWarranty = 'Không bảo hành';
+    }
     const fullDetail = {
       id: productId,
       name: product.name,
@@ -266,9 +286,9 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
       dropbuy_url: dropbuyUrl,
       category_id: product.category_id,
       category_name: product.category_name,
-      warranty: product.warranty || 'Bảo hành chính hãng DropBuy 6 tháng',
+      warranty: stripSupplierText(liveWarranty || product.warranty) || 'Không bảo hành',
       in_stock: product.in_stock !== false,
-      description: description || 'Sản phẩm chính hãng chất lượng cao phân phối từ kho tổng DropBuy.vn.',
+      description: stripSupplierText(description) || 'Sản phẩm chính hãng chất lượng cao phân phối bởi Hoàng Minh Store.',
       gallery: gallery,
       video_url: videoUrl,
       variations: variations,
@@ -293,7 +313,7 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
       dropbuy_url: dropbuyUrl,
       category_id: product.category_id,
       category_name: product.category_name,
-      description: 'Sản phẩm chính hãng chất lượng cao phân phối từ kho tổng DropBuy.vn.',
+      description: 'Sản phẩm chính hãng chất lượng cao phân phối bởi Hoàng Minh Store.',
       gallery: [{ id: 'main', is_video: false, url: product.image_hd || product.image, thumb: product.image }],
       variations: [],
       variation_options: [],

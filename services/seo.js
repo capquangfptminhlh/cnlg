@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const { maskMediaUrl } = require('./catalogImage');
+const { stripSupplierText } = require('./security');
 
 /**
  * Trang sản phẩm có URL thật /sp/<id>-<slug> cho Google và ảnh xem trước khi chia sẻ (Facebook, Zalo...).
@@ -10,10 +12,17 @@ const INDEX_FILE = path.join(__dirname, '..', 'public', 'index.html');
 let template = null;
 let templateMtime = 0;
 
+const ASSET_VERSION = 'v=20261025_7';
+function bustAssets(html) {
+  return html
+    .replace(/(href="\/[a-zA-Z0-9_\-\.]+\.css)(")/g, `$1?${ASSET_VERSION}$2`)
+    .replace(/(src="\/[a-zA-Z0-9_\-\.]+\.js)(")/g, `$1?${ASSET_VERSION}$2`);
+}
+
 function getTemplate() {
   const mtime = fs.statSync(INDEX_FILE).mtimeMs;
   if (!template || mtime !== templateMtime) {
-    template = fs.readFileSync(INDEX_FILE, 'utf8');
+    template = bustAssets(fs.readFileSync(INDEX_FILE, 'utf8'));
     templateMtime = mtime;
   }
   return template;
@@ -46,8 +55,9 @@ function renderProductPage(req, product, detail, config) {
   const url = base + productPath(product);
   const name = storeName(config);
   const priceText = `${Number(product.price).toLocaleString('vi-VN')} đ`;
-  const desc = (stripHtml(detail?.description).slice(0, 155) || `${product.name} – ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, thanh toán khi nhận hàng.'}`);
-  const image = product.image_hd || product.image;
+  const desc = stripSupplierText(stripHtml(detail?.description).slice(0, 155) || `${product.name} – ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, thanh toán khi nhận hàng.'}`);
+  const maskedImg = maskMediaUrl(product.image_hd || product.image);
+  const image = maskedImg && maskedImg.startsWith('/') ? base + maskedImg : maskedImg;
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -97,6 +107,7 @@ function renderHomePage(req, config, total) {
   <meta property="og:site_name" content="${escAttr(name)}">
   <meta property="og:title" content="${escAttr(name)}">
   <meta property="og:description" content="${escAttr(desc)}">
+  <meta property="og:image" content="${escAttr(baseUrl(req) + '/logo.svg')}">
   <meta property="og:url" content="${escAttr(baseUrl(req) + '/')}">`;
   return getTemplate().replace('</head>', `${head}\n</head>`);
 }
@@ -110,7 +121,7 @@ function sitemapXml(req, products) {
 }
 
 function robotsTxt(req) {
-  return `User-agent: *\nAllow: /\nDisallow: /admin.html\nDisallow: /api/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`;
+  return `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`;
 }
 
 module.exports = { renderProductPage, renderHomePage, sitemapXml, robotsTxt, productPath, baseUrl };

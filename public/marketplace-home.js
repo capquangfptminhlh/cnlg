@@ -1,6 +1,6 @@
 /* HOANG MINH STORE — Marketplace presentation layer.
    Only uses existing authenticated storefront functions and public product catalog.
-   No fake ratings, orders, countdowns, promo codes or invented sale prices. */
+   No fake ratings, orders, promo codes or invented sale prices. */
 (() => {
   'use strict';
 
@@ -18,6 +18,12 @@
   function formatVND(input) {
     const number = Number(input);
     return Number.isFinite(number) ? number.toLocaleString('vi-VN') + 'đ' : 'Liên hệ';
+  }
+  function compactVND(amount) {
+    const n = Math.max(0, Math.round(Number(amount) || 0));
+    if (n >= 1000000) return (n / 1000000).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + 'TR';
+    if (n >= 1000) return Math.round(n / 1000).toLocaleString('vi-VN') + 'K';
+    return n.toLocaleString('vi-VN') + 'đ';
   }
   function favorites() {
     try {
@@ -56,22 +62,34 @@
     const discount = Number(p.discount_percent);
     const hasOff = Number.isFinite(discount) && discount > 0 && showOld;
     const discountBadge = soldOut ? '<span class="card-tag tag-out">Hết hàng</span>'
-      : hasOff && discount >= 40 ? '<span class="card-tag tag-deal">Giảm sâu</span>'
-      : p.is_mall ? '<span class="card-tag tag-mall"><i class="fa-solid fa-circle-check"></i> Mall</span>' : '';
+      : p.is_flash_sale ? '<span class="card-tag tag-flash"><i class="fa-solid fa-bolt"></i> FLASH SALE</span>'
+      : hasOff && discount >= 35 ? '<span class="card-tag tag-deal"><i class="fa-solid fa-fire"></i> GIÁ SỈ -' + Math.round(discount) + '%</span>'
+      : p.is_mall ? '<span class="card-tag tag-mall"><i class="fa-solid fa-circle-check"></i> Chính hãng</span>'
+      : '<span class="card-tag tag-si"><i class="fa-solid fa-tag"></i> GIÁ SỈ KHO</span>';
+    const cornerOff = !soldOut && hasOff && discount >= 20
+      ? '<span class="card-corner-off"><b>-' + Math.round(discount) + '%</b><small>GIẢM</small></span>'
+      : '';
+    const saveChip = !soldOut
+      ? (showOld && (oldPrice - price) >= 3000
+          ? '<span class="si-save-chip"><i class="fa-solid fa-fire-flame-curved"></i> Rẻ hơn ' + compactVND(oldPrice - price) + ' · Giá sỉ</span>'
+          : '<span class="si-save-chip is-base"><i class="fa-solid fa-check-double"></i> Mua 1 món cũng giá sỉ</span>')
+      : '';
     const fallback = 'data:image/svg+xml,' + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="100%" height="100%" fill="#f8f8fa"/><text x="50%" y="50%" fill="#aab0b9" text-anchor="middle" dominant-baseline="central" font-size="20">Hoang Minh Store</text></svg>'
     );
     const src = String(p.image || '');
-    return '<article class="featured-card" data-product-id="' + id + '">' +
+    return '<article class="featured-card' + (p.is_flash_sale && !soldOut ? ' is-flash-card' : '') + '" data-product-id="' + id + '">' +
       '<button type="button" class="featured-media" data-shop-product="' + id + '" aria-label="Xem ' + escapeHTML(p.name) + '">' +
       '<img loading="lazy" src="' + escapeHTML(src || fallback) + '" alt="' + escapeHTML(p.name) +
       '" onerror="this.onerror=null;this.src=' + "'" + fallback.replace(/'/g, '') + "'" + '">' +
-      '</button>' + discountBadge +
+      '</button>' + discountBadge + cornerOff +
       '<button type="button" class="card-heart" data-favorite-id="' + id + '" aria-pressed="false" aria-label="Lưu sản phẩm"><i class="fa-regular fa-heart"></i></button>' +
       '<div class="featured-info">' +
       '<button type="button" class="featured-name" data-shop-product="' + id + '">' + escapeHTML(p.name) + '</button>' +
       '<strong class="featured-price">' + formatVND(p.price) + '</strong>' +
       (showOld ? '<span class="price-old-row"><span class="featured-old">' + formatVND(oldPrice) + '</span>' + (hasOff ? '<span class="price-off">-' + Math.round(discount) + '%</span>' : '') + '</span>' : '') +
+      saveChip +
+      '<div class="fs-warranty-line"><i class="fa-solid fa-shield-halved"></i> ' + escapeHTML(p.warranty || 'Không bảo hành') + '</div>' +
       '<div class="featured-actions"><button type="button" class="featured-cart" data-shop-cart="' + id + '" aria-label="Thêm vào giỏ"' + (soldOut ? ' disabled' : '') + '><i class="fa-solid fa-cart-plus"></i></button>' +
       '<button type="button" class="featured-buy" data-shop-buy="' + id + '"' + (soldOut ? ' disabled' : '') + '>' +
       (soldOut ? 'Hết hàng' : 'Mua ngay') + '</button></div></div></article>';
@@ -79,6 +97,7 @@
   function renderFeatured(products) {
     if (!section || !featuredGrid) return;
     const list = (Array.isArray(products) ? products : []).filter(p => numericId(p) !== null).slice(0,6);
+    if (typeof rememberProducts === 'function') rememberProducts(list);
     featuredGrid.innerHTML = list.map(featuredCard).join('');
     section.hidden = !list.length;
     updateHeartButtons();
@@ -100,11 +119,19 @@
   loadFeatured();
   window.addEventListener('storefront:products', event => {
     if (!featuredLoaded) renderFeatured(event.detail && event.detail.products);
+    updateHeartButtons();
   });
+  window.addEventListener('storefront:flash-sale-rendered', updateHeartButtons);
 
   function jumpToCatalog() {
     const el = document.getElementById('catalog');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function resetToAllIfNeeded() {
+    if (typeof state !== 'undefined' && state.currentCategory !== 'all') {
+      const allBtn = document.querySelector('#categoriesContainer .cat-btn[data-id="all"]');
+      if (allBtn) allBtn.click();
+    }
   }
   function action(type) {
     switch (type) {
@@ -120,11 +147,30 @@
         input?.focus({preventScroll:true});
         break;
       }
+      case 'flash-sale':
+        resetToAllIfNeeded();
+        document.querySelector('.price-pill[data-flash="1"]')?.click();
+        jumpToCatalog();
+        break;
+      case 'under99':
+        resetToAllIfNeeded();
+        document.querySelector('.price-pill[data-min="0"][data-max="99000"]')?.click();
+        jumpToCatalog();
+        break;
       case 'under500':
+        resetToAllIfNeeded();
         document.querySelector('.price-pill[data-min="0"][data-max="500000"]')?.click();
         jumpToCatalog();
         break;
+      case 'sort-discount': {
+        resetToAllIfNeeded();
+        const select = document.getElementById('sortSelect');
+        if (select) { select.value = 'discount-desc'; select.dispatchEvent(new Event('change', {bubbles:true})); }
+        jumpToCatalog();
+        break;
+      }
       case 'sort-low': {
+        resetToAllIfNeeded();
         const select = document.getElementById('sortSelect');
         if (select) { select.value = 'price-asc'; select.dispatchEvent(new Event('change', {bubbles:true})); }
         jumpToCatalog();
@@ -159,7 +205,6 @@
       action(actionButton.dataset.storeAction);
       return;
     }
-    // Bấm danh mục: category-sheet.js cuộn tới danh sách sau khi sản phẩm vẽ xong (mọi khổ màn hình)
   });
 
   function updateMobileCartCount() {
@@ -175,14 +220,11 @@
     updateMobileCartCount();
   }
 
-  // Keep all hearts consistent when a saved product is removed from the wishlist dialog.
   window.addEventListener('storefront:favorite-write', () => {
     saved = favorites();
     updateHeartButtons();
   });
 
-  // The native product renderer emits the event after each successful product API refresh.
-  // Also handle a restored view if integration loads the module after the product state.
   try {
     if (!featuredLoaded && typeof state !== 'undefined' && Array.isArray(state.products) && state.products.length) renderFeatured(state.products);
   } catch (_) { /* no storefront state available */ }

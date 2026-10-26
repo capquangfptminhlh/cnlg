@@ -264,3 +264,19 @@ test('Khách vào http:// qua Cloudflare được chuyển sang https://, truy c
   assert.equal(run('198.51.100.9', { 'cf-visitor': '{"scheme":"http"}', host: 'besi.com.vn' }), 'next');   // từ ngoài → không tin header
   assert.equal(run('127.0.0.1', { 'cf-visitor': '{"scheme":"http"}', host: 'evil.com/"><x' }), 'next');    // host lạ → không chuyển
 });
+
+
+test('Bảo hành chuẩn xác từ DropBuy: ngày (D), tuần (W), tháng (M), năm (Y), không bảo hành', () => {
+  const { formatWarranty } = require('../services/dropbuyScraper');
+  assert.equal(formatWarranty('D', 7), 'Bảo hành 7 ngày');
+  assert.equal(formatWarranty('D', 15), 'Bảo hành 15 ngày');
+  assert.equal(formatWarranty('W', 1), 'Bảo hành 1 tuần');
+  assert.equal(formatWarranty('M', 1), 'Bảo hành 1 tháng');
+  assert.equal(formatWarranty('M', 6), 'Bảo hành 6 tháng');
+  assert.equal(formatWarranty('M', 12), 'Bảo hành 12 tháng');
+  assert.equal(formatWarranty('Y', 1), 'Bảo hành 1 năm');
+  assert.equal(formatWarranty('Y', 2), 'Bảo hành 2 năm');
+  assert.equal(formatWarranty('M', 9999), 'Bảo hành trọn đời');
+  assert.equal(formatWarranty(null, null), 'Không bảo hành');
+  assert.equal(formatWarranty('N', 0), 'Không bảo hành');
+});

@@ -1,0 +1,1396 @@
+/* ==========================================================================
+   HOÀNG MINH STORE — Shopee × Taobao Flash Sale & Tổng Kho Giá Sỉ Layer
+   - 100% dữ liệu thật từ catalog (is_flash_sale, giá bán, giá niêm yết)
+   - Chuyển động mượt GPU (transform / opacity / background-position)
+   - Tự tắt hoàn toàn hiệu ứng khi bật prefers-reduced-motion: reduce
+   ========================================================================== */
+
+/* ---------- 1. Thanh thông báo đầu trang: Nhấn mạnh Tổng Kho Giá Sỉ ---------- */
+.top-bar .top-perk-hot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(255, 226, 130, 0.2);
+  border: 1px solid rgba(255, 232, 150, 0.45);
+  color: #fff6bd;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.top-bar .top-perk-hot i {
+  color: #ffdf5d;
+  animation: fsBoltPulse 1.6s ease-in-out infinite;
+}
+.main-header .logo-sub i {
+  color: #ffe066;
+  margin-right: 3px;
+}
+
+/* ---------- 2. Thanh điều hướng nhanh: Flash Sale & Xả Kho < 99K ---------- */
+nav.market-links a,
+nav.market-links button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.luxury-card .card-title {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  height: auto !important;
+  max-height: 2.86em !important;
+  min-height: 2.84em;
+}
+nav.market-links .nav-flash-link,
+nav.market-links .nav-hot-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 800 !important;
+  position: relative;
+}
+nav.market-links .nav-flash-link {
+  color: #e62e05 !important;
+}
+nav.market-links .nav-flash-link i {
+  color: #ff5722;
+  animation: fsBoltPulse 1.5s ease-in-out infinite;
+}
+nav.market-links .nav-hot-link {
+  color: #d9480f !important;
+}
+nav.market-links .nav-hot-link i {
+  color: #ff6b00;
+}
+
+/* ---------- 3. Hero Banner: Ánh kim lướt kiểu Taobao + Con dấu 100% Giá Sỉ ---------- */
+.market-main-banner {
+  position: relative;
+  overflow: hidden;
+}
+.market-main-banner::after {
+  content: "";
+  position: absolute;
+  inset: -40% -60%;
+  background: linear-gradient(
+    112deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.16) 49%,
+    rgba(255, 244, 190, 0.25) 51%,
+    transparent 58%
+  );
+  transform: translate3d(-45%, 0, 0);
+  pointer-events: none;
+  z-index: 2;
+  animation: fsBannerSweep 6.5s cubic-bezier(.25, .8, .25, 1) infinite;
+}
+.hero-si-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.hero-si-pills span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.17);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+.hero-si-pills span i {
+  color: #ffe27a;
+}
+.market-main-banner .banner-shop-btn {
+  position: relative;
+  overflow: hidden;
+}
+.market-main-banner .banner-shop-btn::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 48%;
+  left: -60%;
+  background: linear-gradient(90deg, transparent, rgba(255, 210, 120, 0.55), transparent);
+  transform: skewX(-22deg);
+  animation: fsBtnShine 3.4s ease-in-out infinite;
+}
+.hero-si-stamp {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 4;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, #fff5a8 0%, #ffc107 48%, #ff6f00 100%);
+  border: 2.5px dashed #fff;
+  box-shadow: 0 8px 22px rgba(130, 20, 5, 0.34);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #9e1b08;
+  transform: rotate(11deg);
+  animation: fsStampFloat 3.8s ease-in-out infinite;
+}
+.hero-si-stamp strong {
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.hero-si-stamp span {
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+/* 3 ô promo phải (button & a đồng nhất) */
+button.market-mini-promo {
+  width: 100%;
+  font-family: inherit;
+}
+.market-mini-promo {
+  transition: transform 0.22s cubic-bezier(.2, .8, .2, 1), box-shadow 0.22s ease !important;
+}
+.market-mini-promo:hover {
+  transform: translateY(-3px) scale(1.01) !important;
+  box-shadow: 0 10px 24px rgba(238, 77, 45, 0.14);
+}
+.market-mini-promo:hover small i {
+  transform: translateX(4px);
+}
+.market-mini-promo small i {
+  transition: transform 0.2s ease;
+}
+
+/* ---------- 4. Hàng lối tắt + Nhãn nảy kiểu Shopee/Taobao (HOT / 99K / -70% / SỈ) ---------- */
+.market-shortcut .shortcut-icon {
+  position: relative;
+}
+.shortcut-pop {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  padding: 1.5px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: linear-gradient(135deg, #ff1e42, #ff6a00);
+  border: 1.5px solid #fff;
+  box-shadow: 0 3px 8px rgba(238, 45, 45, 0.35);
+  animation: fsBadgeBounce 2.4s ease-in-out infinite;
+}
+.shortcut-pop.is-gold {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+.market-shortcut:nth-child(2) .shortcut-pop { animation-delay: 0.35s; }
+.market-shortcut:nth-child(4) .shortcut-pop { animation-delay: 0.7s; }
+.market-shortcut:nth-child(7) .shortcut-pop { animation-delay: 1.05s; }
+
+/* ---------- 5. Thanh 4 Trụ Cột Cam Kết Tổng Kho Giá Sỉ ---------- */
+.si-guarantee-bar {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 13px 16px;
+  background: linear-gradient(90deg, #fffdf9 0%, #fff6f2 52%, #fffdf8 100%);
+  border: 1px solid #ffd8ca;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(238, 77, 45, 0.06);
+}
+.si-guarantee-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 4px 6px;
+}
+.si-guarantee-icon {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff6a3d, #ee3b2b);
+  box-shadow: 0 5px 12px rgba(238, 77, 45, 0.24);
+}
+.si-guarantee-icon.is-fire {
+  background: linear-gradient(135deg, #ff922b, #f03e3e);
+}
+.si-guarantee-icon.is-bolt {
+  background: linear-gradient(135deg, #f59f00, #f76707);
+}
+.si-guarantee-icon.is-shield {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 5px 12px rgba(16, 185, 129, 0.22);
+}
+.si-guarantee-item strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.25;
+}
+.si-guarantee-item small {
+  display: block;
+  font-size: 11.5px;
+  color: #64748b;
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+/* ---------- 6. Khu vực ⚡ FLASH SALE GIÁ SỈ (Shopee × Taobao) ---------- */
+.flash-sale-section {
+  margin-top: 18px;
+  padding: 0;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fff5f0 0%, #ffffff 38%);
+  border: 1.5px solid #ffc2b0;
+  box-shadow: 0 12px 32px rgba(238, 77, 45, 0.1);
+  overflow: hidden;
+}
+.flash-sale-section[hidden] {
+  display: none !important;
+}
+.fs-header {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 13px 18px;
+  background: linear-gradient(95deg, #c9001b 0%, #ee4d2d 48%, #ff7b29 100%);
+  color: #fff;
+}
+.fs-header::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.18) 50%, transparent 65%);
+  transform: translate3d(-100%, 0, 0);
+  pointer-events: none;
+  animation: fsHeaderSweep 4.8s ease-in-out infinite;
+}
+.fs-brand-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+.fs-emblem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.fs-bolt-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #ffe14d;
+  color: #c9001b;
+  display: inline-grid;
+  place-items: center;
+  font-size: 17px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  animation: fsBoltPulse 1.3s ease-in-out infinite;
+}
+.fs-logo-word {
+  font-size: 21px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(110, 10, 0, 0.35);
+}
+.fs-si-pill {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #ffe14d;
+  color: #9e1209;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+.fs-slot-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fffbe6;
+}
+.fs-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.28);
+  animation: fsDotBlink 1.4s ease-in-out infinite;
+}
+.fs-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.fs-cd-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  margin-right: 4px;
+}
+.fs-cd-box {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: #111827;
+  color: #ffe678;
+  font-size: 14px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  display: inline-grid;
+  place-items: center;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+}
+.fs-cd-box.is-ticking {
+  animation: fsDigitTick 0.34s cubic-bezier(.2, 1.3, .3, 1);
+}
+.fs-cd-sep {
+  font-weight: 900;
+  color: #ffe678;
+  font-size: 14px;
+}
+.fs-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+.fs-header-promise {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff6bd;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.fs-view-all-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 15px;
+  background: #fff;
+  color: #d92d20;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(120, 15, 5, 0.2);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+.fs-view-all-btn:hover {
+  transform: translateY(-1px);
+  background: #fff9db;
+}
+
+/* Carousel Track */
+.fs-carousel-wrap {
+  position: relative;
+  padding: 14px 14px 16px;
+}
+.fs-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: calc((100% - 5 * 10px) / 6);
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.fs-track::-webkit-scrollbar {
+  display: none;
+}
+.fs-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #ffd0c2;
+  background: rgba(255, 255, 255, 0.96);
+  color: #ee4d2d;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+.fs-nav-btn.prev { left: 6px; }
+.fs-nav-btn.next { right: 6px; }
+.fs-nav-btn:hover {
+  background: #ee4d2d;
+  color: #fff;
+  transform: translateY(-50%) scale(1.08);
+}
+
+/* Thẻ sản phẩm trong khung giờ Flash Sale */
+.fs-card {
+  scroll-snap-align: start;
+  position: relative;
+  background: #fff;
+  border: 1px solid #ffe0d6;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  transition: transform 0.22s cubic-bezier(.2, .8, .2, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.fs-card:hover {
+  transform: translateY(-4px);
+  border-color: #ff6b47;
+  box-shadow: 0 12px 26px rgba(238, 77, 45, 0.14);
+}
+.fs-media {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: #fff;
+  cursor: pointer;
+  overflow: hidden;
+  display: block;
+}
+.fs-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.25s ease;
+}
+.fs-card:hover .fs-media img {
+  transform: scale(1.05);
+}
+.fs-body {
+  padding: 9px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.fs-title {
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1e293b;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 33px;
+  cursor: pointer;
+}
+.fs-title:hover {
+  color: #ee4d2d;
+}
+.fs-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+.fs-price {
+  font-size: 17px;
+  font-weight: 900;
+  color: #e62e05;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.fs-old-price {
+  font-size: 11px;
+  color: #94a3b8;
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thanh lửa Shopee/Taobao (Fire Progress Bar) */
+.fs-fire-bar {
+  position: relative;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffe3dc;
+  overflow: hidden;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fs-fire-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    -45deg,
+    #ff2a2a 0px,
+    #ff2a2a 8px,
+    #ff6f00 8px,
+    #ff6f00 16px
+  );
+  background-size: 24px 24px;
+  animation: fsFireStripe 1.2s linear infinite;
+}
+.fs-fire-text {
+  position: relative;
+  z-index: 1;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(140, 10, 0, 0.75);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.fs-fire-text i {
+  color: #ffe866;
+}
+.fs-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.fs-cart-btn {
+  flex: 0 0 34px;
+  height: 32px;
+  border-radius: 7px;
+  border: 1px solid #ee4d2d;
+  background: #fff5f2;
+  color: #ee4d2d;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.fs-cart-btn:hover {
+  background: #ee4d2d;
+  color: #fff;
+}
+.fs-buy-btn {
+  flex: 1;
+  height: 32px;
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(95deg, #ee4d2d, #ff6b2b);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(238, 77, 45, 0.22);
+}
+.fs-buy-btn:hover {
+  background: linear-gradient(95deg, #d9381a, #ee4d2d);
+}
+
+/* Dòng bảo hành minh bạch trên thẻ Flash Sale & Featured */
+.fs-warranty-line,
+.card-meta,
+.luxury-card .card-meta {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #0f766e !important;
+  background: #f0fdfa !important;
+  border: 1px solid #99f6e4 !important;
+  padding: 2px 7px !important;
+  border-radius: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-top: 3px !important;
+  line-height: 1.3 !important;
+  width: fit-content !important;
+}
+.fs-warranty-line i,
+.card-meta i,
+.luxury-card .card-meta i {
+  color: #0d9488 !important;
+  font-size: 10px !important;
+}
+
+/* Huy hiệu bảo hành to rõ trong Modal chi tiết */
+.detail-warranty-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin: 7px 0 10px;
+  border-radius: 8px;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  width: fit-content;
+}
+.detail-warranty-badge i {
+  color: #0d9488;
+  font-size: 13px;
+}
+.detail-warranty-badge small {
+  font-size: 11px;
+  font-weight: 600;
+  color: #115e59;
+}
+
+/* ---------- 7. Nhãn Giá Sỉ, Ruy-băng Giảm Giá & Chip Tiết Kiệm trên MỌI Thẻ ---------- */
+.card-tag.tag-flash {
+  background: linear-gradient(95deg, #d0011b, #ff5722);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.32);
+}
+.card-tag.tag-flash i {
+  color: #ffe14d;
+  animation: fsBoltPulse 1.4s ease-in-out infinite;
+}
+.card-tag.tag-deal {
+  background: linear-gradient(95deg, #ee4d2d, #ff7a00);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.card-tag.tag-si {
+  background: linear-gradient(95deg, #0f766e, #0d9488);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+}
+.luxury-card.is-flash-card,
+.featured-card.is-flash-card {
+  border-color: #ffd0c2;
+}
+.luxury-card.is-flash-card:hover,
+.featured-card.is-flash-card:hover {
+  border-color: #ff623d;
+  box-shadow: 0 10px 24px rgba(238, 77, 45, 0.13);
+}
+
+/* Ruy-băng góc phải kiểu Shopee / Taobao (-48% GIẢM) */
+.card-corner-off {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 4;
+  min-width: 38px;
+  padding: 3px 5px 5px;
+  background: linear-gradient(180deg, #ffe34d 0%, #ffc107 100%);
+  color: #d0011b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%);
+  box-shadow: -2px 3px 8px rgba(0, 0, 0, 0.1);
+}
+.card-corner-off b {
+  font-size: 11px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.card-corner-off small {
+  font-size: 8.5px;
+  font-weight: 900;
+  color: #7c2d12;
+  letter-spacing: 0.02em;
+}
+/* Đẩy nút tim xuống dưới ruy-băng để không bao giờ đè nhau */
+.card-corner-off ~ .card-heart,
+.fs-card .card-heart {
+  top: 44px !important;
+}
+
+/* Chip "Rẻ hơn XXK · Giá sỉ" trên thẻ SP */
+.si-save-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #fff2ed;
+  border: 1px solid #ffcab8;
+  color: #d92d20;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  max-width: 100%;
+}
+.si-save-chip i {
+  color: #ff5722;
+  font-size: 10px;
+}
+.si-save-chip.is-base {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+.si-save-chip.is-base i {
+  color: #16a34a;
+}
+
+/* Heading kicker cho Top Deal Giá Sỉ */
+.si-section-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ee4d2d;
+  margin-bottom: 2px;
+}
+
+/* Nút lọc giá Flash Sale & < 99K */
+.price-pill.pill-flash {
+  border-color: #ffb8a3;
+  color: #d92d20;
+  font-weight: 800;
+}
+.price-pill.pill-flash.active {
+  background: linear-gradient(95deg, #d0011b, #ff5722) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+.price-pill.pill-hot {
+  border-color: #fed7aa;
+  color: #c2410c;
+  font-weight: 800;
+}
+.price-pill.pill-hot.active {
+  background: linear-gradient(95deg, #ea580c, #f97316) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+
+/* ---------- 8. Banner Giá Sỉ trong Modal Chi Tiết Sản Phẩm ---------- */
+.detail-si-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px 13px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: linear-gradient(95deg, #0f766e, #0d9488);
+  color: #fff;
+}
+.detail-si-banner.is-flash {
+  background: linear-gradient(95deg, #c9001b 0%, #ee4d2d 55%, #ff7a18 100%);
+}
+.detail-si-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+}
+.detail-si-left i {
+  color: #ffe14d;
+  font-size: 15px;
+}
+.detail-si-save {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #ffe14d;
+  color: #9e1209;
+  font-size: 11.5px;
+  font-weight: 900;
+}
+
+/* ---------- 9. Spotlight Deal Giá Sỉ Đang Nổ (Góc trái dưới, 100% SP thật) ---------- */
+.fs-live-spotlight {
+  position: fixed;
+  left: 16px;
+  bottom: 20px;
+  z-index: 99999;
+  max-width: 320px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1.5px solid #ffc2b0;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+  transform: translate3d(0, 24px, 0);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.36s cubic-bezier(.2, .8, .2, 1), opacity 0.3s ease;
+}
+.fs-live-spotlight.is-shown {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+body.is-overlay-open .fs-live-spotlight,
+body.cat-sheet-open .fs-live-spotlight {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.fs-spot-thumb {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border-radius: 9px;
+  border: 1px solid #f1f5f9;
+  object-fit: contain;
+  background: #fff;
+  cursor: pointer;
+}
+.fs-spot-info {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.fs-spot-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 900;
+  color: #d92d20;
+  text-transform: uppercase;
+}
+.fs-spot-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+.fs-spot-price {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.fs-spot-price strong {
+  font-size: 13.5px;
+  font-weight: 900;
+  color: #e62e05;
+  font-variant-numeric: tabular-nums;
+}
+.fs-spot-price span {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #fff0ec;
+  color: #ee4d2d;
+}
+.fs-spot-close {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 0;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.fs-spot-close:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* ---------- 9B. Luồng Đơn Hàng Ảo Xã Hội Siêu Thực (Social-Proof Toast) ---------- */
+.fs-live-spotlight.hm-live-order-toast {
+  max-width: 360px;
+  padding: 8px 10px;
+  border: 1.5px solid #fed7aa;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(234, 88, 12, 0.08);
+}
+.hm-order-thumb-wrap {
+  position: relative;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+}
+.hm-order-thumb-wrap .fs-spot-thumb {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+}
+.hm-order-check {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+  display: inline-grid;
+  place-items: center;
+  font-size: 8.5px;
+  border: 1.5px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+.hm-order-buyer {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
+  line-height: 1.25;
+}
+.hm-buyer-name {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.hm-buyer-meta {
+  font-size: 10px;
+  font-weight: 500;
+  color: #64748b;
+}
+.hm-order-action {
+  font-size: 11px;
+  color: #334155;
+  line-height: 1.3;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hm-order-action b {
+  color: #c2410c;
+  font-weight: 700;
+}
+.hm-order-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 10px;
+}
+.hm-order-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #fff1ed;
+  border: 1px solid #ffd2c2;
+  color: #d92d20;
+  font-weight: 800;
+  font-size: 9.5px;
+}
+.hm-order-ago {
+  color: #16a34a;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ---------- 9C. Hiệu Ứng Khan Hiếm & Kích Thích Mua Hàng Trong Modal Chi Tiết ---------- */
+.detail-urgency-box {
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: linear-gradient(95deg, #fff5f0 0%, #fffbf5 100%);
+  border: 1.5px solid #ffbe98;
+  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.detail-urgency-box.is-just-claimed {
+  animation: urgencyFlash 0.6s ease-out;
+}
+.detail-urgency-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 7px;
+  font-size: 12px;
+}
+.detail-urgency-flame {
+  font-weight: 800;
+  color: #c2410c;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.detail-urgency-flame i {
+  color: #ea580c;
+  font-size: 14px;
+  animation: fsBoltPulse 1.2s infinite ease-in-out;
+}
+.detail-urgency-flame strong {
+  font-size: 13.5px;
+  font-weight: 900;
+  color: #dc2626;
+  font-variant-numeric: tabular-nums;
+  padding: 0 2px;
+}
+.detail-urgency-viewers {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #e2e8f0;
+}
+.live-viewer-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #16a34a;
+  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.6);
+  animation: liveViewerPulse 1.6s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+.detail-urgency-bar {
+  position: relative;
+  height: 20px;
+  border-radius: 999px;
+  background: #fde8e0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.detail-urgency-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    -45deg,
+    #dc2626 0px,
+    #dc2626 10px,
+    #ea580c 10px,
+    #ea580c 20px
+  );
+  background-size: 28px 28px;
+  animation: fsFireStripe 1.2s linear infinite;
+  transition: width 0.4s ease;
+}
+.detail-urgency-bar-label {
+  position: relative;
+  z-index: 2;
+  font-size: 10px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(120, 15, 0, 0.85);
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.detail-urgency-bar-label i {
+  color: #fef08a;
+}
+
+/* Nút MUA NGAY GIÁ SỈ kích thích mạnh */
+.btn-order-now-large.is-urgent-buy {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 18px;
+  min-height: 52px;
+  background: linear-gradient(95deg, #d0011b 0%, #ee4d2d 52%, #ff6a00 100%) !important;
+  box-shadow: 0 8px 24px rgba(238, 45, 25, 0.38) !important;
+  border: 0 !important;
+  animation: urgentBtnPulse 1.8s ease-in-out infinite;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.btn-order-now-large.is-urgent-buy:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 12px 30px rgba(238, 45, 25, 0.5) !important;
+}
+.btn-order-now-large.is-urgent-buy::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.32) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: skewX(-24deg);
+  animation: urgentSweep 2.8s infinite;
+  pointer-events: none;
+}
+.urgent-buy-main {
+  font-size: 14.5px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.urgent-buy-main i {
+  color: #ffe866;
+}
+.urgent-buy-sub {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fef08a;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- 10. Ẩn khối trang chủ khi đang ở Trang Danh Mục Riêng ---------- */
+body.is-category-view #siGuaranteeBar,
+body.is-category-view #flashSaleSection {
+  display: none !important;
+}
+
+/* ---------- 11. Keyframes ---------- */
+@keyframes fsBoltPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18) rotate(-6deg); }
+}
+@keyframes fsBannerSweep {
+  0%, 35% { transform: translate3d(-55%, 0, 0); }
+  75%, 100% { transform: translate3d(55%, 0, 0); }
+}
+@keyframes fsHeaderSweep {
+  0%, 40% { transform: translate3d(-110%, 0, 0); }
+  85%, 100% { transform: translate3d(110%, 0, 0); }
+}
+@keyframes fsBtnShine {
+  0%, 45% { left: -65%; }
+  85%, 100% { left: 125%; }
+}
+@keyframes fsStampFloat {
+  0%, 100% { transform: rotate(11deg) translateY(0); }
+  50% { transform: rotate(7deg) translateY(-5px); }
+}
+@keyframes fsBadgeBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(-3px) scale(1.06); }
+}
+@keyframes fsDotBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
+@keyframes fsDigitTick {
+  0% { transform: scale(0.86); }
+  55% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+@keyframes fsFireStripe {
+  0% { background-position: 0 0; }
+  100% { background-position: 24px 0; }
+}
+@keyframes liveViewerPulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 5px rgba(22, 163, 74, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+@keyframes urgentBtnPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 24px rgba(238, 45, 25, 0.38);
+  }
+  50% {
+    transform: scale(1.025);
+    box-shadow: 0 10px 32px rgba(238, 45, 25, 0.58), 0 0 0 3px rgba(254, 205, 211, 0.6);
+  }
+}
+@keyframes urgentSweep {
+  0%, 25% { left: -60%; }
+  65%, 100% { left: 140%; }
+}
+@keyframes urgencyFlash {
+  0% { transform: scale(1); background: #ffe4d6; }
+  40% { transform: scale(1.02); background: #fed7aa; }
+  100% { transform: scale(1); background: linear-gradient(95deg, #fff5f0 0%, #fffbf5 100%); }
+}
+
+/* ---------- 12. Responsive Tablet & Mobile ---------- */
+@media (max-width: 1120px) {
+  .si-guarantee-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fs-track {
+    grid-auto-columns: calc((100% - 3 * 10px) / 4);
+  }
+}
+@media (max-width: 760px) {
+  .hero-si-stamp {
+    width: 54px;
+    height: 54px;
+    top: 10px;
+    right: 10px;
+  }
+  .hero-si-stamp strong { font-size: 13.5px; }
+  .hero-si-stamp span { font-size: 7px; }
+  .hero-si-pills span { font-size: 10px; padding: 3px 8px; }
+  .si-guarantee-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px 10px;
+  }
+  .si-guarantee-icon {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    border-radius: 9px;
+  }
+  .si-guarantee-item { gap: 8px; padding: 2px; }
+  .si-guarantee-item strong { font-size: 11.5px; }
+  .si-guarantee-item small { font-size: 10px; }
+  .fs-header {
+    padding: 11px 12px;
+    gap: 8px;
+  }
+  .fs-logo-word { font-size: 17px; }
+  .fs-header-promise { display: none; }
+  .fs-slot-pill { display: none; }
+  .fs-cd-label { display: none; }
+  .fs-view-all-btn {
+    padding: 6px 11px;
+    font-size: 11px;
+  }
+  .fs-carousel-wrap {
+    padding: 10px 10px 12px;
+  }
+  .fs-nav-btn {
+    display: none;
+  }
+  .fs-track {
+    grid-auto-columns: calc((100% - 10px) / 2.18);
+    gap: 8px;
+  }
+  .fs-price { font-size: 15px; }
+  .fs-live-spotlight {
+    left: 10px;
+    right: 10px;
+    bottom: 74px;
+    max-width: none;
+  }
+  #productDetailModal .main-preview-box {
+    max-height: 220px !important;
+    height: 220px !important;
+  }
+  .detail-urgency-box {
+    padding: 8px 10px;
+    margin: 8px 0 10px;
+  }
+  .detail-urgency-top {
+    font-size: 11px;
+  }
+  .detail-urgency-flame {
+    font-size: 11px;
+  }
+  .detail-urgency-bar {
+    height: 18px;
+  }
+  .detail-urgency-bar-label {
+    font-size: 9px;
+  }
+  .btn-order-now-large.is-urgent-buy {
+    min-height: 48px;
+    padding: 8px 14px;
+  }
+  .urgent-buy-main {
+    font-size: 13.5px;
+  }
+  .urgent-buy-sub {
+    font-size: 9.5px;
+  }
+}
+
+/* ---------- 13. Tôn trọng cài đặt Giảm chuyển động (Accessibility) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .top-bar .top-perk-hot i,
+  nav.market-links .nav-flash-link i,
+  .market-main-banner::after,
+  .market-main-banner .banner-shop-btn::after,
+  .hero-si-stamp,
+  .shortcut-pop,
+  .fs-header::after,
+  .fs-bolt-icon,
+  .fs-live-dot,
+  .fs-cd-box.is-ticking,
+  .fs-fire-fill,
+  .card-tag.tag-flash i,
+  .live-viewer-dot,
+  .btn-order-now-large.is-urgent-buy,
+  .btn-order-now-large.is-urgent-buy::after,
+  .detail-urgency-box.is-just-claimed,
+  .detail-urgency-flame i,
+  .detail-urgency-fill {
+    animation: none !important;
+  }
+  .fs-live-spotlight {
+    transition: none !important;
+  }
+}

@@ -84,4 +84,55 @@ async function imageForProduct(product){
   pending.set(key,task);
   try{return await task;}finally{pending.delete(key);}
 }
-module.exports={imageForProduct,allowedImage,allowedBytes};
+function maskMediaUrl(url){
+  if(typeof url!=='string'||!url)return url;
+  const masked=url.replace(/^https?:\/\/r6[is]\.pen\.dropbuy\.vn\/(md2?\/)/i,'/cdn/$1');
+  if(/^(https?:)?\/\/(?:[\w-]+\.)*dropbuy\.vn(\/|$)/i.test(masked))return '/logo.svg';
+  return masked;
+}
+function maskMediaHtml(html){
+  if(typeof html!=='string'||!html)return html;
+  return html
+    .replace(/https?:\/\/r6[is]\.pen\.dropbuy\.vn\/(md2?\/[A-Za-z0-9._/%-]+)/gi,'/cdn/$1')
+    .replace(/https?:\/\/(?:[\w-]+\.)*dropbuy\.vn\/[^\s"'<>)]*/gi,'/logo.svg');
+}
+const MAX_MEDIA_BYTES=15*1024*1024;
+const ALLOWED_MEDIA_MIMES=new Set(['image/jpeg','image/png','image/webp','image/avif','image/gif','video/mp4','video/webm']);
+async function mediaFromCdnPath(relPath){
+  const clean=String(relPath||'').replace(/^\/+/,'');
+  if(!/^md2?\/[A-Za-z0-9._/%-]+$/.test(clean)||clean.includes('..'))return null;
+  const fullUrl='https://r6i.pen.dropbuy.vn/'+clean;
+  const hit=cache.get(fullUrl);
+  if(hit&&Date.now()-hit.at<CACHE_AGE){
+    cache.delete(fullUrl);cache.set(fullUrl,hit);
+    return hit.result;
+  }
+  if(pending.has(fullUrl))return pending.get(fullUrl);
+  const task=(async()=>{
+    const response=await fetch(fullUrl,{
+      method:'GET',redirect:'error',signal:AbortSignal.timeout(12000),
+      headers:{accept:'image/avif,image/webp,image/png,image/jpeg,image/gif,video/mp4,video/webm,*/*', 'user-agent':'HoangMinhStore/1.0'}
+    });
+    if(!response.ok)throw new Error('CDN '+response.status);
+    const mime=String(response.headers.get('content-type')||'').split(';')[0].toLowerCase();
+    if(!ALLOWED_MEDIA_MIMES.has(mime))throw new Error('Không phải media hợp lệ');
+    const declared=Number(response.headers.get('content-length'));
+    if(declared>MAX_MEDIA_BYTES)throw new Error('Media quá lớn');
+    let bytes=0;const chunks=[];
+    for await(const chunk of response.body){
+      bytes+=chunk.byteLength;
+      if(bytes>MAX_MEDIA_BYTES)throw new Error('Media quá lớn');
+      chunks.push(Buffer.from(chunk));
+    }
+    const buffer=Buffer.concat(chunks,bytes);
+    const result={buffer,mime};
+    if(bytes<=MAX_BYTES){
+      cache.set(fullUrl,{at:Date.now(),result});
+      while(cache.size>MAX_ITEMS)cache.delete(cache.keys().next().value);
+    }
+    return result;
+  })();
+  pending.set(fullUrl,task);
+  try{return await task;}finally{pending.delete(fullUrl);}
+}
+module.exports={imageForProduct,allowedImage,allowedBytes,maskMediaUrl,maskMediaHtml,mediaFromCdnPath};

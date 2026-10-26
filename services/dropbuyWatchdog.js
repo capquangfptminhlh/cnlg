@@ -6,6 +6,7 @@ const { notify } = require('./notify');
 const { vnDate } = require('./backup');
 const vault = require('./credentialVault');
 const dropbuyAuth = require('./dropbuyAuth');
+const { emitAdmin } = require('./security');
 
 /**
  * Canh chừng để tự đặt đơn chạy được khi không ai trông (mỗi 15 phút + ngay sau khi đăng nhập):
@@ -86,7 +87,7 @@ async function maybeRelogin(io, session, { force = false } = {}) {
     relogin.lastOk = new Date().toISOString();
     console.log('[Watchdog] Đã tự đăng nhập lại DropBuy.');
     notify.info('Đã tự đăng nhập lại DropBuy – tự đặt đơn tiếp tục bình thường.');
-    if (io) io.emit('DROPBUY_AUTH_CHANGED', { authenticated: true });
+    if (io) emitAdmin(io, 'DROPBUY_AUTH_CHANGED', { authenticated: true });
     return dropbuySession.ensureSession(scraper.getConfig(), { force: true }).catch(() => null);
   } catch (e) {
     relogin.fails++;

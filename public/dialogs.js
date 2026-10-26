@@ -8,15 +8,15 @@
  */
 (function () {
   const css = `
-.ui-dlg-backdrop{position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:100000;padding:16px}
-.ui-dlg{background:#fff;color:#0f172a;border-radius:14px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:18px 18px 14px;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.ui-dlg-msg{white-space:pre-wrap;word-break:break-word;margin:0 0 12px;max-height:50vh;overflow:auto}
-.ui-dlg input,.ui-dlg textarea{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:9px;font:inherit;margin-bottom:12px;color:#0f172a;background:#fff}
+.ui-dlg-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:100000;padding:16px}
+.ui-dlg{background:#fff;color:#0f172a;border:1px solid #e2e8f0;border-radius:14px;max-width:440px;width:100%;box-shadow:0 20px 50px -10px rgba(15,23,42,.22);padding:20px 22px 16px;font:13.5px/1.55 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.ui-dlg-msg{white-space:pre-wrap;word-break:break-word;margin:0 0 14px;max-height:50vh;overflow:auto;color:#1e293b;font-weight:500}
+.ui-dlg input,.ui-dlg textarea{width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;margin-bottom:14px;color:#0f172a;background:#fff;transition:border-color .14s,box-shadow .14s}
+.ui-dlg input:focus,.ui-dlg textarea:focus{outline:none;border-color:#ea580c;box-shadow:0 0 0 3px rgba(234,88,12,.12)}
 .ui-dlg-actions{display:flex;justify-content:flex-end;gap:8px}
-.ui-dlg button{border:0;border-radius:9px;padding:8px 16px;font:600 14px system-ui,sans-serif;cursor:pointer}
-.ui-dlg .ui-ok{background:#f97316;color:#fff}.ui-dlg .ui-ok.danger{background:#dc2626}
-.ui-dlg .ui-cancel{background:#e2e8f0;color:#0f172a}
-@media (prefers-color-scheme:dark){.ui-dlg{background:#0f172a;color:#e2e8f0}.ui-dlg input,.ui-dlg textarea{background:#1e293b;color:#e2e8f0;border-color:#334155}.ui-dlg .ui-cancel{background:#334155;color:#e2e8f0}}`;
+.ui-dlg button{border:1px solid transparent;border-radius:8px;height:36px;padding:0 16px;font:600 13px 'Inter',-apple-system,sans-serif;cursor:pointer;transition:background .14s}
+.ui-dlg .ui-ok{background:#ea580c;color:#fff}.ui-dlg .ui-ok:hover{background:#c2410c}.ui-dlg .ui-ok.danger{background:#dc2626}
+.ui-dlg .ui-cancel{background:#fff;border-color:#cbd5e1;color:#334155}.ui-dlg .ui-cancel:hover{background:#f8fafc}`;
   const style = document.createElement('style');
   style.textContent = css;
   document.head.appendChild(style);
