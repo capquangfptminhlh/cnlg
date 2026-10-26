@@ -84,15 +84,33 @@ async function imageForProduct(product){
   pending.set(key,task);
   try{return await task;}finally{pending.delete(key);}
 }
+// Ảnh nguồn sỉ khác đi qua /cdn/<mã>/… của cửa hàng – khách không thấy host nguồn
+const MEDIA_ORIGINS={p1:'https://product.hstatic.net/',p2:'https://cdn.hstatic.net/',p3:'https://file.hstatic.net/',p4:'https://techmall.vn/wp-content/uploads/'};
+const ORIGIN_RE=[
+  [/^https?:\/\/product\.hstatic\.net\//i,'p1'],
+  [/^https?:\/\/cdn\.hstatic\.net\//i,'p2'],
+  [/^https?:\/\/file\.hstatic\.net\//i,'p3'],
+  [/^https?:\/\/(?:www\.)?techmall\.vn\/wp-content\/uploads\//i,'p4']
+];
+const MEDIA_PATH=/^[A-Za-z0-9._/%-]+$/;
+function maskOrigin(url){
+  for(const [re,code] of ORIGIN_RE){
+    if(!re.test(url))continue;
+    const rest=url.replace(re,'').split(/[?#]/)[0];
+    return MEDIA_PATH.test(rest)&&!rest.includes('..')?'/cdn/'+code+'/'+rest:'/logo.svg';
+  }
+  return url;
+}
 function maskMediaUrl(url){
   if(typeof url!=='string'||!url)return url;
-  const masked=url.replace(/^https?:\/\/r6[is]\.pen\.dropbuy\.vn\/(md2?\/)/i,'/cdn/$1');
+  const masked=maskOrigin(url).replace(/^https?:\/\/r6[is]\.pen\.dropbuy\.vn\/(md2?\/)/i,'/cdn/$1');
   if(/^(https?:)?\/\/(?:[\w-]+\.)*dropbuy\.vn(\/|$)/i.test(masked))return '/logo.svg';
   return masked;
 }
 function maskMediaHtml(html){
   if(typeof html!=='string'||!html)return html;
   return html
+    .replace(/https?:\/\/(?:(?:product|cdn|file)\.hstatic\.net|(?:www\.)?techmall\.vn\/wp-content\/uploads)\/[^\s"'<>)]+/gi,maskOrigin)
     .replace(/https?:\/\/r6[is]\.pen\.dropbuy\.vn\/(md2?\/[A-Za-z0-9._/%-]+)/gi,'/cdn/$1')
     .replace(/https?:\/\/(?:[\w-]+\.)*dropbuy\.vn\/[^\s"'<>)]*/gi,'/logo.svg');
 }
@@ -100,8 +118,9 @@ const MAX_MEDIA_BYTES=15*1024*1024;
 const ALLOWED_MEDIA_MIMES=new Set(['image/jpeg','image/png','image/webp','image/avif','image/gif','video/mp4','video/webm']);
 async function mediaFromCdnPath(relPath){
   const clean=String(relPath||'').replace(/^\/+/,'');
-  if(!/^md2?\/[A-Za-z0-9._/%-]+$/.test(clean)||clean.includes('..'))return null;
-  const fullUrl='https://r6i.pen.dropbuy.vn/'+clean;
+  if(!/^(?:md2?|p[1-4])\/[A-Za-z0-9._/%-]+$/.test(clean)||clean.includes('..'))return null;
+  const code=clean.split('/')[0];
+  const fullUrl=MEDIA_ORIGINS[code]?MEDIA_ORIGINS[code]+clean.slice(code.length+1):'https://r6i.pen.dropbuy.vn/'+clean;
   const hit=cache.get(fullUrl);
   if(hit&&Date.now()-hit.at<CACHE_AGE){
     cache.delete(fullUrl);cache.set(fullUrl,hit);

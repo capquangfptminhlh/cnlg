@@ -150,3 +150,25 @@ describe('Chống lộ nguồn hàng & Bảo mật (Anti-Leak)', () => {
     }
   });
 });
+
+describe('Ảnh nguồn sỉ khác đi qua /cdn của cửa hàng', () => {
+  const { maskMediaUrl, maskMediaHtml } = require('../services/catalogImage');
+  const { stripSupplierText } = require('../services/security');
+
+  test('ảnh SP, gallery, ảnh mô tả không còn host nguồn', () => {
+    assert.equal(maskMediaUrl('https://product.hstatic.net/200000567141/product/a_b_large.jpg?v=3'), '/cdn/p1/200000567141/product/a_b_large.jpg');
+    assert.equal(maskMediaUrl('https://cdn.hstatic.net/products/1000152881/x_medium.jpg'), '/cdn/p2/products/1000152881/x_medium.jpg');
+    assert.equal(maskMediaUrl('https://techmall.vn/wp-content/uploads/2024/01/baseus.jpg'), '/cdn/p4/2024/01/baseus.jpg');
+    const html = '<p>Giới thiệu từ TechMall.vn</p><img src="https://file.hstatic.net/1000152881/file/moon-16_9a73.jpg"><a href="https://techmall.vn/san-pham/x/">xem</a>';
+    const out = stripSupplierText(maskMediaHtml(html));
+    assert.match(out, /<img src="\/cdn\/p3\/1000152881\/file\/moon-16_9a73\.jpg">/);
+    assert.doesNotMatch(out, /techmall|hstatic/i);
+  });
+
+  test('đường dẫn /cdn lạ bị từ chối, không thành proxy mở', async () => {
+    const { mediaFromCdnPath } = require('../services/catalogImage');
+    assert.equal(await mediaFromCdnPath('p9/a.jpg'), null);
+    assert.equal(await mediaFromCdnPath('p1/../../etc/passwd'), null);
+    assert.equal(await mediaFromCdnPath('p1/a.jpg?x=https://evil.example'), null);
+  });
+});

@@ -347,7 +347,7 @@ app.get('/api/catalog-image/:id', async (req, res) => {
   }
 });
 
-app.get(/^\/cdn\/(md2?\/.+)$/, async (req, res) => {
+app.get(/^\/cdn\/((?:md2?|p[1-4])\/.+)$/, async (req, res) => {
   try {
     const result = await catalogImage.mediaFromCdnPath(req.params[0]);
     if (!result) return res.sendStatus(404);
@@ -543,7 +543,8 @@ app.get('/api/products/:id', async (req, res) => {
       const d = src.detail(product);
       const pub = publicProduct(product);
       return res.json({ success: true, data: {
-        ...pub, description: stripSupplierText(sanitizeHtml(d.description)), gallery: d.gallery, video_url: null, variation_options: [],
+        ...pub, description: stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(d.description))), video_url: null, variation_options: [],
+        gallery: (d.gallery || []).map(g => ({ url: catalogImage.maskMediaUrl(g.url), thumb: catalogImage.maskMediaUrl(g.thumb || g.url) })),
         variants: [{ id: product.variation_id, sku: product.sku, name: 'Mặc định', is_default: true, in_stock: product.in_stock !== false,
           price: product.price, original_price: pub.original_price || null, discount_percent: pub.discount_percent || 0, weight_gram: product.weight_gram || 0, image: null }]
       } });

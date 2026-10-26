@@ -98,9 +98,18 @@ const hstaticSize = (url, size) => (/hstatic\.net\//i.test(url)
   ? url.replace(HSTATIC_SIZE, '').replace(/(\.(?:jpe?g|png|webp))(\?.*)?$/i, `_${size}$1`)
   : url);
 // Đổi cách chọn ảnh → tăng số này để các SP đã đọc được kiểm tra lại theo cách mới
-const IMAGE_RULES_VERSION = 2;
+const IMAGE_RULES_VERSION = 3; // 3: đọc thêm thời gian bảo hành từ trang SP
 
 /** Ảnh thật trên trang sản phẩm: các ảnh trong gallery WooCommerce, không có thì og:image (bỏ ảnh mặc định "chưa có ảnh"). */
+/** "Thời gian bảo hành: 1 năm" trên trang SP → "Bảo hành 1 năm" (không ghi → bảo hành chính hãng). */
+function pageWarranty(html) {
+  const m = String(html).match(/Thời gian bảo hành\s*:?\s*(?:<[^>]+>\s*)*([^<]{1,40})/i);
+  const v = m ? htmlText(m[1]).replace(/[.;,\s]+$/, '').trim() : '';
+  if (!v || /^(không|0)\b/i.test(v)) return v ? 'Không bảo hành' : 'Bảo hành chính hãng';
+  if (/trọn đời/i.test(v)) return 'Bảo hành trọn đời';
+  return `Bảo hành ${v.toLowerCase()}`;
+}
+
 function pageImages(html) {
   const urls = [];
   for (const m of String(html).matchAll(/woocommerce-product-gallery__image[^>]*>\s*<a[^>]*href="([^"]+)"/gi)) urls.push(decodeEntities(m[1]));
@@ -281,14 +290,16 @@ function createWooSource(def) {
       retail_price: (def.parseRetail || defaultRetail)(raw, dealer),
       weight_gram: Number.isFinite(weightKg) ? Math.round(weightKg * 1000) : 0,
       variant_count: 1,
+      warranty: 'Bảo hành chính hãng', // đọc đúng thời hạn từ trang SP ở bước đọc ảnh
       variation_id: String(def.idOffset + raw.id), // mã trung tính – khách không thấy tên nguồn
       updated_at: new Date().toISOString()
     };
   }
 
   const keepImages = (p, old) => {
-    if (old && old.images_for && old.images_for === p.api_image && old.images_v === IMAGE_RULES_VERSION) {
-      Object.assign(p, { image: old.image || '', image_hd: old.image_hd || '', gallery: old.gallery || [], images_for: old.images_for, images_v: old.images_v });
+    // Ảnh cũ vẫn đúng SP thì giữ (kể cả khi luật đọc trang đổi – đọc lại trong nền, SP không rớt khỏi kệ)
+    if (old && old.images_for && old.images_for === p.api_image) {
+      Object.assign(p, { image: old.image || '', image_hd: old.image_hd || '', gallery: old.gallery || [], images_for: old.images_for, images_v: old.images_v, ...(old.warranty ? { warranty: old.warranty } : {}) });
     }
     return p;
   };
@@ -325,12 +336,14 @@ function createWooSource(def) {
         try {
           const res = await http(new URL(p.source_url).pathname, { timeout: 20000 });
           if (!res.ok) continue;
-          const live = await pickLiveImages(pageImages(await res.text()));
+          const html = await res.text();
+          const live = await pickLiveImages(pageImages(html));
           // đã kiểm tra (kể cả khi không còn ảnh sống) → không đọc lại tới khi ảnh đổi
           Object.assign(p, {
             images_for: p.api_image, images_v: IMAGE_RULES_VERSION,
             image: live[0]?.card || '', image_hd: live[0]?.url || '',
-            gallery: live.map(x => ({ url: x.url, thumb: x.thumb }))
+            gallery: live.map(x => ({ url: x.url, thumb: x.thumb })),
+            warranty: pageWarranty(html)
           });
           done++;
           state.progress = { done, total: todo.length };
@@ -529,4 +542,4 @@ function createWooSource(def) {
   };
 }
 
-module.exports = { createWooSource, parseJsonLoose, defaultRetail, htmlText, normalizeSourceRules, normalizeShipping, isSellable, pageImages, hstaticSize, IMAGE_RULES_VERSION, SPAN };
+module.exports = { createWooSource, parseJsonLoose, defaultRetail, htmlText, normalizeSourceRules, normalizeShipping, isSellable, pageImages, pageWarranty, hstaticSize, IMAGE_RULES_VERSION, SPAN };

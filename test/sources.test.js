@@ -209,3 +209,11 @@ test('Nguồn sỉ: ảnh API hỏng → đọc ảnh thật từ trang SP (CDN)
 });
 
 test.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+test('Bảo hành đọc từ trang SP nguồn', () => {
+  const { pageWarranty } = require('../services/sources/woo');
+  assert.strictEqual(pageWarranty('<li class="bullet-checkmark">Thời gian bảo hành: 1 năm </li>'), 'Bảo hành 1 năm');
+  assert.strictEqual(pageWarranty('<li>Thời gian bảo hành: <b>6 Tháng</b></li>'), 'Bảo hành 6 tháng');
+  assert.strictEqual(pageWarranty('<li>Thời gian bảo hành: Không bảo hành</li>'), 'Không bảo hành');
+  assert.strictEqual(pageWarranty('<p>không ghi</p>'), 'Bảo hành chính hãng');
+});
