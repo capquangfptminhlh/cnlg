@@ -26,3 +26,8 @@ data/dropbuy-cred.json.tmp
 tools/*.exe
 # Khoa + cau hinh tunnel khi chay tren may chu (bi mat)
 data/tunnel/
+# Khoa deploy (chi doc) + file tam cua bo tu cap nhat tren may chu
+data/deploy/
+data/update.lock
+data/update.rejected
+data/*.update-keep
