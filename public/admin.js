@@ -1279,7 +1279,9 @@ loadAutoOrder();
 let tmCurrentPage = 1;
 let tmSearchTerm = '';
 
+let tmStatusTimer = null;
 async function loadTechmallStatus() {
+  clearTimeout(tmStatusTimer);
   try {
     const res = await (await adminFetch('/api/admin/techmall/status')).json();
     if (!res.success) return;
@@ -1295,7 +1297,9 @@ async function loadTechmallStatus() {
     if (badge) {
       if (s.running) {
         badge.className = 'auth-badge badge-warning';
-        badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đồng bộ...';
+        badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + (s.phase === 'images' && s.progress
+          ? 'Đang đọc ảnh ' + s.progress.done.toLocaleString('vi-VN') + '/' + s.progress.total.toLocaleString('vi-VN')
+          : 'Đang tải danh mục...');
       } else if (s.active) {
         badge.className = 'auth-badge badge-connected';
         badge.innerHTML = '<i class="fa-solid fa-bolt"></i> ' + (s.intervalMinutes || 10) + ' phút / lần';
@@ -1327,6 +1331,7 @@ async function loadTechmallStatus() {
         if (logoutBtn) logoutBtn.style.display = 'none';
       }
     }
+    if (s.running) tmStatusTimer = setTimeout(() => { loadTechmallStatus(); loadTechmallPricing(); }, 10000);
   } catch (err) {
     console.warn('[Admin] Lỗi load trạng thái TechMall:', err.message);
   }

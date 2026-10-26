@@ -1419,6 +1419,8 @@ function techmallStatus() {
     totalProducts: st.products,
     sellable: st.sellable,
     imagesPending: st.meta.images_pending || 0,
+    phase: st.sync.phase || null,
+    progress: st.sync.progress || null,
     complete: st.meta.complete !== false,
     auth: { authenticated: st.logged_in, username: st.username, authenticatedAt: src.store.getSession()?.logged_in_at || null, remembered: st.remembered }
   };

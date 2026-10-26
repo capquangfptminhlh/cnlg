@@ -122,7 +122,7 @@ function createWooSource(def) {
   let io = null;
   let syncing = null;
   let verifiedAt = 0;
-  const state = { lastRun: null, lastOk: null, lastError: null, lastDurationMs: null, failures: 0 };
+  const state = { lastRun: null, lastOk: null, lastError: null, lastDurationMs: null, failures: 0, phase: null, progress: null };
 
   async function http(p, { cookie, method = 'GET', body, headers = {}, redirect = 'follow', timeout = 30000 } = {}) {
     return doFetch(p.startsWith('http') ? p : base + p, {
@@ -314,10 +314,11 @@ function createWooSource(def) {
     return out;
   }
 
-  async function resolveImages(list, budget = 600) {
+  async function resolveImages(list, budget = 600, onBatch = () => {}) {
     const todo = list.filter(needsImages).slice(0, budget);
     let next = 0;
     let done = 0;
+    state.progress = { done: 0, total: todo.length };
     await Promise.all([1, 2, 3, 4].map(async () => {
       while (next < todo.length) {
         const p = todo[next++];
@@ -332,6 +333,8 @@ function createWooSource(def) {
             gallery: live.map(x => ({ url: x.url, thumb: x.thumb }))
           });
           done++;
+          state.progress = { done, total: todo.length };
+          if (done % 50 === 0) onBatch(); // lưu dần để admin/khách thấy SP lên kệ ngay, không chờ hết lượt
         } catch (e) { /* lượt sau thử lại */ }
       }
     }));
@@ -365,6 +368,8 @@ function createWooSource(def) {
     syncing = (async () => {
       const t0 = Date.now();
       state.lastRun = new Date().toISOString();
+      state.phase = 'catalog';
+      state.progress = null;
       try {
         const cookie = await ensureSession().catch(e => { console.warn(`[Nguồn ${def.label}] Đăng nhập lỗi:`, e.message); return null; });
         const meta = store.getMeta();
@@ -396,10 +401,20 @@ function createWooSource(def) {
           if (complete && !old.removed) { const gone = { ...old, removed: true, in_stock: false }; next.push(gone); changed.push(gone); }
           else next.push(old); // quét thiếu trang → giữ nguyên, không gỡ nhầm
         }
+        // Lưu ngay danh mục vừa tải (giá, tồn kho) – phần đọc ảnh có thể mất vài phút
+        store.saveProducts(next);
+        store.saveMeta({ ...meta, total: total || items.length, fetched: items.length, complete, logged_in: !!cookie });
         let images = null;
         if (def.resolvePageImages) {
+          state.phase = 'images';
           const before = new Map(next.map(p => [p.id, p.image]));
-          images = await resolveImages(next);
+          const flush = () => {
+            const fresh = next.filter(p => p.image !== before.get(p.id));
+            for (const p of fresh) before.set(p.id, p.image);
+            store.saveProducts(next);
+            emit(fresh);
+          };
+          images = await resolveImages(next, 600, flush);
           for (const p of next) if (p.image !== before.get(p.id) && !changed.includes(p)) changed.push(p);
         }
         store.saveProducts(next);
@@ -421,6 +436,8 @@ function createWooSource(def) {
         throw e;
       } finally {
         state.lastDurationMs = Date.now() - t0;
+        state.phase = null;
+        state.progress = null;
         syncing = null;
       }
     })();
