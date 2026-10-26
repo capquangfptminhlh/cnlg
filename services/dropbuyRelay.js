@@ -68,8 +68,8 @@ async function processOrderFulfillment(order, io) {
   if (io) {
     io.to(orderId).emit('ORDER_STATUS_UPDATE', {
       orderId,
-      status: 'CONNECTING_DROPBUY',
-      message: 'Đang kết nối DropBuy và khởi tạo đơn hàng...'
+      status: 'INITIALIZING_PAYMENT',
+      message: 'Đang khởi tạo mã thanh toán VietQR...'
     });
   }
 
@@ -105,7 +105,6 @@ async function processOrderFulfillment(order, io) {
     if (io) {
       io.to(orderId).emit('ORDER_QR_READY', {
         orderId,
-        dropbuyOrderId,
         qr: qrData,
         message: 'Mã QR thanh toán đã sẵn sàng!'
       });
@@ -219,9 +218,8 @@ async function processOrderFulfillment(order, io) {
     if (io) {
       io.to(orderId).emit('ORDER_QR_READY', {
         orderId,
-        dropbuyOrderId,
         qr: qrData,
-        message: 'Mã QR thanh toán DropBuy đã được đồng bộ realtime!'
+        message: 'Mã QR thanh toán đã sẵn sàng!'
       });
     }
 
@@ -256,7 +254,6 @@ async function processOrderFulfillment(order, io) {
     if (io) {
       io.to(orderId).emit('ORDER_QR_READY', {
         orderId,
-        dropbuyOrderId: `HM-${orderId}`,
         qr: qrData,
         message: 'Mã QR thanh toán đã sẵn sàng!'
       });
@@ -284,7 +281,7 @@ function confirmPayment(orderId, io) {
     io.to(orderId).emit('PAYMENT_CONFIRMED', {
       orderId,
       status: 'PAID',
-      message: 'Thanh toán thành công! DropBuy đang tiến hành đóng gói và giao hàng cho bạn.'
+      message: 'Thanh toán thành công! Cửa hàng đang tiến hành đóng gói và giao hàng cho bạn.'
     });
   }
 

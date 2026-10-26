@@ -104,3 +104,34 @@ test('vào danh mục là trang riêng: xem hết toàn bộ mục (cuộn vô h
   assert.match(app,/reqId !== state\.fetchSeq/); // bỏ kết quả cũ khi đổi mục giữa chừng
   assert.match(app,/insertAdjacentHTML\('beforeend'/); // tải thêm chỉ chèn thẻ mới
 });
+
+
+test('Flash Sale & Tổng Kho Giá Sỉ layer nạp đúng thứ tự, cân bằng ngoặc CSS và tôn trọng reduced-motion',()=>{
+  const fsCss=read('public/flash-sale.css');
+  const fsJs=read('public/flash-sale.js');
+  assert.ok(html.includes('href="/flash-sale.css"'),'flash-sale.css missing');
+  assert.ok(html.includes('src="/flash-sale.js"'),'flash-sale.js missing');
+  assert.doesNotThrow(()=>new Script(fsJs,{filename:'public/flash-sale.js'}));
+  const openBraces=(fsCss.match(/{/g)||[]).length, closeBraces=(fsCss.match(/}/g)||[]).length;
+  assert.equal(openBraces,closeBraces,'flash-sale.css block mismatch');
+  assert.match(fsCss,/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+  assert.match(fsCss,/body\.is-category-view\s+#flashSaleSection/);
+  assert.match(fsJs,/\/api\/flash-sale/);
+});
+
+
+test('Đơn hàng ảo nhảy liên tục + Bảo hành DropBuy chính xác + Hiệu ứng khan hiếm nút mua',()=>{
+  const fsCss=read('public/flash-sale.css');
+  const fsJs=read('public/flash-sale.js');
+  const appJs=read('public/app.js');
+  const mHome=read('public/marketplace-home.js');
+  assert.match(fsCss, /\.hm-live-order-toast/);
+  assert.match(fsCss, /\.fs-warranty-line/);
+  assert.match(fsCss, /\.detail-urgency-box/);
+  assert.match(fsCss, /\.btn-order-now-large\.is-urgent-buy/);
+  assert.match(fsJs, /hm-live-order-toast/);
+  assert.match(appJs, /urgencyStatsFor/);
+  assert.match(appJs, /detail-urgency-box/);
+  assert.match(appJs, /is-urgent-buy/);
+  assert.match(mHome, /fs-warranty-line/);
+});

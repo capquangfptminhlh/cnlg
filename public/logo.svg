@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="hmCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#fff5f2"/>
+    </linearGradient>
+    <linearGradient id="hmBrand" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff653e"/>
+      <stop offset="60%" stop-color="#ee4d2d"/>
+      <stop offset="100%" stop-color="#c93315"/>
+    </linearGradient>
+    <linearGradient id="hmAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffb703"/>
+      <stop offset="100%" stop-color="#fb8500"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="124" height="124" rx="28" fill="url(#hmCard)"/>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="none" stroke="#ffd8cc" stroke-width="2.5"/>
+  <!-- Bag Handle -->
+  <path d="M44 40 C44 23, 84 23, 84 40" fill="none" stroke="url(#hmAccent)" stroke-width="7.5" stroke-linecap="round"/>
+  <!-- Bag Body / Shield -->
+  <rect x="18" y="38" width="92" height="72" rx="16" fill="url(#hmBrand)"/>
+  <path d="M18 54 Q64 64 110 54" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="2.5"/>
+  <!-- HM Monogram -->
+  <g fill="#ffffff">
+    <path d="M27 56 H36.5 V71 H47.5 V56 H57 V96 H47.5 V80 H36.5 V96 H27 Z"/>
+    <path d="M62 56 H71.5 L81.5 75 L91.5 56 H101 V96 H91.5 V73 L82 91 H81 L71.5 73 V96 H62 Z"/>
+  </g>
+  <!-- Sparkle -->
+  <path d="M101 20 L103 25 L108 27 L103 29 L101 34 L99 29 L94 27 L99 25 Z" fill="url(#hmAccent)"/>
+</svg>

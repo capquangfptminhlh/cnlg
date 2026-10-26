@@ -12,7 +12,7 @@ const orderStore = require('./services/orderStore');
 const relay = require('./services/dropbuyRelay');
 const dropbuyAuth = require('./services/dropbuyAuth');
 const realtimeSync = require('./services/realtimeSync');
-const { requireAdmin, rateLimit, securityHeaders, forceHttps, getAdminPassword, sanitizeHtml, maskPhone } = require('./services/security');
+const { requireAdmin, rateLimit, securityHeaders, forceHttps, getAdminPassword, sanitizeHtml, maskPhone, isAdminCookie, isAdminRequest, setAdminCookie, clearAdminCookie, emitAdmin, safeEqual, stripSupplierText, renderAdminLoginGate } = require('./services/security');
 const pricing = require('./services/pricing');
 const { checkDropbuy } = require('./services/dropbuyHealth');
 const variants = require('./services/variants');
@@ -138,11 +138,58 @@ app.get('/sp/:slugId', async (req, res) => {
 });
 
 app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemapXml(req, storeCatalog.getProducts().filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p)))));
+app.get('/favicon.ico', (req, res) => res.type('image/svg+xml').set('Cache-Control', 'public, max-age=86400').sendFile(path.join(__dirname, 'public', 'favicon.svg')));
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(seo.robotsTxt(req)));
 
-app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+// Cổng bảo vệ tài nguyên Quản trị phía server: chặn hoàn toàn khách chưa xác thực đọc admin.html / admin.js / CSS nội bộ
+app.use((req, res, next) => {
+  let decoded = req.path || '';
+  try { decoded = decodeURIComponent(decoded); } catch (e) {}
+  if (decoded.toLowerCase().startsWith('/api/')) return next();
+  const base = path.posix.basename(decoded.replace(/[.\s/\\]+$/, '')).toLowerCase();
+  if (!base.startsWith('admin')) return next();
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  if (base === 'admin.html') {
+    if (!isAdminRequest(req)) {
+      const cfg = readConfig();
+      return res.status(200).type('html').send(renderAdminLoginGate(cfg.store?.name || 'Hoàng Minh Store'));
+    }
+    return res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+  }
+  if (!isAdminRequest(req)) {
+    return res.status(404).type('text/plain').send('Not Found');
+  }
+  const allowed = { 'admin.js': 'admin.js', 'admin-portal.css': 'admin-portal.css', 'admin-theme.css': 'admin-theme.css' }[base];
+  if (!allowed) return res.status(404).type('text/plain').send('Not Found');
+  return res.sendFile(path.join(__dirname, 'public', allowed));
+});
+
+app.use(express.static(path.join(__dirname, 'public'), {
+  index: false,
+  setHeaders(res, filePath) {
+    if (/admin\.(html|js)$|admin-(portal|theme)\.css$|dialogs\.js$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else if (/(storefront-match\.css|flash-sale\.(css|js)|app\.js|marketplace-home\.js|motion\.js)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+
+    }
+  }
+}));
 
 io.on('connection', socket => {
+  if (isAdminCookie(socket.handshake?.headers?.cookie)) {
+    socket.join('admins');
+  }
+  socket.on('join-admin', key => {
+    if (typeof key === 'string' && key && safeEqual(key, getAdminPassword())) {
+      socket.join('admins');
+    }
+  });
   socket.on('join-order', orderId => {
     if (typeof orderId === 'string' && /^HM[A-Z0-9]{6,10}$/.test(orderId)) socket.join(orderId);
   });
@@ -163,9 +210,15 @@ function publicProduct(p) {
   if (!p) return p;
   // Không lộ nguồn hàng cho khách: bỏ giá vốn/biên lãi và link/mã SP bên nguồn
   const { dropbuy_cost, profit_margin, is_wholesale_price, public_price, wholesale_price, pricing_rule, dropbuy_url, dropbuy_id,
-    source, source_id, source_url, dealer_price, retail_price, supplier_cost, removed, description, gallery, ...rest } = p;
+    shop_name, fs_program_code, removed_from_dropbuy, stock_qty, warranty_type, warranty_duration, cost, supplier, techmall_id, permalink,
+    source, source_id, source_url, dealer_price, retail_price, supplier_cost, removed, description, gallery, api_image, images_for, images_v, ...rest } = p;
   // "Giá gốc" nguồn đôi khi bị thổi (vd 574k so với 10 triệu = -94%) → giảm > 70% coi như không có giá gốc,
   // tránh hiển thị khuyến mãi trông như giả
+  if (rest.image) rest.image = catalogImage.maskMediaUrl(rest.image);
+  if (rest.image_hd) rest.image_hd = catalogImage.maskMediaUrl(rest.image_hd);
+  if (rest.warranty) rest.warranty = stripSupplierText(rest.warranty);
+  if (rest.name) rest.name = stripSupplierText(rest.name);
+  if (rest.description) rest.description = stripSupplierText(rest.description);
   const discount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
   if (discount > 70) return { ...rest, original_price: null, discount_percent: 0 };
   return { ...rest, discount_percent: discount };
@@ -190,7 +243,7 @@ function categoryIdsFor(catId) {
 
 /** Không để chữ "DropBuy" (nguồn hàng) lọt ra phía khách */
 // Chữ khách xem: bỏ tên nguồn hàng, đổi "Admin" (từ nội bộ, có ở đơn cũ) thành "Cửa hàng"
-const customerSafe = t => (t ? String(t).replace(/(trên|từ|của)?\s*drop\s*buy(\.vn)?/gi, '').replace(/\badmin\b/gi, 'Cửa hàng').replace(/\s{2,}/g, ' ').trim() || 'Đã huỷ' : t);
+const customerSafe = t => (t ? stripSupplierText(String(t)).replace(/\badmin\b/gi, 'Cửa hàng').replace(/\s{2,}/g, ' ').trim() || 'Đã huỷ' : t);
 
 /** Dữ liệu đơn trả cho khách: che bớt thông tin cá nhân, không lộ thông tin nội bộ. */
 function publicOrder(o) {
@@ -201,9 +254,9 @@ function publicOrder(o) {
     total_amount: o.total_amount,
     subtotal: o.subtotal ?? o.total_amount,
     shipping_fee: o.shipping_fee || 0,
-    shipping_detail: o.shipping_detail || null,
+    shipping_detail: stripSupplierText(o.shipping_detail) || null,
     cancel_reason: customerSafe(o.cancel_reason) || null,
-    items: (o.items || []).map(i => ({ id: i.id, name: i.name, variant_name: i.variant_name || null, price: i.price, quantity: i.quantity, image: i.image })),
+    items: (o.items || []).map(i => ({ id: i.id, name: i.name, variant_name: i.variant_name || null, price: i.price, quantity: i.quantity, image: catalogImage.maskMediaUrl(i.image) })),
     customer: { name: o.customer?.name, phone: maskPhone(o.customer?.phone), province: o.customer?.province || null, ward_name: o.customer?.ward_name || null },
     payment: o.payment,
     payment_method: o.payment_method || 'BANK',
@@ -250,7 +303,7 @@ app.get('/api/categories', (req, res) => {
     const withCount = cats.map(c => {
       let n = 0;
       for (const id of categoryIdsFor(c.id)) n += perCat.get(id) || 0;
-      return { ...c, product_count: n };
+      return { ...c, icon: c.icon ? catalogImage.maskMediaUrl(c.icon) : c.icon, product_count: n };
     });
     res.json({ success: true, data: withCount });
   } catch (err) {
@@ -278,9 +331,23 @@ app.get('/api/catalog-image/:id', async (req, res) => {
   }
 });
 
+app.get(/^\/cdn\/(md2?\/.+)$/, async (req, res) => {
+  try {
+    const result = await catalogImage.mediaFromCdnPath(req.params[0]);
+    if (!result) return res.sendStatus(404);
+    res.set('Content-Type', result.mime);
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.set('X-Content-Type-Options', 'nosniff');
+    return res.send(result.buffer);
+  } catch (error) {
+    res.set('Cache-Control', 'no-store');
+    return res.status(503).type('text/plain').send('\u1ea2nh t\u1ea1m th\u1eddi kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c');
+  }
+});
+
 app.get('/api/products', (req, res) => {
   try {
-    const { category, search, page = 1, limit = 24, sort = 'default', minPrice, maxPrice, inStock } = req.query;
+    const { category, search, page = 1, limit = 24, sort = 'default', minPrice, maxPrice, inStock, flashSale } = req.query;
     let products = storeCatalog.getProducts();
     // Không bán SP chưa có giá (DropBuy đôi khi để giá 0 khi ẩn giá / ngừng bán) hoặc chưa có ảnh thật
     products = products.filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p));
@@ -325,6 +392,13 @@ app.get('/api/products', (req, res) => {
       products = products.filter(p => p.price <= max);
     }
     if (inStock === '1') products = products.filter(p => p.in_stock !== false);
+    if (flashSale === '1') products = products.filter(p => p.is_flash_sale && p.in_stock !== false);
+
+    const validDisc = p => {
+      if (!p.original_price || p.original_price <= p.price) return 0;
+      const d = Math.round((1 - p.price / p.original_price) * 100);
+      return d > 70 ? 0 : d;
+    };
 
     if (sort === 'price-asc') {
       products.sort((a, b) => a.price - b.price);
@@ -332,6 +406,8 @@ app.get('/api/products', (req, res) => {
       products.sort((a, b) => b.price - a.price);
     } else if (sort === 'name-asc') {
       products.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    } else if (sort === 'discount-desc') {
+      products.sort((a, b) => (validDisc(b) - validDisc(a)) || ((b.is_flash_sale ? 1 : 0) - (a.is_flash_sale ? 1 : 0)) || (a.price - b.price));
     } else if (relevance) {
       // Mặc định khi tìm kiếm: xếp theo độ khớp
       products.sort((a, b) => relevance.get(b.id) - relevance.get(a.id));
@@ -348,6 +424,70 @@ app.get('/api/products', (req, res) => {
     res.json({ success: true, total, page: pageNum, totalPages: Math.ceil(total / limitNum) || 1, data: items });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Khung giờ Flash Sale Giá Sỉ trực tiếp từ catalog thật (xoay theo khung 3 giờ giờ Việt Nam)
+app.get('/api/flash-sale', (req, res) => {
+  try {
+    const sellable = scraper.getProducts().filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p) && p.in_stock !== false);
+    const discOf = p => {
+      if (!p.original_price || p.original_price <= p.price) return 0;
+      const d = Math.round((1 - p.price / p.original_price) * 100);
+      return d > 70 ? 0 : d;
+    };
+    const fsPool = sellable.filter(p => p.is_flash_sale && discOf(p) >= 15);
+    const dealPool = fsPool.length >= 18 ? fsPool : sellable.filter(p => discOf(p) >= 25);
+
+    const vnOffsetMs = 7 * 3600 * 1000;
+    const slotMs = 3 * 3600 * 1000;
+    const nowMs = Date.now();
+    const slotIndex = Math.floor((nowMs + vnOffsetMs) / slotMs);
+    const slotStartMs = slotIndex * slotMs - vnOffsetMs;
+    const slotEndMs = slotStartMs + slotMs;
+    const fmtHour = ms => {
+      const h = new Date(ms + vnOffsetMs).getUTCHours();
+      return `${String(h).padStart(2, '0')}:00`;
+    };
+
+    const byCat = new Map();
+    const sorted = [...dealPool].sort((a, b) => discOf(b) - discOf(a));
+    for (const p of sorted) {
+      const cid = p.category_id || 0;
+      if (!byCat.has(cid)) byCat.set(cid, []);
+      byCat.get(cid).push(p);
+    }
+    const picked = [];
+    const catLists = [...byCat.values()];
+    let round = 0;
+    while (picked.length < 18 && round < 10) {
+      for (let i = 0; i < catLists.length && picked.length < 18; i++) {
+        const list = catLists[(i + slotIndex) % catLists.length];
+        const idx = (round + (slotIndex % Math.max(1, Math.min(5, list.length)))) % list.length;
+        const cand = list[idx];
+        if (cand && !picked.some(x => x.id === cand.id)) picked.push(cand);
+      }
+      round++;
+    }
+
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({
+      success: true,
+      data: {
+        slotLabel: `${fmtHour(slotStartMs)} – ${fmtHour(slotEndMs)}`,
+        nextSlotLabel: fmtHour(slotEndMs),
+        slotEndsAt: new Date(slotEndMs).toISOString(),
+        stats: {
+          totalSellable: sellable.length,
+          totalFlashSale: sellable.filter(p => p.is_flash_sale).length,
+          under99kCount: sellable.filter(p => p.price <= 99000).length,
+          deepDealCount: sellable.filter(p => discOf(p) >= 25).length
+        },
+        items: picked.map(publicProduct)
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: stripSupplierText(err.message) });
   }
 });
 
@@ -369,33 +509,61 @@ app.get('/api/products/:id', async (req, res) => {
       const d = src.detail(product);
       const pub = publicProduct(product);
       return res.json({ success: true, data: {
-        ...pub, description: sanitizeHtml(d.description), gallery: d.gallery, video_url: null, variation_options: [],
+        ...pub, description: stripSupplierText(sanitizeHtml(d.description)), gallery: d.gallery, video_url: null, variation_options: [],
         variants: [{ id: product.variation_id, sku: product.sku, name: 'Mặc định', is_default: true, in_stock: product.in_stock !== false,
           price: product.price, original_price: pub.original_price || null, discount_percent: pub.discount_percent || 0, weight_gram: product.weight_gram || 0, image: null }]
       } });
     }
-    // Làm mới giá/tồn kho trực tiếp từ DropBuy (chạy nền, tối đa 1 lần / 30s mỗi SP); thay đổi được đẩy qua socket
-    const last = liveRefreshAt.get(id) || 0;
-    if (Date.now() - last > 30000) {
-      liveRefreshAt.set(id, Date.now());
-      realtimeSync.liveCheck([id]).catch(() => {});
+    const isDropbuy = !product.supplier || product.supplier === 'dropbuy';
+    if (isDropbuy) {
+      const last = liveRefreshAt.get(id) || 0;
+      if (Date.now() - last > 20000) {
+        liveRefreshAt.set(id, Date.now());
+        await Promise.race([realtimeSync.liveCheck([id]), new Promise(r => setTimeout(r, 2500))]).catch(() => {});
+      }
     }
-    const detail = await detailScraper.fetchProductFullDetail(product, false);
+    const freshProduct = scraper.getProducts().find(p => p.id === id) || product;
+    let detail;
+    if (isDropbuy) {
+      detail = await detailScraper.fetchProductFullDetail(freshProduct, false);
+    } else {
+      detail = {
+        id: freshProduct.id,
+        name: freshProduct.name,
+        slug: freshProduct.slug,
+        sku: freshProduct.sku,
+        price: freshProduct.price,
+        description: freshProduct.description || '',
+        gallery: (freshProduct.gallery && freshProduct.gallery.length) ? freshProduct.gallery : [{ url: freshProduct.image, thumb: freshProduct.image }],
+        warranty: freshProduct.warranty || 'Bảo hành chính hãng',
+        in_stock: freshProduct.in_stock !== false,
+        variations: [],
+        variation_options: []
+      };
+    }
     // Giá / tồn kho luôn lấy từ catalog hiện tại (bản cache chi tiết có thể đã cũ)
     const merged = {
       ...detail,
-      ...publicProduct(product),
-      description: sanitizeHtml(detail.description),
-      gallery: detail.gallery,
+      ...publicProduct(freshProduct),
+      description: stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(detail.description))),
+      warranty: stripSupplierText((!detail.fetch_failed && detail.warranty) || freshProduct.warranty || 'Không bảo hành'),
+      gallery: (detail.gallery || []).map(g => ({ ...g, url: catalogImage.maskMediaUrl(g.url), thumb: g.thumb ? catalogImage.maskMediaUrl(g.thumb) : g.thumb })),
       variations: detail.variations,
-      video_url: detail.video_url
+      video_url: catalogImage.maskMediaUrl(detail.video_url)
     };
     delete merged.dropbuy_cost;
     delete merged.dropbuy_url;
     delete merged.dropbuy_id;
     delete merged.rating;
     delete merged.sold_count;
-    merged.variants = await variants.variantsWithPrices(product, detail).catch(() => []);
+    delete merged.shop_name;
+    delete merged.fs_program_code;
+    delete merged.removed_from_dropbuy;
+    delete merged.stock_qty;
+    delete merged.cache_version;
+    delete merged.cached_at;
+    delete merged.fetch_failed;
+    merged.variants = (await variants.variantsWithPrices(freshProduct, detail).catch(() => [])).map(v => ({ ...v, image: v.image ? catalogImage.maskMediaUrl(v.image) : v.image }));
     merged.variation_options = detail.variation_options || [];
     delete merged.variations;
     res.json({ success: true, data: merged });
@@ -439,7 +607,10 @@ async function priceCartLines(items) {
     let price = p.price;
     let weight = 0;
     // Chi tiết (cache 6h) cho biết giá theo phân loại và khối lượng thật để tính phí ship
-    const detail = await detailScraper.fetchProductFullDetail(p, false).catch(() => null);
+    let detail = null;
+    if (!p.supplier || p.supplier === 'dropbuy') {
+      detail = await detailScraper.fetchProductFullDetail(p, false).catch(() => null);
+    }
     const vs = await variants.variantsWithPrices(p, detail).catch(() => []);
     const v = vs.find(x => x.id === it.variation_id) || vs.find(x => x.id === p.variation_id) || (vs.length === 1 ? vs[0] : null);
     if (v) { price = v.price; weight = v.weight_gram; }
@@ -456,7 +627,7 @@ app.post('/api/shipping/quote', rateLimit('quote', 10 * 60e3, 60), async (req, r
     const lines = await priceCartLines(items.slice(0, 30));
     const subtotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
     const q = await quoteShipping({ province, wardId: Number(ward_id) || null, subtotal, lines });
-    res.json({ success: true, data: { subtotal, shipping_fee: q.fee, total: subtotal + q.fee, ...q } });
+    res.json({ success: true, data: { subtotal, fee: q.fee, shipping_fee: q.fee, total: subtotal + q.fee, free_ship: !!q.free_ship, region: q.region, weight_gram: q.weight_gram || 0, source: q.source === 'dropbuy' ? 'live' : 'flat', detail: stripSupplierText(q.detail || '') } });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
@@ -509,19 +680,21 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       merged.set(key, cur);
     }
 
-    // Cập nhật catalog chung (giá/tồn kho cấp SP) chạy song song
-    realtimeSync.liveCheck([...new Set([...merged.values()].map(l => l.id))].filter(id => !storeCatalog.sourceOf(id))).catch(() => {});
+    // Quét TRỰC TIẾP giá & tồn kho DropBuy ngay lúc khách bấm Đặt hàng (SP nguồn sỉ khác kiểm tra với nguồn của nó)
+    await realtimeSync.liveCheck([...new Set([...merged.values()].map(l => l.id))].filter(id => !storeCatalog.sourceOf(id))).catch(() => {});
+    const freshKnown = new Map(storeCatalog.getProducts().map(p => [p.id, p]));
 
-    // Kiểm tra TRỰC TIẾP từng dòng (SKU phân loại) trên DropBuy
+    // Kiểm tra TRỰC TIẾP từng dòng (SKU phân loại + get-price không cache) trên DropBuy / nguồn sỉ
     const checked = await Promise.all([...merged.values()].map(async l => {
       const src = storeCatalog.sourceOf(l.id);
-      return { line: l, r: src ? await src.liveCheck(known.get(l.id)) : await variants.checkLine(known.get(l.id), l.variation_id) };
+      const prod = freshKnown.get(l.id) || known.get(l.id);
+      return { line: l, r: src ? await src.liveCheck(prod) : await variants.checkLine(prod, l.variation_id) };
     }));
     const problems = [];
     for (const { line, r } of checked) {
-      const label = `"${r.name || known.get(line.id).name}${r.variant_name ? ` – ${r.variant_name}` : ''}"`;
-      if (!r.ok) problems.push({ id: line.id, variation_id: line.variation_id, reason: r.in_stock === false ? 'OUT_OF_STOCK' : 'INVALID', message: r.message || `${label} hiện không đặt được.` });
-      else if (!(Number(r.price) > 0)) problems.push({ id: line.id, variation_id: line.variation_id, reason: 'INVALID', message: `${label} chưa có giá bán, tạm thời không đặt được.` });
+      const label = `"${r.name || (freshKnown.get(line.id) || known.get(line.id)).name}${r.variant_name ? ` – ${r.variant_name}` : ''}"`;
+      if (!r.ok) problems.push({ id: line.id, variation_id: line.variation_id, reason: r.in_stock === false ? 'OUT_OF_STOCK' : 'INVALID', message: stripSupplierText(r.message) || `${label} hiện không đặt được.` });
+      else if (!(Number(r.price) > 0) || (Number(r.cost) > 0 && Number(r.price) < Number(r.cost))) problems.push({ id: line.id, variation_id: line.variation_id, reason: 'INVALID', message: `${label} đang cập nhật lại giá từ kho, vui lòng thử lại sau giây lát.` });
       else if (line.expected != null && line.expected !== r.price) problems.push({ id: line.id, variation_id: line.variation_id, reason: 'PRICE_CHANGED', old_price: line.expected, price: r.price, message: `Giá ${label} vừa đổi từ ${line.expected.toLocaleString('vi-VN')} đ thành ${r.price.toLocaleString('vi-VN')} đ.` });
     }
     if (problems.length) {
@@ -530,7 +703,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
 
     const orderItems = checked.map(({ line, r }) => {
       const p = known.get(line.id);
-      return { id: line.id, sku: r.sku, variation_id: r.variation_id, variant_name: r.variant_name || null, name: p.name, price: r.price, quantity: line.quantity, image: p.image, weight_gram: r.weight_gram || 0, dropbuy_url: p.dropbuy_url, source: p.source || 'dropbuy', source_url: p.source_url || null, dropbuy_cost: r.cost, cost_is_wholesale: !!r.cost_is_wholesale, live_verified: r.live };
+      return { id: line.id, sku: r.sku, variation_id: r.variation_id, variant_name: r.variant_name || null, name: p.name, price: r.price, quantity: line.quantity, image: p.image, weight_gram: r.weight_gram || 0, dropbuy_url: p.dropbuy_url, source: p.source || 'dropbuy', source_url: p.source_url || null, dropbuy_cost: r.cost, cost_is_wholesale: !!r.cost_is_wholesale, fs_program_code: r.fs_program_code || p.fs_program_code || null, live_verified: r.live };
     });
     const subtotal = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
     // Cùng cách tính với lúc khách xem (phí DropBuy thật được nhớ 30 phút) → khách trả đúng số đã thấy
@@ -576,7 +749,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     setImmediate(() => {
       relay.processOrderFulfillment(order, io).catch(err => {
         console.error(`[Relay Error] Lỗi xử lý đơn #${order.id}:`, err.message);
-        io.to(order.id).emit('ORDER_STATUS_UPDATE', { orderId: order.id, status: 'ERROR', message: `Không tạo được mã thanh toán: ${err.message} Vui lòng liên hệ cửa hàng.` });
+        io.to(order.id).emit('ORDER_STATUS_UPDATE', { orderId: order.id, status: 'ERROR', message: 'Chưa tạo được mã thanh toán tự động. Vui lòng liên hệ cửa hàng để được hỗ trợ ngay.' });
         notify.paymentIssue(`Đơn ${order.id}: không tạo được mã QR – ${err.message}`);
       });
     });
@@ -613,7 +786,7 @@ app.post('/api/orders/:id/report-paid', rateLimit('report', 10 * 60e3, 20), (req
     return res.json({ success: true, data: publicOrder(order), message: 'Đơn hàng đã được ghi nhận trước đó.' });
   }
   const updated = orderStore.updateOrder(order.id, { status: 'PAYMENT_REPORTED', payment_reported_at: new Date().toISOString() });
-  io.emit('ADMIN_PAYMENT_REPORTED', { orderId: order.id, total_amount: order.total_amount });
+  emitAdmin(io, 'ADMIN_PAYMENT_REPORTED', { orderId: order.id, total_amount: order.total_amount });
   notify.paymentReported(updated);
   res.json({ success: true, data: publicOrder(updated), message: 'Đã ghi nhận. Cửa hàng sẽ xác nhận ngay khi nhận được tiền.' });
 });
@@ -641,7 +814,7 @@ function confirmOrderPayment(orderId, meta = {}) {
   const order = relay.confirmPayment(orderId, io);
   if (!order) return null;
   const updated = orderStore.updateOrder(orderId, { payment_via: meta.via || 'admin', payment_tx: meta.tx_id || null, paid_amount: meta.amount ?? order.total_amount });
-  io.emit('ADMIN_ORDER_CHANGED', { orderId, status: 'PAID' });
+  emitAdmin(io, 'ADMIN_ORDER_CHANGED', { orderId, status: 'PAID' });
   notify.paymentConfirmed(updated, meta.via === 'admin' ? 'admin xác nhận' : `tự động qua ${meta.via}`);
 
   // Tự đặt đơn DropBuy (nếu bật) hoặc đưa vào giỏ cho admin đặt tay
@@ -658,7 +831,7 @@ function processBankTransactions(txs) {
   return txs.map(tx => payments.handleTransaction(tx, {
     confirm: (orderId, meta) => confirmOrderPayment(orderId, meta),
     onIssue: entry => {
-      io.emit('ADMIN_ORDER_CHANGED', { orderId: entry.order_id });
+      emitAdmin(io, 'ADMIN_ORDER_CHANGED', { orderId: entry.order_id });
       if (entry.result !== 'ALREADY_PAID') notify.paymentIssue(`${entry.result}: ${entry.amount.toLocaleString('vi-VN')} đ – "${entry.content}"${entry.note ? ` (${entry.note})` : ''}`);
     }
   }));
@@ -685,7 +858,15 @@ app.post('/api/webhooks/casso', (req, res) => {
 
 // --- ADMIN API (cần header x-admin-key) ---
 
-app.get('/api/admin/session', requireAdmin, (req, res) => res.json({ success: true }));
+app.all('/api/admin/session', requireAdmin, (req, res) => {
+  setAdminCookie(req, res);
+  res.json({ success: true });
+});
+
+app.post('/api/admin/logout', (req, res) => {
+  clearAdminCookie(req, res);
+  res.json({ success: true });
+});
 
 app.post('/api/orders/:id/confirm-payment', requireAdmin, (req, res) => {
   try {
@@ -704,6 +885,7 @@ app.post('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
   const order = orderStore.updateOrder(req.params.id, { status, admin_note: note || undefined, ...(stamp ? { [stamp]: new Date().toISOString() } : {}), ...(status === 'CANCELLED' && !note ? { cancel_reason: 'Cửa hàng huỷ đơn' } : {}) });
   if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
   io.to(order.id).emit('ORDER_STATUS_UPDATE', { orderId: order.id, status, message: `Đơn hàng chuyển sang trạng thái ${status}` });
+  notify.notifyCustomerOrder(order).catch(() => {});
   res.json({ success: true, data: order });
 });
 
@@ -785,7 +967,7 @@ app.get('/api/admin/orders/:id/customer-message', requireAdmin, (req, res) => {
 app.post('/api/admin/orders/:id/test-flag', requireAdmin, (req, res) => {
   const o = orderStore.updateOrder(req.params.id, { is_test: req.body?.is_test !== false });
   if (!o) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
-  io.emit('ADMIN_ORDER_CHANGED', { orderId: o.id, status: o.status });
+  emitAdmin(io, 'ADMIN_ORDER_CHANGED', { orderId: o.id, status: o.status });
   res.json({ success: true, data: o });
 });
 
@@ -882,7 +1064,7 @@ app.post('/api/admin/config', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/sync', requireAdmin, (req, res) => {
   realtimeSync.runFullSync5Min(io)
-    .then(() => io.emit('CATALOG_SYNC_COMPLETED', { total: scraper.getProducts().length }))
+    .then(() => emitAdmin(io, 'CATALOG_SYNC_COMPLETED', { total: scraper.getProducts().length }))
     .catch(err => console.error('[Manual sync]:', err.message));
   res.json({ success: true, message: 'Đã bắt đầu quét lại toàn bộ kho DropBuy (giá + tồn kho).' });
 });
@@ -900,14 +1082,14 @@ app.post('/api/admin/download-all-images', requireAdmin, (req, res) => {
       try {
         await detailScraper.fetchProductFullDetail(p, true);
         count++;
-        if (count % 10 === 0) io.emit('DOWNLOAD_PROGRESS', { current: count, total: products.length });
+        if (count % 10 === 0) emitAdmin(io, 'DOWNLOAD_PROGRESS', { current: count, total: products.length });
       } catch (e) {
         console.error(`[BatchDownloader] Lỗi #${p.id}:`, e.message);
       }
       await new Promise(r => setTimeout(r, 300));
     }
     imageJobRunning = false;
-    io.emit('DOWNLOAD_COMPLETED', { total: count });
+    emitAdmin(io, 'DOWNLOAD_COMPLETED', { total: count });
   })();
 });
 
@@ -924,7 +1106,7 @@ app.post('/api/dropbuy/login', requireAdmin, async (req, res) => {
     watchdog.resetRelogin();
     realtimeSync.runFullSync5Min(io).catch(err => console.error('[Sync after login]:', err.message));
     watchdog.tick(io).catch(err => console.error('[Watchdog after login]:', err.message));
-    io.emit('DROPBUY_AUTH_CHANGED', { authenticated: true });
+    emitAdmin(io, 'DROPBUY_AUTH_CHANGED', { authenticated: true });
     res.json({ success: true, message: 'Đăng nhập DropBuy thành công! Đang đồng bộ lại giá sỉ.', data: { username: result.username, method: result.method } });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -936,7 +1118,7 @@ app.post('/api/dropbuy/set-cookie', requireAdmin, async (req, res) => {
     const result = await dropbuyAuth.setManualCookie(req.body?.cookie);
     realtimeSync.runFullSync5Min(io).catch(err => console.error('[Sync after set-cookie]:', err.message));
     watchdog.tick(io).catch(err => console.error('[Watchdog after set-cookie]:', err.message));
-    io.emit('DROPBUY_AUTH_CHANGED', { authenticated: true });
+    emitAdmin(io, 'DROPBUY_AUTH_CHANGED', { authenticated: true });
     res.json({ success: true, message: result.message });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -959,7 +1141,7 @@ app.get('/api/dropbuy/auth-status', requireAdmin, async (req, res) => {
 app.post('/api/dropbuy/logout', requireAdmin, (req, res) => {
   const result = dropbuyAuth.logout();
   vault.clear(); // đăng xuất = không tự đăng nhập lại nữa
-  io.emit('DROPBUY_AUTH_CHANGED', { authenticated: false });
+  emitAdmin(io, 'DROPBUY_AUTH_CHANGED', { authenticated: false });
   res.json(result);
 });
 
@@ -970,14 +1152,14 @@ const refPrice = p => p.public_price || p.retail_price || 0;
 
 function pricingStats(products) {
   const sellable = products.filter(p => p.in_stock !== false);
-  const profits = sellable.map(p => p.price - (p.dropbuy_cost || 0));
+  const profits = sellable.map(p => p.price - (p.dropbuy_cost || p.cost || 0));
   const belowPublic = products.filter(p => refPrice(p) && p.price <= refPrice(p)).length;
   return {
     total: products.length,
-    wholesaleCount: products.filter(p => p.wholesale_price > 0 || p.dealer_price > 0).length,
+    wholesaleCount: products.filter(p => p.wholesale_price > 0 || p.dealer_price > 0 || p.cost > 0).length,
     sellable: sellable.length,
     avgProfit: profits.length ? Math.round(profits.reduce((a, b) => a + b, 0) / profits.length) : 0,
-    negativeProfit: products.filter(p => p.price < (p.dropbuy_cost || 0)).length,
+    negativeProfit: products.filter(p => p.price < (p.dropbuy_cost || p.cost || 0)).length,
     belowOrEqualPublic: belowPublic,
     abovePublic: products.length - belowPublic
   };
@@ -1081,7 +1263,7 @@ app.get('/api/admin/pricing/products', requireAdmin, withPricingSource(async (re
   const rows = list.slice((pageNum - 1) * lim, pageNum * lim).map(p => ({
     id: p.id, sku: p.sku, name: p.name, image: p.image, category_name: p.category_name, in_stock: p.in_stock !== false,
     public_price: refPrice(p), wholesale_price: p.wholesale_price || p.dealer_price || null, cost: p.dropbuy_cost, price: p.price,
-    profit: p.price - (p.dropbuy_cost || 0), rule: p.pricing_rule, override: rules.productOverrides[String(p.id)] || null, dropbuy_url: p.dropbuy_url || p.source_url
+    profit: p.price - (p.dropbuy_cost || 0), rule: p.pricing_rule, override: rules.productOverrides[String(p.id)] || null, dropbuy_url: p.dropbuy_url || p.source_url, is_flash_sale: !!p.is_flash_sale
   }));
   res.json({ success: true, total: list.length, page: pageNum, totalPages: Math.ceil(list.length / lim) || 1, data: rows });
 }));
@@ -1200,12 +1382,119 @@ app.get('/api/admin/dropbuy-health', requireAdmin, async (req, res) => {
 app.get('/healthz', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()), products: storeCatalog.getProducts().length }));
 
 app.get('/api/realtime/status', (req, res) => {
+  res.json({ success: true, data: realtimeSync.getPublicSyncStatus() });
+});
+
+app.get('/api/admin/realtime-status', requireAdmin, (req, res) => {
   res.json({ success: true, data: realtimeSync.getSyncStatus() });
 });
 
 app.post('/api/realtime/sync-now', requireAdmin, (req, res) => {
   res.json({ success: true, message: 'Đã kích hoạt quét đồng bộ kho DropBuy ngay lập tức!' });
   realtimeSync.runFullSync5Min(io).catch(err => console.error('[Manual Sync Error]:', err.message));
+});
+
+
+// ==========================================
+// QUẢN TRỊ KHO TECHMALL.VN & GIÁ BÁN RIÊNG
+// Trang "Kho TechMall" của admin dùng các đường dưới; bên dưới chạy bằng khung nguồn hàng (services/sources).
+// ==========================================
+const techmallSource = () => sources.get('techmall');
+
+function techmallStatus() {
+  const src = techmallSource();
+  const st = src.status();
+  const cfg = readConfig();
+  const minutes = Math.min(180, Math.max(5, Number(cfg.sources?.techmall?.intervalMinutes) || src.def.intervalMinutes || 10));
+  const last = st.meta.lastSync || st.sync.lastOk;
+  return {
+    active: cfg.sources?.techmall?.enabled !== false,
+    running: !!st.sync.running,
+    intervalMinutes: minutes,
+    lastRun: st.sync.lastRun,
+    lastOk: last,
+    nextRun: last ? new Date(Date.parse(last) + minutes * 60e3).toISOString() : null,
+    lastError: st.sync.lastError,
+    lastChanges: st.meta.changed || 0,
+    totalProducts: st.products,
+    sellable: st.sellable,
+    imagesPending: st.meta.images_pending || 0,
+    complete: st.meta.complete !== false,
+    auth: { authenticated: st.logged_in, username: st.username, authenticatedAt: src.store.getSession()?.logged_in_at || null, remembered: st.remembered }
+  };
+}
+
+app.get('/api/admin/techmall/status', requireAdmin, (req, res) => {
+  res.json({ success: true, data: techmallStatus() });
+});
+
+app.post('/api/admin/techmall/login', requireAdmin, rateLimit('srcLogin', 15 * 60e3, 10), async (req, res) => {
+  try {
+    const { username, password, remember = true } = req.body || {};
+    if (!username || !password) return res.status(400).json({ success: false, error: 'Nhập tài khoản và mật khẩu đại lý TechMall.' });
+    const src = techmallSource();
+    const r = await src.login(String(username).trim(), String(password), { remember: remember !== false });
+    src.syncAll().catch(e => console.warn('[Nguồn TechMall] Lỗi quét sau đăng nhập:', e.message));
+    res.json({ success: true, message: 'Đã kết nối tài khoản đại lý TechMall: ' + r.username + '. Đang quét lại giá đại lý...', data: r });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/admin/techmall/logout', requireAdmin, (req, res) => {
+  techmallSource().logout();
+  res.json({ success: true, message: 'Đã ngắt kết nối tài khoản TechMall và xoá mật khẩu đã lưu.' });
+});
+
+app.get('/api/admin/techmall/pricing', requireAdmin, (req, res) => {
+  const src = techmallSource();
+  const list = src.store.getProducts().filter(p => !p.removed);
+  const stats = { ...pricingStats(list), sellable: src.status().sellable };
+  res.json({ success: true, data: { rules: src.rules(readConfig()), stats, auth: techmallStatus().auth } });
+});
+
+// { markupPercent, minProfit, roundTo, capAtPublic, surchargePercent, categoryMarkups? }
+app.post('/api/admin/techmall/pricing', requireAdmin, async (req, res) => {
+  try {
+    const src = techmallSource();
+    const cfg = readConfig();
+    const current = src.rules(cfg);
+    const b = { ...(req.body || {}) };
+    delete b.base; // nguồn sỉ luôn tính trên giá đại lý
+    const rules = normalizeSourceRules({ ...current, ...b, productOverrides: b.productOverrides ?? current.productOverrides }, src.def.pricingDefaults);
+    cfg.sources = cfg.sources || {};
+    cfg.sources.techmall = { ...(cfg.sources.techmall || {}), pricing: rules };
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
+    const changed = src.reprice();
+    const list = src.store.getProducts().filter(p => !p.removed);
+    res.json({ success: true, message: 'Đã lưu bảng giá riêng TechMall. Đã cập nhật giá bán cho ' + changed + ' sản phẩm.', data: { rules, stats: { ...pricingStats(list), sellable: src.status().sellable } } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Một lần quét = toàn bộ kho (~10.000 SP, ~1 phút) + đọc ảnh SP mới, nên "đồng bộ ngay" và "tải toàn bộ" là một việc
+function startTechmallSync(res, message) {
+  const src = techmallSource();
+  if (src.status().sync.running) return res.json({ success: true, message: 'TechMall đang được quét, vui lòng chờ…', data: techmallStatus() });
+  src.syncAll().catch(err => console.error('[Nguồn TechMall] Lỗi quét:', err.message));
+  res.json({ success: true, message, data: techmallStatus() });
+}
+app.post('/api/admin/techmall/sync', requireAdmin, (req, res) => startTechmallSync(res, 'Đang quét giá đại lý & tồn kho toàn bộ kho TechMall (khoảng 1–3 phút)...'));
+app.post('/api/admin/techmall/fetch-all', requireAdmin, (req, res) => startTechmallSync(res, 'Đang tải toàn bộ kho TechMall trong nền (khoảng 1–3 phút, SP mới cần thêm vài phút để đọc ảnh)...'));
+
+app.get('/api/admin/techmall/products', requireAdmin, (req, res) => {
+  const { search = '', page = 1, limit = 20, all = '' } = req.query;
+  const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+  let list = techmallSource().store.getProducts().filter(p => !p.removed && (all === '1' || p.image));
+  if (search) list = list.filter(p => norm(p.name).includes(norm(search)) || norm(p.sku).includes(norm(search)) || String(p.id) === String(search));
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const lim = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+  const rows = list.slice((pageNum - 1) * lim, pageNum * lim).map(p => ({
+    id: p.id, sku: p.sku, name: p.name, image: p.image, category_name: p.category_name, in_stock: p.in_stock !== false,
+    cost: p.supplier_cost, wholesale_price: p.dealer_price, retail_price: p.retail_price, price: p.price, rule: p.pricing_rule, source_url: p.source_url
+  }));
+  res.json({ success: true, total: list.length, page: pageNum, totalPages: Math.ceil(list.length / lim) || 1, data: rows });
 });
 
 process.on('uncaughtException', err => {
@@ -1223,11 +1512,14 @@ server.listen(PORT, () => {
   console.log(`🔗 Storefront: http://localhost:${PORT}`);
   console.log(`🔗 Admin Console: http://localhost:${PORT}/admin.html`);
   console.log(`================================================================`);
+  const legacy = storeCatalog.removeLegacyPartnerItems();
+  if (legacy) console.log(`[Nguồn hàng] Đã gỡ ${legacy} SP TechMall cũ khỏi data/products.json (nay ở data/source-techmall-*.json).`);
   realtimeSync.startRealtimeSync(io);
   sources.start(io, readConfig);
   orderExpiry.startOrderExpiry(io, readConfig);
   backup.startBackups();
   watchdog.startWatchdog(io);
+  notify.startZaloBotPolling();
 
   // Định kỳ mỗi 2 phút đồng bộ trạng thái đơn hàng từ DropBuy đến khi hoàn tất
   setInterval(() => {

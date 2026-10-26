@@ -1,4 +1,5 @@
 const orderStore = require('./orderStore');
+const { emitAdmin } = require('./security');
 
 /**
  * Tự huỷ đơn chờ thanh toán quá hạn (config.orders.paymentTimeoutMinutes, mặc định 30 phút).
@@ -31,13 +32,13 @@ function sweep(io, getConfig) {
       cancelled++;
       if (io) {
         io.to(o.id).emit('ORDER_EXPIRED', { orderId: o.id, message: `Đơn ${o.id} đã tự huỷ vì quá ${rules.paymentTimeoutMinutes} phút chưa thanh toán. Vui lòng đặt lại nếu bạn vẫn muốn mua.` });
-        io.emit('ADMIN_ORDER_CHANGED', { orderId: o.id, status: 'CANCELLED' });
+        emitAdmin(io, 'ADMIN_ORDER_CHANGED', { orderId: o.id, status: 'CANCELLED' });
       }
     } else if (o.status === 'PAYMENT_REPORTED' && !o.needs_attention) {
       const reported = new Date(o.payment_reported_at || o.created_at).getTime();
       if (now - reported > rules.reportedAlertHours * 3600000) {
         orderStore.updateOrder(o.id, { needs_attention: true });
-        if (io) io.emit('ADMIN_ORDER_CHANGED', { orderId: o.id, status: o.status, needs_attention: true });
+        if (io) emitAdmin(io, 'ADMIN_ORDER_CHANGED', { orderId: o.id, status: o.status, needs_attention: true });
       }
     }
   }

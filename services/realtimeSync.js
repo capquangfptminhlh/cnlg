@@ -1,5 +1,7 @@
 const scraper = require('./dropbuyScraper');
 const dropbuySession = require('./dropbuySession');
+const catalogImage = require('./catalogImage');
+const { emitAdmin, stripSupplierText } = require('./security');
 
 /**
  * Đồng bộ realtime với DropBuy – 2 vòng độc lập:
@@ -44,8 +46,10 @@ function withCatalogLock(fn) {
 
 /** Thông tin công khai của SP (khớp với publicProduct trong server.js) để gửi qua socket */
 function publicPatch(p) {
-  const discount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
-  return { id: p.id, name: p.name, price: p.price, original_price: p.original_price, discount_percent: discount, in_stock: p.in_stock !== false, image: p.image, category_id: p.category_id, variant_count: p.variant_count };
+  const rawDiscount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
+  const discount = rawDiscount > 70 ? 0 : rawDiscount;
+  const original = rawDiscount > 70 ? null : p.original_price;
+  return { id: p.id, name: stripSupplierText(p.name), price: p.price, original_price: original, discount_percent: discount, in_stock: p.in_stock !== false, image: catalogImage.maskMediaUrl(p.image), category_id: p.category_id, variant_count: p.variant_count, warranty: stripSupplierText(p.warranty || '') };
 }
 
 function emitChanges(changed, meta = {}) {
@@ -58,7 +62,8 @@ async function runStockSync() {
   return withCatalogLock(async () => {
     const config = scraper.getConfig();
     const products = scraper.getProducts();
-    const stock = await scraper.fetchStockMap(products.map(p => p.id), config);
+    const dropbuyProducts = products.filter(p => !p.supplier || p.supplier === 'dropbuy');
+    const stock = await scraper.fetchStockMap(dropbuyProducts.map(p => p.id), config);
     const changed = [];
     for (const p of products) {
       if (!stock.has(p.id)) continue;
@@ -106,7 +111,7 @@ async function runPriceSync() {
         continue;
       }
       const priceDiff = cur.price !== fresh.price || cur.original_price !== fresh.original_price || cur.dropbuy_cost !== fresh.dropbuy_cost;
-      const infoDiff = cur.name !== fresh.name || cur.image !== fresh.image || cur.variant_count !== fresh.variant_count;
+      const infoDiff = cur.name !== fresh.name || cur.image !== fresh.image || cur.variant_count !== fresh.variant_count || cur.warranty !== fresh.warranty;
       // in_stock do vòng tồn kho quyết định (API in-stock chuẩn hơn cờ trong kết quả tìm kiếm)
       const keepStock = cur.in_stock;
       Object.assign(cur, fresh, { in_stock: keepStock, updated_at: priceDiff || infoDiff ? fresh.updated_at : cur.updated_at });
@@ -118,12 +123,13 @@ async function runPriceSync() {
     // SP không còn trên DropBuy (chỉ kết luận khi đã quét đủ mọi trang) → ngừng bán
     // Kho bỗng nhỏ hơn hẳn lần quét đủ trước (vd phiên vừa hết hạn → chỉ thấy kho công khai) → không gỡ SP nào
     // Mốc so sánh: lần quét đủ trước, hoặc số SP đang bán trong catalog (giữ được qua lần khởi động lại)
-    const baseline = Math.max(lastCompleteTotal, products.filter(p => !p.removed_from_dropbuy).length);
+    const baseline = Math.max(lastCompleteTotal, products.filter(p => (!p.supplier || p.supplier === 'dropbuy') && !p.removed_from_dropbuy).length);
     const shrunk = baseline > 0 && totalRecords < baseline * 0.5;
     if (shrunk) console.warn(`[RealtimeSync] DropBuy chỉ trả ${totalRecords} SP (mốc trước: ${baseline}) – bỏ qua bước gỡ SP.`);
     if (complete && !shrunk) {
       lastCompleteTotal = totalRecords;
       for (const p of products) {
+        if (p.supplier && p.supplier !== 'dropbuy') continue;
         if (!liveIds.has(p.id) && !p.removed_from_dropbuy) {
           p.in_stock = false;
           p.removed_from_dropbuy = true;
@@ -171,7 +177,10 @@ async function tick(loop, fn) {
     loop.running = false;
     const delay = loop.failures ? Math.min(MAX_BACKOFF_MS, loop.baseMs * 2 ** loop.failures) : loop.baseMs;
     schedule(loop, fn, delay);
-    if (ioRef) ioRef.emit('REALTIME_HEARTBEAT', getSyncStatus());
+    if (ioRef) {
+      ioRef.emit('REALTIME_HEARTBEAT', getPublicSyncStatus());
+      emitAdmin(ioRef, 'ADMIN_REALTIME_HEARTBEAT', getSyncStatus());
+    }
   }
 }
 
@@ -214,8 +223,8 @@ async function liveCheck(productIds) {
         const item = liveItems[i];
         if (item) {
           const fresh = scraper.mapItem(item, { ctx, priceMap, previous: cur, keepWholesale: !!config.dropbuy?.cookieHeader });
-          if (fresh.price !== cur.price || fresh.original_price !== cur.original_price) {
-            Object.assign(cur, { price: fresh.price, original_price: fresh.original_price, dropbuy_cost: fresh.dropbuy_cost, public_price: fresh.public_price, wholesale_price: fresh.wholesale_price, profit_margin: fresh.profit_margin, is_wholesale_price: fresh.is_wholesale_price, pricing_rule: fresh.pricing_rule, updated_at: fresh.updated_at });
+          if (fresh.price !== cur.price || fresh.original_price !== cur.original_price || fresh.warranty !== cur.warranty) {
+            Object.assign(cur, { price: fresh.price, original_price: fresh.original_price, dropbuy_cost: fresh.dropbuy_cost, public_price: fresh.public_price, wholesale_price: fresh.wholesale_price, is_flash_sale: fresh.is_flash_sale, fs_program_code: fresh.fs_program_code, profit_margin: fresh.profit_margin, is_wholesale_price: fresh.is_wholesale_price, pricing_rule: fresh.pricing_rule, warranty: fresh.warranty, warranty_type: fresh.warranty_type, warranty_duration: fresh.warranty_duration, updated_at: fresh.updated_at });
             changed.push(cur);
           }
         }
@@ -265,6 +274,19 @@ function getSyncStatus() {
   };
 }
 
+function getPublicSyncStatus() {
+  const pubView = l => ({ intervalSeconds: l.baseMs / 1000, running: l.running, lastOk: l.lastOk, nextRun: l.nextRun });
+  return {
+    active: !!(loops.stock.timer || loops.price.timer),
+    stock: pubView(loops.stock),
+    price: pubView(loops.price),
+    intervalMinutes: Math.round(loops.price.baseMs / 60000) || 1,
+    lastSyncTime: loops.stock.lastOk || loops.price.lastOk,
+    nextSyncTime: [loops.stock.nextRun, loops.price.nextRun].filter(Boolean).sort()[0] || null,
+    totalProducts: scraper.getProducts().filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p)).length
+  };
+}
+
 module.exports = {
   startRealtimeSync,
   runFullSync5Min,
@@ -272,5 +294,9 @@ module.exports = {
   runPriceSync,
   liveCheck,
   repriceNow,
-  getSyncStatus
+  getSyncStatus,
+  getPublicSyncStatus,
+  publicPatch,
+  withCatalogLock,
+  emitChanges
 };

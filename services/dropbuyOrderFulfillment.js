@@ -4,6 +4,7 @@ const dropbuyCart = require('./dropbuyCart');
 const { bff, ensureSession, DropbuyError } = require('./dropbuySession');
 const { notify } = require('./notify');
 const { vnDate } = require('./backup');
+const { emitAdmin } = require('./security');
 
 /**
  * VÒNG ĐỜI ĐƠN TRÊN DROPBUY
@@ -53,9 +54,10 @@ const inFlight = new Set();
 const { withCartLock, snapshotCart, selectOnly, restoreCart, groupByDepot, shippingFor } = dropbuyCart;
 
 function emit(io, order, status, message) {
+  if (order?.id && typeof notify.notifyCustomerOrder === 'function') notify.notifyCustomerOrder(order.id).catch(() => {});
   if (!io) return;
   if (message) io.to(order.id).emit('ORDER_STATUS_UPDATE', { orderId: order.id, status, message });
-  io.emit('ADMIN_ORDER_CHANGED', { orderId: order.id, status });
+  emitAdmin(io, 'ADMIN_ORDER_CHANGED', { orderId: order.id, status });
 }
 
 function setSync(id, patch, extra = {}) {

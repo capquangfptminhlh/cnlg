@@ -23,18 +23,18 @@
   // Real, keyboard accessible banner carousel — informational messages only;
   // never pretend a promotion, review score or discount exists.
   const slides = [
-    {label:'HOÀNG MINH STORE',over:'KHÁM PHÁ ĐIỀU HAY',
-      headline:'Mọi thứ bạn cần,<span><em>ở ngay đây.</em></span>',
-      description:'Phụ kiện, công nghệ và tiện ích cho mỗi ngày.',
-      cta:'Xem sản phẩm',href:'#catalog'},
-    {label:'MUA SẮM DỄ DÀNG',over:'DỄ TÌM · DỄ CHỌN',
-      headline:'Chọn đúng sản phẩm,<span><em>hợp nhu cầu.</em></span>',
-      description:'Duyệt danh mục, lọc giá và xem thông tin chi tiết.',
-      cta:'Khám phá danh mục',href:'#catalog'},
-    {label:'HOÀNG MINH STORE',over:'TIỆN LỢI MỖI NGÀY',
-      headline:'Thêm vào giỏ,<span><em>mua thật dễ.</em></span>',
-      description:'Chọn món bạn thích và quản lý giỏ hàng.',
-      cta:'Mua sắm ngay',href:'#catalog'}
+    {label:'TỔNG KHO GIÁ SỈ HOÀNG MINH',icon:'fa-bolt',over:'MUA LẺ 1 MÓN · TÍNH GIÁ SỈ TẬN GỐC',
+      headline:'Giá sỉ tận kho,<span><em>rẻ vô địch!</em></span>',
+      description:'Nhập trực tiếp tổng kho không qua trung gian — tiết kiệm tới 70% mỗi đơn hàng.',
+      cta:'Săn Giá Sỉ Ngay',ctaIcon:'fa-bolt',href:'#flashSaleSection'},
+    {label:'ĐẠI TIỆC FLASH SALE KHUNG GIỜ',icon:'fa-fire-flame-curved',over:'HƠN 1.900+ DEAL ĐANG NỔ GIÁ SỐC',
+      headline:'Deal hời mỗi giờ,<span><em>chốt kẻo lỡ!</em></span>',
+      description:'Tự động quét tồn kho & hạ giá sỉ theo thời gian thực — luôn rẻ bậc nhất thị trường.',
+      cta:'Vào Khung Giờ Săn Sale',ctaIcon:'fa-fire',href:'#flashSaleSection'},
+    {label:'ĐỒNG KIỂM TOÀN QUỐC · AN TÂM 100%',icon:'fa-shield-halved',over:'NHẬN HÀNG KIỂM TRA · MỚI TRẢ TIỀN',
+      headline:'Mở hộp kiểm tra,<span><em>ưng mới nhận!</em></span>',
+      description:'Hàng chuẩn chính hãng, báo cước vận chuyển thật siêu rẻ tới từng phường/xã.',
+      cta:'Xem Bảng Giá Sỉ',ctaIcon:'fa-arrow-right',href:'#catalog'}
   ];
   if (hero) {
     const heading=hero.querySelector('.market-banner-copy h1');
@@ -66,11 +66,11 @@
         const setContents=()=>{
           const s=slides[next];
           hero.dataset.slide=String(next);
-          label.innerHTML='<i class="fa-solid fa-star"></i> '+s.label;
+          label.innerHTML='<i class="fa-solid '+(s.icon||'fa-bolt')+'"></i> '+s.label;
           over.textContent=s.over;
           heading.innerHTML=s.headline; // all values are hardcoded above, never external data
           subtitle.textContent=s.description;
-          shopBtn.innerHTML=s.cta+' <i class="fa-solid fa-arrow-right"></i>';
+          shopBtn.innerHTML=s.cta+' <i class="fa-solid '+(s.ctaIcon||'fa-arrow-right')+'"></i>';
           shopBtn.setAttribute('href',s.href);
           dotBar.querySelectorAll('button').forEach((btn,i)=>{
             btn.classList.toggle('active',i===next);
@@ -110,7 +110,7 @@
 
   // Animate sections only when in view. Dynamic cards get observed after data refresh.
   const staticTargets=['.market-main-banner','.market-banner-side','.market-sidebar',
-    '.market-shortcuts','.featured-header','.filter-bar','.market-footer-offers'];
+    '.market-shortcuts','.si-guarantee-bar','.flash-sale-section','.featured-header','.filter-bar','.market-footer-offers'];
   function initReveals(){
     if(reducedMotion.matches || !('IntersectionObserver' in window))return;
     revealObserver=new IntersectionObserver(entries=>{
@@ -206,7 +206,7 @@
   }
   // Capture the specific add-to-cart button from a real user click.
   document.addEventListener('click',e=>{
-    const source=e.target.closest('.btn-add-mini,.btn-add-cart-large,#detailAddCartBtn,.btn-detail-cart,.btn-add-cart');
+    const source=e.target.closest('.btn-add-mini,.featured-cart,.fs-cart-btn,.btn-add-cart-large,#detailAddCartBtn,.btn-detail-cart,.btn-add-cart');
     if(source && !source.disabled)lastCartClick={node:source,at:Date.now()};
     const heart=e.target.closest('.card-heart');
     if(heart && !reducedMotion.matches){

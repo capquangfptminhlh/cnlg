@@ -13,12 +13,12 @@
   ].filter(Boolean);
   let generation=0;
   function createPictureLabel(img) {
-    const card=img.closest('.luxury-card,.featured-card');
-    const container=img.closest('.card-media,.featured-media');
+      const card=img.closest('.luxury-card,.featured-card,.fs-card');
+    const container=img.closest('.card-media,.featured-media,.fs-media');
     if(!container)return null;
     let fallback=container.querySelector('.premium-image-fallback');
     if(fallback)return fallback;
-    const name=card?.querySelector('.card-title,.featured-name')?.textContent?.trim()||'Sản phẩm đang cập nhật ảnh';
+    const name=card?.querySelector('.card-title,.featured-name,.fs-title')?.textContent?.trim()||'Sản phẩm đang cập nhật ảnh';
     fallback=document.createElement('div');
     fallback.className='premium-image-fallback';
     fallback.setAttribute('role','img');
@@ -46,7 +46,7 @@
       placeholder?.remove();
     };
     const onError=()=>{
-      const card=img.closest('.luxury-card,.featured-card');
+        const card=img.closest('.luxury-card,.featured-card,.fs-card');
       const id=Number(card?.dataset.id||card?.dataset.productId);
       // Live storefront: retry once through the store's own public image endpoint.
       // In static Pages demo the image is already mirrored, so no backend is used.
@@ -68,11 +68,11 @@
     }
   }
   function observeCards() {
-    document.querySelectorAll('#productGrid .card-media img,#featuredProducts .featured-media img')
+    document.querySelectorAll('#productGrid .card-media img,#featuredProducts .featured-media img,#fsTrack .fs-media img')
       .forEach(trackImage);
   }
   const cardObserver=new MutationObserver(observeCards);
-  [document.getElementById('productGrid'),document.getElementById('featuredProducts')]
+  [document.getElementById('productGrid'),document.getElementById('featuredProducts'),document.getElementById('fsTrack')]
     .filter(Boolean).forEach(node=>cardObserver.observe(node,{childList:true,subtree:true}));
   observeCards();
 

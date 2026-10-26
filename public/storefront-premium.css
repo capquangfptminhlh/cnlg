@@ -257,8 +257,8 @@ body { background:var(--shop-bg);color:#242938;font-size:13px;font-family:var(--
 .card-heart{background:#fff;box-shadow:0 2px 8px rgba(24,32,53,.09);width:29px;height:29px;right:7px;top:7px;}
 .card-details{padding:11px;gap:7px;}
 .card-category{font-size:9px;color:#ef7154;text-transform:none;font-weight:750;}
-.card-meta{font-size:9px;color:#9099a8;min-height:16px;}
-.card-meta i{color:#b0bac5;}
+.card-meta{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:#0f766e;background:#f0fdfa;border:1px solid #ccfbf1;padding:2px 7px;border-radius:5px;width:fit-content;}
+.card-meta i{color:#0d9488;}
 .card-pricing{gap:3px;display:flex;align-items:baseline;flex-wrap:wrap;}
 .card-actions-row{gap:7px;}
 .btn-add-mini{border:1px solid #ffd9cd;background:#fff1ec;color:#ec4f32;border-radius:6px;}
@@ -420,7 +420,7 @@ body { background:var(--shop-bg);color:#242938;font-size:13px;font-family:var(--
   .featured-name,.card-title{font-size:11px;line-height:1.55;min-height:35px;}
   .featured-price,.card-pricing .price-highlight{font-size:15px !important;}
   .featured-buy,.btn-buy-instant{min-height:34px;font-size:10px;}
-  .card-meta{display:none;}
+  .card-meta{display:inline-flex;font-size:9.5px;padding:1px 5px;}
   .card-category{font-size:8px;}
   .main-layout{padding-top:13px;}
   .filter-bar{padding:14px 11px;margin-bottom:10px;gap:10px;}
