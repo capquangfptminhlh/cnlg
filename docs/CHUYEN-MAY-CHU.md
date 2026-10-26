@@ -69,5 +69,24 @@ Trên máy cũ: đổi tên `HoangMinhStore.cmd.da-chuyen-may` trong thư mục 
 | Nhật ký cửa hàng | `data\server.log` |
 | Nhật ký tunnel | `data\tunnel.log` |
 | Tắt / bật | Task Scheduler → `HoangMinh Store`, `HoangMinh Tunnel` |
-| Cập nhật mã mới | `git pull` rồi khởi động lại tác vụ `HoangMinh Store` |
+| Cập nhật mã mới | tự động mỗi 5 phút (mục dưới); nhật ký `data\update.log` |
 | Sao lưu | tự động trong `data\backups\` (nên chép ra USB / ổ khác định kỳ) |
+
+## Tự cập nhật mã nguồn từ GitHub (bật một lần)
+
+Tác vụ **HoangMinh Update** chạy mỗi 5 phút: có bản mới trên `main` → lấy về → chạy test →
+test đạt mới khởi động lại cửa hàng (gián đoạn vài giây) → cửa hàng không lên thì tự quay về bản cũ.
+Test hỏng thì giữ nguyên bản đang chạy và không thử lại bản đó. Danh mục đang bán (`data\products.json`) luôn được giữ.
+
+1. Trên máy chủ, PowerShell **Run as administrator**:
+   ```
+   cd C:\HoangMinh
+   git pull
+   powershell -ExecutionPolicy Bypass -File scripts\enable-auto-update.ps1
+   ```
+2. Script in ra **khoá công khai** (một dòng `ssh-ed25519 …`). Gửi dòng đó cho người quản trị repo để thêm vào
+   GitHub → repo `cnlg` → Settings → Deploy keys, **không** tick "Allow write access" (chỉ đọc).
+   Không gửi file `data\deploy\id_ed25519` (khoá riêng).
+3. Sau tối đa 5 phút, `data\update.log` có dòng đầu tiên khi có bản mới.
+
+Tắt tự cập nhật: `Disable-ScheduledTask -TaskName 'HoangMinh Update'`.
