@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin-portal.css?v=20261025v6">
+  <link rel="stylesheet" href="/admin-portal.css?v=20261026v1">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body class="admin-body">
@@ -642,9 +642,9 @@
               <div class="stat-trend" style="color:#64748b;">Trong cơ sở dữ liệu</div>
             </div>
             <div class="stat-card">
-              <div class="stat-label">Đang Mở Bán</div>
+              <div class="stat-label">Đang Bán Trên Web</div>
               <div class="stat-value" id="tmStatSellable" style="color:#16a34a;">0</div>
-              <div class="stat-trend" style="color:#16a34a;">Còn hàng trong kho</div>
+              <div class="stat-trend" style="color:#16a34a;">Còn hàng + đã có ảnh</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Lợi Nhuận Trung Bình</div>
@@ -652,9 +652,9 @@
               <div class="stat-trend" style="color:#ea580c;">Theo % bảng giá riêng</div>
             </div>
             <div class="stat-card">
-              <div class="stat-label">Đã Có Giá Sỉ Đại Lý</div>
+              <div class="stat-label">Còn Hàng Tại Kho</div>
               <div class="stat-value" id="tmStatWholesale" style="color:#2563eb;">0</div>
-              <div class="stat-trend" style="color:#2563eb;">Chiết khấu bán buôn</div>
+              <div class="stat-trend" style="color:#2563eb;" id="tmStatWaiting">0 SP chờ ảnh</div>
             </div>
           </div>
 
@@ -753,6 +753,13 @@
                 <p class="help-text" style="margin:0;">Xem giá vốn đại lý, giá bán ra và trạng thái tồn kho 5 phút/lần.</p>
               </div>
               <div style="display:flex; gap:10px; align-items:center;">
+                <select id="tmViewFilter" onchange="loadTechmallProducts(1, tmSearchTerm)" style="height:38px; padding:0 8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+                  <option value="selling">Đang bán trên web</option>
+                  <option value="waiting">Còn hàng – chờ ảnh</option>
+                  <option value="instock">Tất cả còn hàng</option>
+                  <option value="out">Hết hàng</option>
+                  <option value="all">Toàn bộ kho</option>
+                </select>
                 <input type="text" id="tmSearchInput" placeholder="Tìm theo tên hoặc SKU..." style="width:240px; height:38px; padding:0 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
                 <button type="button" class="btn btn-outline" id="btnTmSearch" style="height:38px; padding:0 14px;">Tìm</button>
               </div>
@@ -791,6 +798,6 @@
   </div>
 
   <script src="/dialogs.js?v=20261025v7"></script>
-  <script src="/admin.js?v=20261025v7"></script>
+  <script src="/admin.js?v=20261026v1"></script>
 </body>
 </html>

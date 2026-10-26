@@ -248,6 +248,8 @@ function mapItem(item, { ctx = getPricingContext(), priceMap, previous, keepWhol
     warranty: formatWarranty(item.warranty_type, item.warranty_duration),
     is_mall: !!item.shop_is_mall,
     shop_name: item.shop_name || null,
+    shop_id: item.shop_id ?? null,
+    depot_code: item.current_depot_code || null, // kho giao hàng: mỗi kho = 1 kiện / 1 phí ship riêng
     is_flash_sale: isFlashSale,
     fs_program_code: fsCode,
     variant_count: Number(item.total_variations) || 1,

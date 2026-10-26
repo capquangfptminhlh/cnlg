@@ -34,6 +34,7 @@ const customerMessage = require('./services/customerMessage');
 const catalogImage = require('./services/catalogImage');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
+const shipments = require('./services/shipments');
 
 const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
 /**
@@ -41,37 +42,39 @@ const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
  * miễn phí nếu đạt ngưỡng (shop chịu). Không lấy được (chưa đăng nhập / DropBuy lỗi) → bảng phí cố định, ghi "ước tính".
  * lines: [{ variation_id, quantity, name, weight_gram }]
  */
-/** Phí ship cả giỏ: phần DropBuy tính như cũ, phần của mỗi nguồn sỉ khác tính theo chính sách của nguồn đó, rồi cộng lại. */
-async function quoteShipping(args) {
-  const groups = new Map();
-  const dropLines = [];
-  for (const l of args.lines || []) {
-    const s = storeCatalog.sourceOf(l.id);
-    if (s) groups.set(s, [...(groups.get(s) || []), l]);
-    else dropLines.push(l);
-  }
-  if (groups.size === 0) return quoteShippingDropbuy(args);
-  const sum = ls => ls.reduce((t, l) => t + Number(l.price) * Number(l.quantity), 0);
+/**
+ * Phí ship cả giỏ = tổng phí từng KIỆN (services/shipments.js):
+ *  - mỗi nguồn sỉ một nhà cung cấp (TechMall…) = 1 kiện, phí theo chính sách của nguồn;
+ *  - DropBuy: mỗi kho / nhà phân phối = 1 kiện. Có phí thật (đủ phường/xã) thì lấy theo từng kho DropBuy trả về,
+ *    không thì ước tính theo bảng phí cho TỪNG kiện. Mức miễn ship xét theo giá trị từng kiện, không gộp cả đơn.
+ */
+async function quoteShipping({ province, wardId, lines, cfg = readConfig() }) {
+  const groups = shipments.groupShipments(lines, {
+    sourceOf: id => storeCatalog.sourceOf(id),
+    depotOf: id => storeCatalog.findProduct(id)?.depot_code || null
+  });
+  if (!groups.length) throw new Error('Giỏ hàng trống');
   const parts = [];
-  if (dropLines.length) parts.push(await quoteShippingDropbuy({ ...args, subtotal: sum(dropLines), lines: dropLines }));
-  for (const [s, ls] of groups) parts.push({ ...s.shippingQuote({ province: args.province, subtotal: sum(ls) }), source: 'partner' });
-  if (parts.length === 1) return parts[0];
-  const fee = parts.reduce((t, q) => t + q.fee, 0);
-  return {
-    fee, free_ship: fee === 0, source: 'mixed', parts: parts.map(q => ({ fee: q.fee, detail: q.detail })),
-    weight_gram: parts.reduce((t, q) => t + (q.weight_gram || 0), 0),
-    detail: `${parts.length} kiện giao riêng: ` + parts.map(q => `${q.fee ? q.fee.toLocaleString('vi-VN') + ' đ' : 'miễn phí'} (${q.detail})`).join(' + ')
-  };
+  const dropGroups = groups.filter(g => g.kind === 'dropbuy');
+  if (dropGroups.length) parts.push(...await quoteDropbuyShipments({ province, wardId, groups: dropGroups, cfg }));
+  for (const g of groups.filter(x => x.kind === 'source')) {
+    parts.push({ ...g.source.shippingQuote({ province, subtotal: g.subtotal }), source: 'partner', key: g.key, items: g.lines.length, subtotal: g.subtotal, refs: g.lines.map(shipments.refOf) });
+  }
+  return shipments.combineQuotes(parts);
 }
 
-async function quoteShippingDropbuy({ province, wardId, subtotal, lines, cfg = readConfig() }) {
+/** Phần khách xem: chỉ số kiện, phí, số món – không mã kho, không tên nguồn. */
+const publicShipments = q => (q.shipments || []).map(x => ({ no: x.no, fee: x.fee, free_ship: x.free_ship, items: x.items, subtotal: x.subtotal }));
+
+async function quoteDropbuyShipments({ province, wardId, groups, cfg }) {
   const rules = shipping.normalizeShipping(cfg.shipping);
-  const flat = note => {
-    const q = shipping.quote({ province, subtotal, lines }, cfg.shipping);
-    return { ...q, source: 'flat', detail: note && !q.free_ship ? `${q.detail} (ước tính)` : q.detail, live_error: note || null };
-  };
+  const flat = note => groups.map(g => {
+    const q = shipping.quote({ province, subtotal: g.subtotal, lines: g.lines }, cfg.shipping);
+    return { ...q, source: 'flat', key: g.key, items: g.lines.length, subtotal: g.subtotal, refs: g.lines.map(shipments.refOf), detail: note && !q.free_ship ? `${q.detail} (ước tính)` : q.detail, live_error: note || null };
+  });
   if (rules.mode !== 'live' || !rules.enabled) return flat();
   if (!wardId) return flat('chọn phường/xã để tính phí thật');
+  const lines = groups.flatMap(g => g.lines);
   try {
     const addr = await vnAddress.resolve(province, wardId);
     if (!addr) return flat('phường/xã không hợp lệ');
@@ -79,17 +82,29 @@ async function quoteShippingDropbuy({ province, wardId, subtotal, lines, cfg = r
       lines: lines.map(l => ({ variation_id: l.variation_id, quantity: l.quantity, name: l.name })),
       provinceId: addr.province.id,
       wardId: addr.ward.id,
-      codAmount: subtotal,
+      codAmount: shipments.sum(lines),
       method: dropbuyOrderFulfillment.normalizeAutoOrder(cfg.autoOrder).shippingMethod,
       config: cfg
     });
-    const carriers = [...new Set(live.depots.map(d => CARRIER[d.method] || d.method))].join(' + ');
-    const base = { source: 'dropbuy', region: shipping.regionOf(province), weight_gram: live.weight_gram, live: { fee: live.fee, depots: live.depots, quoted_at: new Date().toISOString() } };
-    if (rules.freeShipThreshold > 0 && subtotal >= rules.freeShipThreshold) {
-      return { ...base, fee: 0, free_ship: true, detail: `Miễn phí ship cho đơn từ ${rules.freeShipThreshold.toLocaleString('vi-VN')} đ` };
+    // Kho DropBuy trả về là căn cứ chia kiện (chuẩn hơn mã kho lưu trong catalog)
+    const parts = live.depots.map(d => {
+      const mine = lines.filter(l => (d.variation_ids || []).includes(l.variation_id));
+      const subtotal = shipments.sum(mine);
+      const free = rules.freeShipThreshold > 0 && subtotal >= rules.freeShipThreshold;
+      return {
+        source: 'dropbuy', key: `db:${d.code}`, items: mine.length, subtotal, live_fee: d.fee, refs: mine.map(shipments.refOf),
+        region: shipping.regionOf(province),
+        fee: free ? 0 : d.fee + rules.liveExtra, free_ship: free,
+        detail: free ? `Miễn phí ship cho kiện từ ${rules.freeShipThreshold.toLocaleString('vi-VN')} đ` : (CARRIER[d.method] || d.method)
+      };
+    });
+    if (parts.length && parts.every(x => x.items > 0)) {
+      parts[0].weight_gram = live.weight_gram;
+      return parts;
     }
-    const fee = live.fee + rules.liveExtra;
-    return { ...base, fee, free_ship: false, detail: `${carriers}${live.depots.length > 1 ? ` – ${live.depots.length} kho` : ''}${live.weight_gram ? `, ${(live.weight_gram / 1000).toLocaleString('vi-VN')} kg` : ''}` };
+    // Bản báo phí cũ không kèm danh sách món từng kho → chia theo tỉ lệ không được, coi cả phần DropBuy là các kho đã báo
+    const subtotal = shipments.sum(lines);
+    return live.depots.map((d, i) => ({ source: 'dropbuy', key: `db:${d.code}`, items: i ? 0 : lines.length, subtotal: i ? 0 : subtotal, refs: i ? [] : lines.map(shipments.refOf), live_fee: d.fee, region: shipping.regionOf(province), fee: d.fee + rules.liveExtra, free_ship: false, detail: CARRIER[d.method] || d.method }));
   } catch (e) {
     console.warn('[Ship] Không lấy được phí ship DropBuy:', e.message);
     return flat(e.code === 401 ? 'chưa kết nối kho' : 'kho chưa phản hồi');
@@ -303,7 +318,8 @@ app.get('/api/categories', (req, res) => {
     const withCount = cats.map(c => {
       let n = 0;
       for (const id of categoryIdsFor(c.id)) n += perCat.get(id) || 0;
-      return { ...c, icon: c.icon ? catalogImage.maskMediaUrl(c.icon) : c.icon, product_count: n };
+      const { source, source_id, source_url, ...pub } = c;
+      return { ...pub, icon: c.icon ? catalogImage.maskMediaUrl(c.icon) : c.icon, product_count: n };
     });
     res.json({ success: true, data: withCount });
   } catch (err) {
@@ -344,6 +360,21 @@ app.get(/^\/cdn\/(md2?\/.+)$/, async (req, res) => {
     return res.status(503).type('text/plain').send('\u1ea2nh t\u1ea1m th\u1eddi kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c');
   }
 });
+
+/** Xen 1 món nguồn khác sau mỗi `every - 1` món DropBuy (giữ nguyên thứ tự trong từng nhóm). */
+function mixSources(products, every = 4) {
+  const own = products.filter(p => !storeCatalog.sourceOf(p.id));
+  const other = products.filter(p => storeCatalog.sourceOf(p.id));
+  if (!other.length || !own.length) return products;
+  const out = [];
+  let i = 0;
+  let j = 0;
+  while (i < own.length || j < other.length) {
+    if (j < other.length && (out.length % every === every - 1 || i >= own.length)) out.push(other[j++]);
+    else out.push(own[i++]);
+  }
+  return out;
+}
 
 app.get('/api/products', (req, res) => {
   try {
@@ -411,6 +442,9 @@ app.get('/api/products', (req, res) => {
     } else if (relevance) {
       // Mặc định khi tìm kiếm: xếp theo độ khớp
       products.sort((a, b) => relevance.get(b.id) - relevance.get(a.id));
+    } else {
+      // Mặc định: hàng các nguồn sỉ khác xen đều vào giữa hàng DropBuy, không bị dồn xuống cuối danh sách
+      products = mixSources(products);
     }
     // Mọi kiểu sắp xếp: món còn hàng đứng trước (trước đây "giá thấp → cao" để 10/24 món đầu là món hết hàng)
     products = [...products.filter(p => p.in_stock !== false), ...products.filter(p => p.in_stock === false)];
@@ -627,7 +661,7 @@ app.post('/api/shipping/quote', rateLimit('quote', 10 * 60e3, 60), async (req, r
     const lines = await priceCartLines(items.slice(0, 30));
     const subtotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
     const q = await quoteShipping({ province, wardId: Number(ward_id) || null, subtotal, lines });
-    res.json({ success: true, data: { subtotal, fee: q.fee, shipping_fee: q.fee, total: subtotal + q.fee, free_ship: !!q.free_ship, region: q.region, weight_gram: q.weight_gram || 0, source: q.source === 'dropbuy' ? 'live' : 'flat', detail: stripSupplierText(q.detail || '') } });
+    res.json({ success: true, data: { subtotal, fee: q.fee, shipping_fee: q.fee, total: subtotal + q.fee, free_ship: !!q.free_ship, region: q.region, weight_gram: q.weight_gram || 0, source: q.source === 'dropbuy' ? 'live' : 'flat', detail: stripSupplierText(q.detail || ''), shipments: publicShipments(q) } });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
@@ -709,6 +743,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     // Cùng cách tính với lúc khách xem (phí DropBuy thật được nhớ 30 phút) → khách trả đúng số đã thấy
     const ship = await quoteShipping({ province, wardId: addr.ward.id, subtotal, lines: orderItems });
     const total_amount = subtotal + ship.fee;
+    for (const it of orderItems) it.shipment_no = (ship.shipments || []).find(x => x.refs.includes(shipments.refOf(it)))?.no || 1;
     if (paymentMethod === 'COD' && total_amount > payOpts.cod.maxTotal) {
       return res.status(400).json({ success: false, error: `Đơn trên ${payOpts.cod.maxTotal.toLocaleString('vi-VN')} đ vui lòng chọn chuyển khoản.` });
     }
@@ -722,7 +757,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       total_amount,
       payment_method: paymentMethod
     });
-    orderStore.updateOrder(order.id, { subtotal, shipping_fee: ship.fee, shipping_detail: ship.detail, shipping_source: ship.source, shipping_live: ship.live || null, weight_gram: ship.weight_gram, live_verified: orderItems.every(i => i.live_verified) });
+    orderStore.updateOrder(order.id, { subtotal, shipping_fee: ship.fee, shipping_detail: ship.detail, shipping_source: ship.source, shipping_live: ship.live || null, shipments: (ship.shipments || []).map(({ refs, ...x }) => x), weight_gram: ship.weight_gram, live_verified: orderItems.every(i => i.live_verified) });
     order.subtotal = subtotal;
     order.shipping_fee = ship.fee;
     console.log(`[Order] Đã tiếp nhận đơn hàng #${order.id}: ${subtotal.toLocaleString('vi-VN')} đ + ship ${ship.fee.toLocaleString('vi-VN')} đ`);
@@ -1193,7 +1228,7 @@ function pricingSource(key) {
     reprice: async () => src.reprice()
   };
 }
-const { normalizeSourceRules } = require('./services/sources/woo');
+const { normalizeSourceRules, isSellable } = require('./services/sources/woo');
 
 function withPricingSource(handler) {
   return async (req, res) => {
@@ -1418,7 +1453,8 @@ function techmallStatus() {
     lastChanges: st.meta.changed || 0,
     totalProducts: st.products,
     sellable: st.sellable,
-    imagesPending: st.meta.images_pending || 0,
+    inStock: st.in_stock,
+    imagesPending: src.store.getProducts().filter(p => !p.removed && p.in_stock !== false && !isSellable(p)).length,
     phase: st.sync.phase || null,
     progress: st.sync.progress || null,
     complete: st.meta.complete !== false,
@@ -1451,7 +1487,8 @@ app.post('/api/admin/techmall/logout', requireAdmin, (req, res) => {
 app.get('/api/admin/techmall/pricing', requireAdmin, (req, res) => {
   const src = techmallSource();
   const list = src.store.getProducts().filter(p => !p.removed);
-  const stats = { ...pricingStats(list), sellable: src.status().sellable };
+  const st = src.status();
+  const stats = { ...pricingStats(list), sellable: st.sellable, inStock: st.in_stock, waiting: list.filter(p => p.in_stock !== false && !isSellable(p)).length };
   res.json({ success: true, data: { rules: src.rules(readConfig()), stats, auth: techmallStatus().auth } });
 });
 
@@ -1487,8 +1524,10 @@ app.post('/api/admin/techmall/fetch-all', requireAdmin, (req, res) => startTechm
 
 app.get('/api/admin/techmall/products', requireAdmin, (req, res) => {
   const { search = '', page = 1, limit = 20, all = '' } = req.query;
+  const view = all === '1' ? 'all' : String(req.query.view || 'selling');
   const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
-  let list = techmallSource().store.getProducts().filter(p => !p.removed && (all === '1' || p.image));
+  const inView = { selling: isSellable, instock: p => p.in_stock !== false, waiting: p => p.in_stock !== false && !isSellable(p), out: p => p.in_stock === false, all: () => true }[view] || isSellable;
+  let list = techmallSource().store.getProducts().filter(p => !p.removed && inView(p));
   if (search) list = list.filter(p => norm(p.name).includes(norm(search)) || norm(p.sku).includes(norm(search)) || String(p.id) === String(search));
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const lim = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));

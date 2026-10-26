@@ -1310,3 +1310,7 @@ button:disabled {
     margin-bottom: 4px;
   }
 }
+
+/* Đơn nhiều kiện: mỗi kiện đặt riêng một đơn ở nguồn/kho */
+.ord-parcel{border:1px dashed #cbd5e1;border-radius:8px;padding:6px 8px;margin-bottom:6px}
+.ord-parcel-head{font-size:12px;font-weight:700;color:#ea580c;margin-bottom:4px}

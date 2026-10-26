@@ -308,7 +308,7 @@ function renderOrders(orders) {
     const fullAddr = [o.customer?.address, o.customer?.ward_name, o.customer?.province_name || o.customer?.province].filter(Boolean).join(', ');
     const timeStr = new Date(o.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
 
-    const itemsHtml = (o.items || []).map(i => {
+    const itemRow = i => {
       const thumb = i.image ? `<img class="ord-item-thumb" src="${esc(adminThumbUrl(i.image))}" alt="" loading="lazy" onerror="this.style.display='none'">` : '';
       const title = i.dropbuy_url
         ? `<a class="ord-item-title" href="${esc(i.dropbuy_url)}" target="_blank" rel="noopener">${esc(i.name)}</a>`
@@ -325,7 +325,12 @@ function renderOrders(orders) {
           </div>
         </div>
       </div>`;
-    }).join('');
+    };
+    // Đơn gồm nhiều kiện (nhiều nguồn / nhiều kho DropBuy): đặt hàng tách theo từng kiện
+    const parcels = o.shipments || [];
+    const itemsHtml = parcels.length > 1
+      ? parcels.map(sh => `<div class="ord-parcel"><div class="ord-parcel-head">Kiện ${sh.no} · ${esc(parcelLabel(sh.key))} · ship ${sh.fee ? formatPrice(sh.fee) : 'miễn phí'}</div>${(o.items || []).filter(i => (i.shipment_no || 1) === sh.no).map(itemRow).join('')}</div>`).join('')
+      : (o.items || []).map(itemRow).join('');
 
     let actions;
     if (canConfirm) {
@@ -515,11 +520,24 @@ function staffBox(o) {
   </div>`;
 }
 
+/** Nhãn kiện cho nhân viên: nguồn + kho (khách không thấy). */
+function parcelLabel(key) {
+  const k = String(key || '');
+  if (k.startsWith('src:')) return k.slice(4).replace(/^techmall$/i, 'TechMall');
+  if (k === 'db:kho-chua-ro') return 'DropBuy (chưa rõ kho)';
+  if (k.startsWith('db:')) return 'DropBuy kho ' + k.slice(3);
+  return k || 'Kiện';
+}
+
 function copyReceiver(orderId, silent = false) {
   const o = lastOrders.find(x => x.id === orderId);
   if (!o) return;
   const c = o.customer || {};
-  const items = (o.items || []).map(i => `- ${i.name}${i.variant_name ? ` [${i.variant_name}]` : ''} x${i.quantity}${i.sku ? ` (SKU ${i.sku})` : ''}`).join('\n');
+  const line = i => `- ${i.name}${i.variant_name ? ` [${i.variant_name}]` : ''} x${i.quantity}${i.sku ? ` (SKU ${i.sku})` : ''}`;
+  const parcels = o.shipments || [];
+  const items = parcels.length > 1
+    ? parcels.map(sh => `Kiện ${sh.no} (${parcelLabel(sh.key)}):\n` + (o.items || []).filter(i => (i.shipment_no || 1) === sh.no).map(line).join('\n')).join('\n')
+    : (o.items || []).map(line).join('\n');
   const text = `Người nhận: ${c.name}\nSĐT: ${c.phone}\nĐịa chỉ: ${c.address}${c.ward_name ? `, ${c.ward_name}` : ''}${c.province_name || c.province ? `, ${c.province_name || c.province}` : ''}\nThu hộ (COD): ${codToCollect(o).toLocaleString('vi-VN')}\nĐơn shop: ${o.id}${c.note ? `\nGhi chú: ${c.note}` : ''}\nSản phẩm:\n${items}`;
   navigator.clipboard.writeText(text).then(() => { if (!silent) uiAlert('Đã sao chép:\n\n' + text); }).catch(() => uiPrompt('Sao chép thông tin người nhận:', { value: text, readOnly: true }));
 }
@@ -1312,8 +1330,8 @@ async function loadTechmallStatus() {
     if (text) {
       const lastOkStr = s.lastOk ? new Date(s.lastOk).toLocaleTimeString('vi-VN') : 'chưa có';
       const nextRunStr = s.nextRun ? new Date(s.nextRun).toLocaleTimeString('vi-VN') : '--:--';
-      text.innerHTML = 'Lần đồng bộ gần nhất: <strong>' + lastOkStr + '</strong> (Đổi: <strong>' + (s.lastChanges || 0) + '</strong> SP). Lượt tiếp theo: <strong>' + nextRunStr + '</strong>. Tổng kho: <strong>' + (s.totalProducts || 0).toLocaleString('vi-VN') + '</strong> SP, <strong>' + (s.sellable || 0).toLocaleString('vi-VN') + '</strong> SP có ảnh đang lên kệ' +
-        (s.imagesPending ? ', còn ' + s.imagesPending.toLocaleString('vi-VN') + ' SP đang đọc ảnh' : '') + (s.complete === false ? ' (lần quét trước thiếu trang – chưa gỡ SP nào)' : '') + '.' +
+      text.innerHTML = 'Lần đồng bộ gần nhất: <strong>' + lastOkStr + '</strong> (Đổi: <strong>' + (s.lastChanges || 0) + '</strong> SP). Lượt tiếp theo: <strong>' + nextRunStr + '</strong>. Tổng kho: <strong>' + (s.totalProducts || 0).toLocaleString('vi-VN') + '</strong> SP = <strong>' + (s.inStock || 0).toLocaleString('vi-VN') + '</strong> còn hàng + ' + Math.max(0, (s.totalProducts || 0) - (s.inStock || 0)).toLocaleString('vi-VN') + ' hết hàng (không bán). Trong số còn hàng: <strong style="color:#16a34a;">' + (s.sellable || 0).toLocaleString('vi-VN') + '</strong> đang bán trên web' +
+        (s.imagesPending ? ', ' + s.imagesPending.toLocaleString('vi-VN') + ' chờ đọc ảnh (tự lên kệ dần mỗi lượt)' : '') + (s.complete === false ? ' (lần quét trước thiếu trang – chưa gỡ SP nào)' : '') + '.' +
         (s.lastError ? ' <span style="color:#ef4444;">Lỗi: ' + esc(s.lastError) + '</span>' : '');
     }
 
@@ -1363,7 +1381,9 @@ async function loadTechmallPricing() {
     if (statTot) statTot.textContent = (stats.total || 0).toLocaleString('vi-VN');
     if (statSell) statSell.textContent = (stats.sellable || 0).toLocaleString('vi-VN');
     if (statAvg) statAvg.textContent = formatPrice(stats.avgProfit || 0) + ' / SP';
-    if (statWholesale) statWholesale.textContent = (stats.wholesaleCount || 0).toLocaleString('vi-VN');
+    if (statWholesale) statWholesale.textContent = (stats.inStock || 0).toLocaleString('vi-VN');
+    const waitEl = document.getElementById('tmStatWaiting');
+    if (waitEl) waitEl.textContent = (stats.waiting || 0).toLocaleString('vi-VN') + ' SP chờ ảnh';
   } catch (err) {
     console.warn('[Admin] Lỗi load bảng giá TechMall:', err.message);
   }
@@ -1378,7 +1398,7 @@ async function loadTechmallProducts(page = 1, search = '') {
   if (!tbody) return;
 
   try {
-    const params = new URLSearchParams({ page: String(page), limit: '20' });
+    const params = new URLSearchParams({ page: String(page), limit: '20', view: document.getElementById('tmViewFilter')?.value || 'selling' });
     if (search) params.set('search', search);
 
     const res = await (await adminFetch('/api/admin/techmall/products?' + params.toString())).json();
