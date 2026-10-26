@@ -32,6 +32,8 @@ const watchdog = require('./services/dropbuyWatchdog');
 const vault = require('./services/credentialVault');
 const customerMessage = require('./services/customerMessage');
 const catalogImage = require('./services/catalogImage');
+const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
+const sources = require('./services/sources');
 
 const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
 /**
@@ -39,7 +41,30 @@ const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
  * miễn phí nếu đạt ngưỡng (shop chịu). Không lấy được (chưa đăng nhập / DropBuy lỗi) → bảng phí cố định, ghi "ước tính".
  * lines: [{ variation_id, quantity, name, weight_gram }]
  */
-async function quoteShipping({ province, wardId, subtotal, lines, cfg = readConfig() }) {
+/** Phí ship cả giỏ: phần DropBuy tính như cũ, phần của mỗi nguồn sỉ khác tính theo chính sách của nguồn đó, rồi cộng lại. */
+async function quoteShipping(args) {
+  const groups = new Map();
+  const dropLines = [];
+  for (const l of args.lines || []) {
+    const s = storeCatalog.sourceOf(l.id);
+    if (s) groups.set(s, [...(groups.get(s) || []), l]);
+    else dropLines.push(l);
+  }
+  if (groups.size === 0) return quoteShippingDropbuy(args);
+  const sum = ls => ls.reduce((t, l) => t + Number(l.price) * Number(l.quantity), 0);
+  const parts = [];
+  if (dropLines.length) parts.push(await quoteShippingDropbuy({ ...args, subtotal: sum(dropLines), lines: dropLines }));
+  for (const [s, ls] of groups) parts.push({ ...s.shippingQuote({ province: args.province, subtotal: sum(ls) }), source: 'partner' });
+  if (parts.length === 1) return parts[0];
+  const fee = parts.reduce((t, q) => t + q.fee, 0);
+  return {
+    fee, free_ship: fee === 0, source: 'mixed', parts: parts.map(q => ({ fee: q.fee, detail: q.detail })),
+    weight_gram: parts.reduce((t, q) => t + (q.weight_gram || 0), 0),
+    detail: `${parts.length} kiện giao riêng: ` + parts.map(q => `${q.fee ? q.fee.toLocaleString('vi-VN') + ' đ' : 'miễn phí'} (${q.detail})`).join(' + ')
+  };
+}
+
+async function quoteShippingDropbuy({ province, wardId, subtotal, lines, cfg = readConfig() }) {
   const rules = shipping.normalizeShipping(cfg.shipping);
   const flat = note => {
     const q = shipping.quote({ province, subtotal, lines }, cfg.shipping);
@@ -91,26 +116,28 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
 app.use(express.json({ limit: '100kb' }));
 // --- Trang có SEO (render phía server) – đặt trước static để "/" không trả index.html trần ---
 app.get('/', (req, res) => {
-  res.type('html').send(seo.renderHomePage(req, readConfig(), scraper.getProducts().length));
+  res.type('html').send(seo.renderHomePage(req, readConfig(), storeCatalog.getProducts().length));
 });
 
 app.get('/sp/:slugId', async (req, res) => {
   const id = parseInt(String(req.params.slugId), 10);
-  const product = scraper.getProducts().find(p => p.id === id);
+  const product = storeCatalog.findProduct(id);
   if (!product) return res.redirect(302, '/');
   // Sai slug (tên SP đổi) → chuyển về URL chuẩn
   const canonical = seo.productPath(product);
   if (decodeURIComponent(req.path) !== canonical) return res.redirect(301, canonical);
   // Chỉ dùng chi tiết đã cache (không gọi DropBuy cho mỗi lượt bot Google/Facebook)
   let detail = null;
-  try {
+  const src = storeCatalog.sourceOf(id);
+  if (src) detail = src.detail(product);
+  else try {
     const f = path.join(DATA_DIR, 'products_detail', `${id}.json`);
     if (fs.existsSync(f)) detail = JSON.parse(fs.readFileSync(f, 'utf8'));
   } catch (e) {}
   res.type('html').send(seo.renderProductPage(req, product, detail, readConfig()));
 });
 
-app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemapXml(req, scraper.getProducts().filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p)))));
+app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemapXml(req, storeCatalog.getProducts().filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p)))));
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(seo.robotsTxt(req)));
 
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
@@ -135,7 +162,8 @@ function readConfig() {
 function publicProduct(p) {
   if (!p) return p;
   // Không lộ nguồn hàng cho khách: bỏ giá vốn/biên lãi và link/mã SP bên nguồn
-  const { dropbuy_cost, profit_margin, is_wholesale_price, public_price, wholesale_price, pricing_rule, dropbuy_url, dropbuy_id, ...rest } = p;
+  const { dropbuy_cost, profit_margin, is_wholesale_price, public_price, wholesale_price, pricing_rule, dropbuy_url, dropbuy_id,
+    source, source_id, source_url, dealer_price, retail_price, supplier_cost, removed, description, gallery, ...rest } = p;
   // "Giá gốc" nguồn đôi khi bị thổi (vd 574k so với 10 triệu = -94%) → giảm > 70% coi như không có giá gốc,
   // tránh hiển thị khuyến mãi trông như giả
   const discount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
@@ -145,7 +173,7 @@ function publicProduct(p) {
 
 /** Danh mục cha bao gồm mọi danh mục con. */
 function categoryIdsFor(catId) {
-  const cats = scraper.getCategories();
+  const cats = storeCatalog.getCategories();
   const ids = new Set([catId]);
   let added = true;
   while (added) {
@@ -214,11 +242,11 @@ app.get('/api/categories', (req, res) => {
   try {
     // Đếm đúng như /api/products đang bán (bỏ SP chưa có giá / đã gỡ) để số trên menu khớp số trong trang danh mục
     const perCat = new Map();
-    for (const p of scraper.getProducts()) {
+    for (const p of storeCatalog.getProducts()) {
       if (!(Number(p.price) > 0) || p.removed_from_dropbuy || !scraper.hasRealPhoto(p)) continue;
       perCat.set(p.category_id, (perCat.get(p.category_id) || 0) + 1);
     }
-    const cats = scraper.getCategories();
+    const cats = storeCatalog.getCategories();
     const withCount = cats.map(c => {
       let n = 0;
       for (const id of categoryIdsFor(c.id)) n += perCat.get(id) || 0;
@@ -235,8 +263,8 @@ app.get('/api/categories', (req, res) => {
 app.get('/api/catalog-image/:id', async (req, res) => {
   const id=Number(req.params.id);
   if(!Number.isSafeInteger(id)||id<1)return res.sendStatus(404);
-  const product=scraper.getProducts().find(p=>Number(p.id)===id);
-  if(!product)return res.sendStatus(404);
+  const product=storeCatalog.findProduct(id);
+  if(!product||product.source)return res.sendStatus(404);
   try {
     const result=await catalogImage.imageForProduct(product);
     if(!result)return res.sendStatus(404);
@@ -253,7 +281,7 @@ app.get('/api/catalog-image/:id', async (req, res) => {
 app.get('/api/products', (req, res) => {
   try {
     const { category, search, page = 1, limit = 24, sort = 'default', minPrice, maxPrice, inStock } = req.query;
-    let products = scraper.getProducts();
+    let products = storeCatalog.getProducts();
     // Không bán SP chưa có giá (DropBuy đôi khi để giá 0 khi ẩn giá / ngừng bán) hoặc chưa có ảnh thật
     products = products.filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p));
 
@@ -327,9 +355,24 @@ const liveRefreshAt = new Map();
 app.get('/api/products/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const product = scraper.getProducts().find(p => p.id === id);
+    const product = storeCatalog.findProduct(id);
     if (!product) {
       return res.status(404).json({ success: false, error: 'Product not found' });
+    }
+    const src = storeCatalog.sourceOf(id);
+    if (src) {
+      // Nguồn sỉ khác: kiểm tra trực tiếp giá đại lý + tồn kho (chạy nền, tối đa 1 lần / 30s mỗi SP)
+      if (Date.now() - (liveRefreshAt.get(id) || 0) > 30000) {
+        liveRefreshAt.set(id, Date.now());
+        src.liveCheck(product).catch(() => {});
+      }
+      const d = src.detail(product);
+      const pub = publicProduct(product);
+      return res.json({ success: true, data: {
+        ...pub, description: sanitizeHtml(d.description), gallery: d.gallery, video_url: null, variation_options: [],
+        variants: [{ id: product.variation_id, sku: product.sku, name: 'Mặc định', is_default: true, in_stock: product.in_stock !== false,
+          price: product.price, original_price: pub.original_price || null, discount_percent: pub.discount_percent || 0, weight_gram: product.weight_gram || 0, image: null }]
+      } });
     }
     // Làm mới giá/tồn kho trực tiếp từ DropBuy (chạy nền, tối đa 1 lần / 30s mỗi SP); thay đổi được đẩy qua socket
     const last = liveRefreshAt.get(id) || 0;
@@ -383,12 +426,16 @@ app.get('/api/shipping/provinces', (req, res) => {
 
 /** Tính giá & khối lượng từng dòng giỏ theo dữ liệu đã đồng bộ (không gọi trực tiếp DropBuy) */
 async function priceCartLines(items) {
-  const catalog = new Map(scraper.getProducts().map(p => [p.id, p]));
+  const catalog = new Map(storeCatalog.getProducts().map(p => [p.id, p]));
   const lines = [];
   for (const it of items) {
     const p = catalog.get(Number(it.id));
     if (!p) continue;
     const qty = Math.max(1, Math.min(MAX_QTY_PER_ITEM, Number(it.quantity) || 1));
+    if (p.source) {
+      lines.push({ id: p.id, name: p.name, variation_id: p.variation_id, quantity: qty, price: p.price, weight_gram: p.weight_gram || 0, source: p.source });
+      continue;
+    }
     let price = p.price;
     let weight = 0;
     // Chi tiết (cache 6h) cho biết giá theo phân loại và khối lượng thật để tính phí ship
@@ -444,7 +491,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     }
     if (!addr) return res.status(400).json({ success: false, error: 'Vui lòng chọn Phường/Xã nhận hàng.' });
 
-    const known = new Map(scraper.getProducts().map(p => [p.id, p]));
+    const known = new Map(storeCatalog.getProducts().map(p => [p.id, p]));
     // Gộp theo SP + phân loại
     const merged = new Map();
     for (const it of items) {
@@ -463,10 +510,13 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     }
 
     // Cập nhật catalog chung (giá/tồn kho cấp SP) chạy song song
-    realtimeSync.liveCheck([...new Set([...merged.values()].map(l => l.id))]).catch(() => {});
+    realtimeSync.liveCheck([...new Set([...merged.values()].map(l => l.id))].filter(id => !storeCatalog.sourceOf(id))).catch(() => {});
 
     // Kiểm tra TRỰC TIẾP từng dòng (SKU phân loại) trên DropBuy
-    const checked = await Promise.all([...merged.values()].map(async l => ({ line: l, r: await variants.checkLine(known.get(l.id), l.variation_id) })));
+    const checked = await Promise.all([...merged.values()].map(async l => {
+      const src = storeCatalog.sourceOf(l.id);
+      return { line: l, r: src ? await src.liveCheck(known.get(l.id)) : await variants.checkLine(known.get(l.id), l.variation_id) };
+    }));
     const problems = [];
     for (const { line, r } of checked) {
       const label = `"${r.name || known.get(line.id).name}${r.variant_name ? ` – ${r.variant_name}` : ''}"`;
@@ -480,7 +530,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
 
     const orderItems = checked.map(({ line, r }) => {
       const p = known.get(line.id);
-      return { id: line.id, sku: r.sku, variation_id: r.variation_id, variant_name: r.variant_name || null, name: p.name, price: r.price, quantity: line.quantity, image: p.image, weight_gram: r.weight_gram || 0, dropbuy_url: p.dropbuy_url, dropbuy_cost: r.cost, cost_is_wholesale: !!r.cost_is_wholesale, live_verified: r.live };
+      return { id: line.id, sku: r.sku, variation_id: r.variation_id, variant_name: r.variant_name || null, name: p.name, price: r.price, quantity: line.quantity, image: p.image, weight_gram: r.weight_gram || 0, dropbuy_url: p.dropbuy_url, source: p.source || 'dropbuy', source_url: p.source_url || null, dropbuy_cost: r.cost, cost_is_wholesale: !!r.cost_is_wholesale, live_verified: r.live };
     });
     const subtotal = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
     // Cùng cách tính với lúc khách xem (phí DropBuy thật được nhớ 30 phút) → khách trả đúng số đã thấy
@@ -915,13 +965,16 @@ app.post('/api/dropbuy/logout', requireAdmin, (req, res) => {
 
 // --- Thiết lập giá bán (giá gốc DropBuy + % lãi) ---
 
+// Giá vốn / giá tham chiếu của 1 SP (DropBuy: giá niêm yết; nguồn sỉ khác: giá lẻ đề xuất)
+const refPrice = p => p.public_price || p.retail_price || 0;
+
 function pricingStats(products) {
   const sellable = products.filter(p => p.in_stock !== false);
   const profits = sellable.map(p => p.price - (p.dropbuy_cost || 0));
-  const belowPublic = products.filter(p => p.public_price && p.price <= p.public_price).length;
+  const belowPublic = products.filter(p => refPrice(p) && p.price <= refPrice(p)).length;
   return {
     total: products.length,
-    wholesaleCount: products.filter(p => p.wholesale_price > 0).length,
+    wholesaleCount: products.filter(p => p.wholesale_price > 0 || p.dealer_price > 0).length,
     sellable: sellable.length,
     avgProfit: profits.length ? Math.round(profits.reduce((a, b) => a + b, 0) / profits.length) : 0,
     negativeProfit: products.filter(p => p.price < (p.dropbuy_cost || 0)).length,
@@ -930,77 +983,194 @@ function pricingStats(products) {
   };
 }
 
-app.get('/api/admin/pricing', requireAdmin, async (req, res) => {
-  const cfg = readConfig();
-  const rules = pricing.normalizeRules(cfg.pricing || {});
-  const products = scraper.getProducts();
-  const rootMap = pricing.rootCategoryMap(scraper.getCategories());
-  const roots = scraper.getCategories().filter(c => !c.parent_id).map(c => ({
-    id: c.id,
-    name: c.name,
-    product_count: products.filter(p => (rootMap.get(p.category_id) ?? p.category_id) === c.id).length,
-    markupPercent: rules.categoryMarkups[String(c.id)] ?? null
-  })).filter(c => c.product_count > 0).sort((a, b) => b.product_count - a.product_count);
-  const auth = await dropbuyAuth.getAuthStatus().catch(() => ({ authenticated: false }));
-  res.json({ success: true, data: { rules, categories: roots, stats: pricingStats(products), dropbuy: { authenticated: !!auth.authenticated, username: auth.username || null, message: auth.message } } });
-});
-
-app.post('/api/admin/pricing', requireAdmin, async (req, res) => {
-  try {
-    const cfg = readConfig();
-    const current = pricing.normalizeRules(cfg.pricing || {});
-    const b = req.body || {};
-    cfg.pricing = pricing.normalizeRules({
-      ...current,
-      ...b,
-      // Ghi đè từng SP không bị xoá khi lưu form chung
-      productOverrides: b.productOverrides ?? current.productOverrides
-    });
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
-    const changed = await realtimeSync.repriceNow();
-    res.json({ success: true, message: `Đã lưu thiết lập giá. ${changed} sản phẩm được cập nhật giá ngay.`, data: { rules: cfg.pricing, stats: pricingStats(scraper.getProducts()) } });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+/**
+ * Thiết lập giá theo từng nguồn: ?source=dropbuy (mặc định) hoặc mã nguồn sỉ (vd techmall).
+ * Mỗi nguồn một bộ quy tắc riêng: DropBuy ở config.pricing, nguồn khác ở config.sources.<mã>.pricing.
+ */
+function pricingSource(key) {
+  if (!key || key === 'dropbuy') {
+    return {
+      key: 'dropbuy', label: 'DropBuy',
+      products: () => scraper.getProducts(),
+      categories: () => scraper.getCategories(),
+      rules: cfg => pricing.normalizeRules(cfg.pricing || {}),
+      normalize: raw => pricing.normalizeRules(raw),
+      store: (cfg, rules) => { cfg.pricing = rules; },
+      reprice: () => realtimeSync.repriceNow()
+    };
   }
-});
+  const src = sources.get(String(key));
+  if (!src) return null;
+  return {
+    key: src.def.key, label: src.def.label,
+    products: () => src.store.getProducts().filter(p => !p.removed),
+    categories: () => src.store.getCategories(),
+    rules: cfg => src.rules(cfg),
+    normalize: raw => normalizeSourceRules(raw, src.def.pricingDefaults),
+    store: (cfg, rules) => { cfg.sources = cfg.sources || {}; cfg.sources[src.def.key] = { ...(cfg.sources[src.def.key] || {}), pricing: rules }; },
+    reprice: async () => src.reprice()
+  };
+}
+const { normalizeSourceRules } = require('./services/sources/woo');
 
-app.get('/api/admin/pricing/products', requireAdmin, (req, res) => {
+function withPricingSource(handler) {
+  return async (req, res) => {
+    const ps = pricingSource(req.query.source || req.body?.source);
+    if (!ps) return res.status(404).json({ success: false, error: 'Không có nguồn hàng này' });
+    try { await handler(req, res, ps); } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+  };
+}
+
+app.get('/api/admin/pricing', requireAdmin, withPricingSource(async (req, res, ps) => {
+  const rules = ps.rules(readConfig());
+  const products = ps.products();
+  const cats = ps.categories();
+  const rootMap = pricing.rootCategoryMap(cats);
+  // Nguồn khác gom dưới 1 danh mục gốc → hiện các danh mục cấp 2 để đặt % riêng cho có ý nghĩa
+  const topLevel = ps.key === 'dropbuy' ? cats.filter(c => !c.parent_id) : cats.filter(c => c.parent_id && !cats.find(x => x.id === c.parent_id)?.parent_id);
+  const groupOf = id => {
+    if (ps.key === 'dropbuy') return rootMap.get(id) ?? id;
+    let cur = cats.find(c => c.id === id);
+    while (cur && cur.parent_id && cats.find(x => x.id === cur.parent_id)?.parent_id) cur = cats.find(x => x.id === cur.parent_id);
+    return cur?.id ?? id;
+  };
+  const counts = new Map();
+  for (const p of products) counts.set(groupOf(p.category_id), (counts.get(groupOf(p.category_id)) || 0) + 1);
+  const categories = topLevel.map(c => ({ id: c.id, name: c.name, product_count: counts.get(c.id) || 0, markupPercent: rules.categoryMarkups[String(c.id)] ?? null }))
+    .filter(c => c.product_count > 0).sort((a, b) => b.product_count - a.product_count);
+  const data = { source: ps.key, label: ps.label, rules, categories, stats: pricingStats(products), sources: [{ key: 'dropbuy', label: 'DropBuy' }, ...sources.all().map(x => ({ key: x.def.key, label: x.def.label }))] };
+  if (ps.key === 'dropbuy') {
+    const auth = await dropbuyAuth.getAuthStatus().catch(() => ({ authenticated: false }));
+    data.dropbuy = { authenticated: !!auth.authenticated, username: auth.username || null, message: auth.message };
+  } else {
+    const st = sources.get(ps.key).status();
+    data.partner = { logged_in: st.logged_in, username: st.username, sellable: st.sellable };
+  }
+  res.json({ success: true, data });
+}));
+
+app.post('/api/admin/pricing', requireAdmin, withPricingSource(async (req, res, ps) => {
+  const cfg = readConfig();
+  const current = ps.rules(cfg);
+  const b = { ...(req.body || {}) };
+  delete b.source;
+  const rules = ps.normalize({
+    ...current,
+    ...b,
+    // Ghi đè từng SP không bị xoá khi lưu form chung
+    productOverrides: b.productOverrides ?? current.productOverrides
+  });
+  ps.store(cfg, rules);
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
+  const changed = await ps.reprice();
+  res.json({ success: true, message: `Đã lưu thiết lập giá ${ps.label}. ${changed} sản phẩm được cập nhật giá ngay.`, data: { rules, stats: pricingStats(ps.products()) } });
+}));
+
+app.get('/api/admin/pricing/products', requireAdmin, withPricingSource(async (req, res, ps) => {
   const { search = '', page = 1, limit = 20, filter = '' } = req.query;
-  const rules = pricing.normalizeRules(readConfig().pricing || {});
+  const rules = ps.rules(readConfig());
   const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
-  let list = scraper.getProducts();
+  let list = ps.products();
+  if (ps.key !== 'dropbuy' && filter !== 'all') list = list.filter(p => p.image); // SP nguồn khác chưa có ảnh không lên kệ
   if (search) list = list.filter(p => norm(p.name).includes(norm(search)) || norm(p.sku).includes(norm(search)) || String(p.id) === String(search));
   if (filter === 'override') list = list.filter(p => rules.productOverrides[String(p.id)]);
   if (filter === 'low') list = list.filter(p => p.price - (p.dropbuy_cost || 0) < Math.max(rules.minProfit, 1));
-  if (filter === 'abovePublic') list = list.filter(p => p.public_price && p.price > p.public_price);
+  if (filter === 'abovePublic') list = list.filter(p => refPrice(p) && p.price > refPrice(p));
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const lim = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
   const rows = list.slice((pageNum - 1) * lim, pageNum * lim).map(p => ({
     id: p.id, sku: p.sku, name: p.name, image: p.image, category_name: p.category_name, in_stock: p.in_stock !== false,
-    public_price: p.public_price, wholesale_price: p.wholesale_price || null, cost: p.dropbuy_cost, price: p.price,
-    profit: p.price - (p.dropbuy_cost || 0), rule: p.pricing_rule, override: rules.productOverrides[String(p.id)] || null, dropbuy_url: p.dropbuy_url
+    public_price: refPrice(p), wholesale_price: p.wholesale_price || p.dealer_price || null, cost: p.dropbuy_cost, price: p.price,
+    profit: p.price - (p.dropbuy_cost || 0), rule: p.pricing_rule, override: rules.productOverrides[String(p.id)] || null, dropbuy_url: p.dropbuy_url || p.source_url
   }));
   res.json({ success: true, total: list.length, page: pageNum, totalPages: Math.ceil(list.length / lim) || 1, data: rows });
-});
+}));
 
-// Đặt giá riêng 1 SP: { product_id, type: 'percent'|'fixed', value } – value null/'' = xoá giá riêng
-app.post('/api/admin/pricing/override', requireAdmin, async (req, res) => {
+// Đặt giá riêng 1 SP: { product_id, type: 'percent'|'fixed', value, source } – value null/'' = xoá giá riêng
+app.post('/api/admin/pricing/override', requireAdmin, withPricingSource(async (req, res, ps) => {
   const { product_id, type, value } = req.body || {};
   const id = Number(product_id);
-  if (!scraper.getProducts().some(p => p.id === id)) return res.status(404).json({ success: false, error: 'Không tìm thấy sản phẩm' });
+  if (!ps.products().some(p => p.id === id)) return res.status(404).json({ success: false, error: 'Không tìm thấy sản phẩm' });
   const cfg = readConfig();
-  const rules = pricing.normalizeRules(cfg.pricing || {});
+  const rules = ps.rules(cfg);
   if (value === null || value === '' || value === undefined) delete rules.productOverrides[String(id)];
   else {
     const v = Number(value);
     if (!Number.isFinite(v) || v < 0) return res.status(400).json({ success: false, error: 'Giá trị không hợp lệ' });
     rules.productOverrides[String(id)] = { type: type === 'fixed' ? 'fixed' : 'percent', value: v };
   }
-  cfg.pricing = rules;
+  ps.store(cfg, rules);
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
-  await realtimeSync.repriceNow();
-  const p = scraper.getProducts().find(x => x.id === id);
+  await ps.reprice();
+  const p = ps.products().find(x => x.id === id);
   res.json({ success: true, data: { id, price: p.price, cost: p.dropbuy_cost, profit: p.price - p.dropbuy_cost, rule: p.pricing_rule, override: rules.productOverrides[String(id)] || null } });
+}));
+
+// --- Nguồn hàng sỉ khác (TechMall, …): trạng thái, đăng nhập đại lý, quét ngay, cài đặt ---
+const sourceOr404 = (req, res) => {
+  const src = sources.get(req.params.key);
+  if (!src) res.status(404).json({ success: false, error: 'Không có nguồn hàng này' });
+  return src;
+};
+
+app.get('/api/admin/sources', requireAdmin, (req, res) => {
+  const cfg = readConfig();
+  res.json({ success: true, data: sources.all().map(s => ({
+    ...s.status(),
+    enabled: cfg.sources?.[s.def.key]?.enabled !== false,
+    intervalMinutes: Number(cfg.sources?.[s.def.key]?.intervalMinutes) || s.def.intervalMinutes || 10,
+    shipping: s.shippingRules(cfg)
+  })) });
+});
+
+app.post('/api/admin/sources/:key/login', requireAdmin, rateLimit('srcLogin', 15 * 60e3, 10), async (req, res) => {
+  const src = sourceOr404(req, res);
+  if (!src) return;
+  const { username, password, remember } = req.body || {};
+  if (!username || !password) return res.status(400).json({ success: false, error: 'Nhập tên đăng nhập và mật khẩu đại lý.' });
+  try {
+    await src.login(String(username).trim(), String(password), { remember: remember !== false });
+    res.json({ success: true, message: `Đã đăng nhập ${src.def.label}. Đang quét lại giá đại lý...` });
+    src.syncAll().catch(e => console.error(`[Nguồn ${src.def.label}]`, e.message));
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/admin/sources/:key/logout', requireAdmin, (req, res) => {
+  const src = sourceOr404(req, res);
+  if (!src) return;
+  src.logout();
+  res.json({ success: true, message: `Đã đăng xuất ${src.def.label} và xoá mật khẩu đã lưu.` });
+});
+
+app.post('/api/admin/sources/:key/sync', requireAdmin, async (req, res) => {
+  const src = sourceOr404(req, res);
+  if (!src) return;
+  try {
+    const r = await src.syncAll();
+    res.json({ success: true, message: `Đã quét ${r.fetched}/${r.total} SP, ${r.sellable} SP lên kệ, ${r.changed} thay đổi.`, data: r });
+  } catch (e) {
+    res.status(502).json({ success: false, error: e.message });
+  }
+});
+
+// { enabled, intervalMinutes, shipping: { hcmFreeFrom, hcmFee, otherFreeFrom, otherFee } }
+app.post('/api/admin/sources/:key/settings', requireAdmin, (req, res) => {
+  const src = sourceOr404(req, res);
+  if (!src) return;
+  const b = req.body || {};
+  const cfg = readConfig();
+  cfg.sources = cfg.sources || {};
+  const cur = cfg.sources[src.def.key] || {};
+  cfg.sources[src.def.key] = {
+    ...cur,
+    enabled: b.enabled === undefined ? cur.enabled !== false : !!b.enabled,
+    intervalMinutes: Math.min(180, Math.max(5, Number(b.intervalMinutes) || cur.intervalMinutes || src.def.intervalMinutes || 10)),
+    shipping: b.shipping ? src.shippingRules({ sources: { [src.def.key]: { shipping: b.shipping } } }) : cur.shipping
+  };
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
+  res.json({ success: true, message: 'Đã lưu cài đặt nguồn hàng.', data: cfg.sources[src.def.key] });
 });
 
 // --- Phí vận chuyển & hạn thanh toán ---
@@ -1027,7 +1197,7 @@ app.get('/api/admin/dropbuy-health', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/healthz', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()), products: scraper.getProducts().length }));
+app.get('/healthz', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()), products: storeCatalog.getProducts().length }));
 
 app.get('/api/realtime/status', (req, res) => {
   res.json({ success: true, data: realtimeSync.getSyncStatus() });
@@ -1054,6 +1224,7 @@ server.listen(PORT, () => {
   console.log(`🔗 Admin Console: http://localhost:${PORT}/admin.html`);
   console.log(`================================================================`);
   realtimeSync.startRealtimeSync(io);
+  sources.start(io, readConfig);
   orderExpiry.startOrderExpiry(io, readConfig);
   backup.startBackups();
   watchdog.startWatchdog(io);

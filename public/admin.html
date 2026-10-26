@@ -320,9 +320,17 @@
     </div>
 
     <!-- ===================== THIẾT LẬP GIÁ BÁN (như CTV) ===================== -->
+    <!-- ===================== NGUỒN HÀNG SỈ (TechMall, …) ===================== -->
+    <div class="admin-card" id="sourcesSection" style="margin-top: 24px;">
+      <h3 style="margin:0 0 6px;"><i class="fa-solid fa-warehouse" style="color:#c9a84c;"></i> Nguồn hàng sỉ</h3>
+      <p class="help-text">Ngoài DropBuy, cửa hàng gom thêm sản phẩm từ các web sỉ dưới đây. Đăng nhập bằng tài khoản <strong>đại lý</strong> để lấy đúng giá sỉ của bạn; mật khẩu được mã hoá và chỉ lưu trên máy chủ. Giá bán của từng nguồn chỉnh ở khung <strong>Thiết lập giá bán</strong> (chọn nguồn).</p>
+      <div id="sourcesList" class="sources-list"></div>
+    </div>
+
     <div class="admin-card" id="pricingSection" style="margin-top: 24px;">
       <div class="flex-between" style="flex-wrap: wrap; gap: 10px;">
-        <h3 style="margin:0;"><i class="fa-solid fa-tags" style="color:#c9a84c;"></i> Thiết Lập Giá Bán (Giá gốc DropBuy + % lãi)</h3>
+        <h3 style="margin:0; display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><i class="fa-solid fa-tags" style="color:#c9a84c;"></i> Thiết Lập Giá Bán
+          <select id="prSource" style="width:auto; font-size:14px;"><option value="dropbuy">DropBuy</option></select></h3>
         <span id="pricingAuthBadge" class="auth-badge badge-disconnected">...</span>
       </div>
       <p class="help-text" id="pricingAuthNote" style="margin-top:8px;"></p>
@@ -330,7 +338,12 @@
       <div class="pricing-stats" id="pricingStats"></div>
 
       <form id="pricingForm" class="pricing-grid">
-        <div class="form-group">
+        <div class="form-group" id="prSurchargeGroup" hidden>
+          <label>Phụ phí cộng vào giá vốn (%)</label>
+          <input type="number" id="prSurcharge" min="0" max="50" step="0.5">
+          <p class="help-text">Vd TechMall cộng 5–10% với đơn đại lý dưới 1 triệu – tính sẵn vào giá vốn để không lỗ ở đơn nhỏ.</p>
+        </div>
+        <div class="form-group" id="prBaseGroup">
           <label>Giá gốc để tính lãi</label>
           <select id="prBase">
             <option value="wholesale">Giá CTV/F1 của tài khoản DropBuy (cần đăng nhập)</option>
@@ -357,8 +370,8 @@
           </select>
         </div>
         <div class="form-group checkbox-group" style="grid-column: 1 / -1;">
-          <label><input type="checkbox" id="prCapAtPublic"> <strong>Không bán cao hơn giá niêm yết DropBuy</strong> (nếu vẫn còn lãi)</label>
-          <p class="help-text">Ví dụ: giá CTV 639.000 đ, niêm yết 2.650.000 đ, lãi 15% → bán 735.000 đ. Nếu chưa đăng nhập DropBuy, giá gốc = giá niêm yết nên +15% sẽ cao hơn giá DropBuy đang bán.</p>
+          <label><input type="checkbox" id="prCapAtPublic"> <strong id="prCapLabel">Không bán cao hơn giá niêm yết DropBuy</strong> (nếu vẫn còn lãi)</label>
+          <p class="help-text" id="prCapHelp">Ví dụ: giá CTV 639.000 đ, niêm yết 2.650.000 đ, lãi 15% → bán 735.000 đ. Nếu chưa đăng nhập DropBuy, giá gốc = giá niêm yết nên +15% sẽ cao hơn giá DropBuy đang bán.</p>
         </div>
 
         <div style="grid-column: 1 / -1;">
@@ -382,7 +395,7 @@
             <option value="">Tất cả</option>
             <option value="override">Đang đặt giá riêng</option>
             <option value="low">Lãi thấp / lỗ</option>
-            <option value="abovePublic">Bán cao hơn giá niêm yết DropBuy</option>
+            <option value="abovePublic" id="prFilterAbove">Bán cao hơn giá niêm yết DropBuy</option>
           </select>
         </div>
       </div>
@@ -391,8 +404,8 @@
           <thead>
             <tr>
               <th>Sản phẩm</th>
-              <th>Niêm yết DropBuy</th>
-              <th>Giá CTV của bạn</th>
+              <th id="prThRef">Niêm yết DropBuy</th>
+              <th id="prThCost">Giá CTV của bạn</th>
               <th>Giá bán</th>
               <th>Lãi</th>
               <th>Giá riêng</th>

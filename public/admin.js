@@ -152,7 +152,9 @@ function renderOrders(orders) {
       : ds.status === 'IN_DROPBUY_CART' ? '<br><small style="color:#10b981;">✓ Đã nằm trong giỏ DropBuy</small>' : '';
     const readyForKho = (o.payment_method === 'COD' && o.status === 'CONFIRMED') || (o.payment_method !== 'COD' && o.status === 'PAID');
     const items = (o.items || []).map(i => {
-      const name = i.dropbuy_url ? `<a href="${esc(i.dropbuy_url)}" target="_blank" rel="noopener" style="color:#c9a84c;">${esc(i.name)}</a>` : esc(i.name);
+      const link = i.source && i.source !== 'dropbuy' ? i.source_url : i.dropbuy_url;
+      const tag = i.source && i.source !== 'dropbuy' ? `<span class="status-pill pending" style="font-size:10px; margin-right:4px;">${esc(i.source.toUpperCase())}</span>` : '';
+      const name = tag + (link ? `<a href="${esc(link)}" target="_blank" rel="noopener" style="color:#c9a84c;">${esc(i.name)}</a>` : esc(i.name));
       return `${name}${i.variant_name ? ` <em style="color:#94a3b8;">[${esc(i.variant_name)}]</em>` : ''} × ${i.quantity}${i.sku ? ` <small style="color:#64748b;">${esc(i.sku)}</small>` : ''}${i.dropbuy_cost ? ` <span title="Giá vốn DropBuy">(${formatPrice(i.dropbuy_cost)})</span>` : ''}`;
     }).join('<br>');
     let actions;
@@ -618,7 +620,8 @@ updateAuthStatusUI();
 
 
 // ============================ THIẾT LẬP GIÁ BÁN ============================
-const pricingState = { page: 1, search: '', filter: '', categories: [] };
+const pricingState = { page: 1, search: '', filter: '', categories: [], source: 'dropbuy' };
+const prQuery = () => `source=${encodeURIComponent(pricingState.source)}`;
 
 function fmtPct(v) {
   return v == null || v === '' ? '' : String(v);
@@ -626,10 +629,25 @@ function fmtPct(v) {
 
 async function loadPricing() {
   try {
-    const json = await (await adminFetch('/api/admin/pricing')).json();
+    const json = await (await adminFetch(`/api/admin/pricing?${prQuery()}`)).json();
     if (!json.success) throw new Error(json.error);
-    const { rules, categories, stats, dropbuy } = json.data;
+    const { rules, categories, stats, dropbuy, partner, sources, label } = json.data;
     pricingState.categories = categories;
+    const isDropbuy = pricingState.source === 'dropbuy';
+    const sel = document.getElementById('prSource');
+    if (sources && sel.options.length !== sources.length) sel.innerHTML = sources.map(s => `<option value="${esc(s.key)}">${esc(s.label)}</option>`).join('');
+    sel.value = pricingState.source;
+    // .form-group có display riêng nên thuộc tính hidden không ăn → ẩn bằng style
+    document.getElementById('prBaseGroup').style.display = isDropbuy ? '' : 'none';
+    document.getElementById('prSurchargeGroup').hidden = false;
+    document.getElementById('prSurchargeGroup').style.display = isDropbuy ? 'none' : '';
+    document.getElementById('prCapHelp').style.display = isDropbuy ? '' : 'none';
+    document.getElementById('prSurcharge').value = rules.surchargePercent ?? 0;
+    const refName = isDropbuy ? 'giá niêm yết DropBuy' : `giá lẻ đề xuất ${label}`;
+    document.getElementById('prCapLabel').innerText = `Không bán cao hơn ${refName}`;
+    document.getElementById('prFilterAbove').innerText = `Bán cao hơn ${refName}`;
+    document.getElementById('prThRef').innerText = isDropbuy ? 'Niêm yết DropBuy' : 'Giá lẻ đề xuất';
+    document.getElementById('prThCost').innerText = isDropbuy ? 'Giá CTV của bạn' : 'Giá đại lý';
 
     document.getElementById('prBase').value = rules.base;
     document.getElementById('prMarkup').value = rules.markupPercent;
@@ -639,7 +657,11 @@ async function loadPricing() {
 
     const badge = document.getElementById('pricingAuthBadge');
     const note = document.getElementById('pricingAuthNote');
-    if (dropbuy.authenticated) {
+    if (!isDropbuy) {
+      badge.className = `auth-badge ${partner.logged_in ? 'badge-connected' : 'badge-disconnected'}`;
+      badge.innerHTML = partner.logged_in ? `<i class="fa-solid fa-circle-check"></i> Giá đại lý ${esc(label)} của ${esc(partner.username || '')}` : `<i class="fa-solid fa-triangle-exclamation"></i> Chưa đăng nhập ${esc(label)}`;
+      note.innerHTML = `Giá vốn = giá đại lý ${esc(label)} + phụ phí; giá gạch ngang = giá lẻ đề xuất của ${esc(label)}. <strong>${partner.sellable.toLocaleString('vi-VN')}</strong> SP đang lên kệ (chỉ SP có ảnh).${partner.logged_in ? '' : ' <span style="color:#f59e0b;">Đăng nhập ở mục Nguồn hàng sỉ để chắc chắn đúng giá đại lý của bạn.</span>'}`;
+    } else if (dropbuy.authenticated) {
       badge.className = 'auth-badge badge-connected';
       badge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Đang lấy giá CTV của ${esc(dropbuy.username || 'tài khoản DropBuy')}`;
       note.innerHTML = `Đã có giá CTV cho <strong>${stats.wholesaleCount.toLocaleString('vi-VN')}/${stats.total.toLocaleString('vi-VN')}</strong> sản phẩm. Giá CTV được cập nhật lại mỗi lần quét giá.`;
@@ -651,10 +673,10 @@ async function loadPricing() {
 
     document.getElementById('pricingStats').innerHTML = [
       ['Sản phẩm', stats.total.toLocaleString('vi-VN')],
-      ['Có giá CTV', stats.wholesaleCount.toLocaleString('vi-VN')],
+      [isDropbuy ? 'Có giá CTV' : 'Có giá đại lý', stats.wholesaleCount.toLocaleString('vi-VN')],
       ['Lãi TB / SP còn hàng', formatPrice(stats.avgProfit)],
       ['SP bị lỗ', stats.negativeProfit],
-      ['Giá bán > niêm yết DropBuy', stats.abovePublic.toLocaleString('vi-VN')]
+      [isDropbuy ? 'Giá bán > niêm yết DropBuy' : 'Giá bán > giá lẻ đề xuất', stats.abovePublic.toLocaleString('vi-VN')]
     ].map(([k, v]) => `<div class="pricing-stat"><span>${k}</span><strong>${v}</strong></div>`).join('');
 
     document.getElementById('prCategoryList').innerHTML = categories.map(c => `
@@ -675,6 +697,8 @@ document.getElementById('pricingForm').addEventListener('submit', async e => {
     if (inp.value !== '') categoryMarkups[inp.dataset.cat] = parseFloat(inp.value);
   });
   const body = {
+    source: pricingState.source,
+    surchargePercent: parseFloat(document.getElementById('prSurcharge').value) || 0,
     base: document.getElementById('prBase').value,
     markupPercent: parseFloat(document.getElementById('prMarkup').value),
     minProfit: parseFloat(document.getElementById('prMinProfit').value) || 0,
@@ -685,7 +709,7 @@ document.getElementById('pricingForm').addEventListener('submit', async e => {
   const msg = document.getElementById('pricingSaveMsg');
   msg.innerText = 'Đang áp dụng...';
   try {
-    const json = await (await adminFetch('/api/admin/pricing', { method: 'POST', body: JSON.stringify(body) })).json();
+    const json = await (await adminFetch(`/api/admin/pricing?${prQuery()}`, { method: 'POST', body: JSON.stringify(body) })).json();
     if (!json.success) throw new Error(json.error);
     msg.innerText = json.message;
     loadPricing();
@@ -696,7 +720,7 @@ document.getElementById('pricingForm').addEventListener('submit', async e => {
 });
 
 async function loadPricingTable() {
-  const params = new URLSearchParams({ page: pricingState.page, limit: 20, search: pricingState.search, filter: pricingState.filter });
+  const params = new URLSearchParams({ source: pricingState.source, page: pricingState.page, limit: 20, search: pricingState.search, filter: pricingState.filter });
   const tbody = document.getElementById('pricingTableBody');
   try {
     const json = await (await adminFetch(`/api/admin/pricing/products?${params}`)).json();
@@ -710,7 +734,7 @@ async function loadPricingTable() {
             <a href="${esc(r.dropbuy_url)}" target="_blank" rel="noopener" style="color:#e2e8f0;">${esc(r.name)}</a><br>
             <small style="color:#64748b;">${esc(r.sku)} · ${esc(r.category_name || '')}${r.in_stock ? '' : ' · <span style="color:#ef4444;">hết hàng</span>'}</small>
           </td>
-          <td>${formatPrice(r.public_price)}</td>
+          <td>${r.public_price ? formatPrice(r.public_price) : '<small style="color:#64748b;">—</small>'}</td>
           <td>${r.wholesale_price ? `<strong>${formatPrice(r.wholesale_price)}</strong>` : '<small style="color:#64748b;">chưa có</small>'}</td>
           <td><strong style="color:#c9a84c;">${formatPrice(r.price)}</strong><br><small style="color:#64748b;">${esc(r.rule || '')}</small></td>
           <td style="color:${r.profit < 0 ? '#ef4444' : '#10b981'};"><strong>${formatPrice(r.profit)}</strong></td>
@@ -768,7 +792,7 @@ document.getElementById('pricingTableBody').addEventListener('click', async e =>
     value: clear ? null : row.querySelector('.pr-ov-value').value
   };
   try {
-    const json = await (await adminFetch('/api/admin/pricing/override', { method: 'POST', body: JSON.stringify(body) })).json();
+    const json = await (await adminFetch(`/api/admin/pricing/override?${prQuery()}`, { method: 'POST', body: JSON.stringify({ ...body, source: pricingState.source }) })).json();
     if (!json.success) throw new Error(json.error);
     loadPricingTable();
     loadPricing();
@@ -804,8 +828,132 @@ socket.on('PRODUCTS_UPDATED', () => {
   window.__prReload = setTimeout(() => { loadPricing(); loadPricingTable(); }, 1500);
 });
 
+document.getElementById('prSource').addEventListener('change', e => {
+  pricingState.source = e.target.value;
+  pricingState.page = 1;
+  document.getElementById('pricingSaveMsg').innerText = '';
+  loadPricing();
+  loadPricingTable();
+});
+
 loadPricing();
 loadPricingTable();
+
+// ============================ NGUỒN HÀNG SỈ (TechMall, …) ============================
+const sinceText = iso => {
+  if (!iso) return 'chưa quét';
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  return m < 1 ? 'vừa xong' : m < 60 ? `${m} phút trước` : `${Math.round(m / 60)} giờ trước`;
+};
+
+function sourceCard(s) {
+  const m = s.meta || {};
+  const sh = s.shipping || {};
+  const err = s.sync?.lastError ? `<div style="color:#ef4444; margin-top:4px;">⚠ Lần quét gần nhất lỗi: ${esc(s.sync.lastError)}</div>` : '';
+  return `
+    <div class="source-card" data-source="${esc(s.key)}">
+      <div class="flex-between" style="flex-wrap:wrap; gap:8px;">
+        <h4 style="margin:0;"><i class="fa-solid fa-store"></i> ${esc(s.label)} <small style="color:#64748b; font-weight:500;">${esc(s.url)}</small></h4>
+        <span class="auth-badge ${s.logged_in ? 'badge-connected' : 'badge-disconnected'}">${s.logged_in ? `<i class="fa-solid fa-circle-check"></i> Đại lý: ${esc(s.username || '')}` : '<i class="fa-solid fa-triangle-exclamation"></i> Chưa đăng nhập đại lý'}</span>
+      </div>
+      <div class="pricing-stats" style="margin:10px 0;">
+        <div class="pricing-stat"><span>Sản phẩm của nguồn</span><strong>${(s.products || 0).toLocaleString('vi-VN')}</strong></div>
+        <div class="pricing-stat"><span>Đang lên kệ (có ảnh)</span><strong>${(s.sellable || 0).toLocaleString('vi-VN')}</strong></div>
+        <div class="pricing-stat"><span>Còn hàng</span><strong>${(s.in_stock || 0).toLocaleString('vi-VN')}</strong></div>
+        <div class="pricing-stat"><span>Quét gần nhất</span><strong>${s.sync?.running ? 'đang quét…' : sinceText(m.lastSync)}</strong></div>
+      </div>
+      <small style="color:#64748b;">${m.lastSync ? `Lần trước: ${(m.fetched || 0).toLocaleString('vi-VN')}/${(m.total || 0).toLocaleString('vi-VN')} SP${m.complete === false ? ' (thiếu trang – chưa gỡ SP nào)' : ''}, ${m.logged_in ? 'giá đại lý' : 'giá khi chưa đăng nhập'}.` : ''}</small>
+      ${err}
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;">
+        <button type="button" class="btn-sync-now src-sync"><i class="fa-solid fa-rotate"></i> Quét ngay</button>
+        ${s.logged_in || s.remembered ? '<button type="button" class="btn-ghost src-logout"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất & xoá mật khẩu</button>' : ''}
+      </div>
+      <form class="src-login pricing-grid" ${s.logged_in ? 'hidden' : ''}>
+        <div class="form-group"><label>Tài khoản đại lý ${esc(s.label)}</label><input name="username" autocomplete="off" value="${esc(s.username || '')}" placeholder="Email / tên đăng nhập"></div>
+        <div class="form-group"><label>Mật khẩu</label><input name="password" type="password" autocomplete="new-password"></div>
+        <div class="form-group checkbox-group" style="grid-column:1/-1;"><label><input type="checkbox" name="remember" checked> Ghi nhớ để tự đăng nhập lại khi phiên hết hạn (mật khẩu mã hoá, chỉ lưu trên máy chủ)</label></div>
+        <div style="grid-column:1/-1;"><button type="submit" class="btn-submit" style="width:auto;"><i class="fa-solid fa-key"></i> Đăng nhập đại lý</button></div>
+      </form>
+      <details style="margin-top:8px;"><summary style="cursor:pointer;">Cài đặt nguồn: bật/tắt, chu kỳ quét, phí ship</summary>
+        <form class="src-settings pricing-grid" style="margin-top:8px;">
+          <div class="form-group checkbox-group" style="grid-column:1/-1;"><label><input type="checkbox" name="enabled" ${s.enabled ? 'checked' : ''}> Bán hàng của nguồn này (tắt = ngừng quét; SP đã có vẫn hiển thị cho tới khi quét lại)</label></div>
+          <div class="form-group"><label>Quét lại mỗi (phút)</label><input name="intervalMinutes" type="number" min="5" max="180" value="${s.intervalMinutes}"></div>
+          <div class="form-group"><label>TP.HCM: miễn ship từ (đ)</label><input name="hcmFreeFrom" type="number" min="0" step="1000" value="${sh.hcmFreeFrom ?? 0}"></div>
+          <div class="form-group"><label>TP.HCM: phí ship đơn nhỏ (đ)</label><input name="hcmFee" type="number" min="0" step="1000" value="${sh.hcmFee ?? 0}"></div>
+          <div class="form-group"><label>Tỉnh khác: miễn ship từ (đ)</label><input name="otherFreeFrom" type="number" min="0" step="1000" value="${sh.otherFreeFrom ?? 0}"></div>
+          <div class="form-group"><label>Tỉnh khác: phí ship đơn nhỏ (đ)</label><input name="otherFee" type="number" min="0" step="1000" value="${sh.otherFee ?? 0}"></div>
+          <div style="grid-column:1/-1;"><button type="submit" class="btn-submit" style="width:auto;"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button></div>
+        </form>
+      </details>
+      <div class="help-text src-msg" style="margin-top:6px;"></div>
+    </div>`;
+}
+
+async function loadSources() {
+  const box = document.getElementById('sourcesList');
+  try {
+    const json = await (await adminFetch('/api/admin/sources')).json();
+    if (!json.success) throw new Error(json.error);
+    box.innerHTML = json.data.map(sourceCard).join('') || '<p class="help-text">Chưa có nguồn nào.</p>';
+  } catch (e) {
+    box.innerHTML = `<p style="color:#ef4444;">Lỗi tải nguồn hàng: ${esc(e.message)}</p>`;
+  }
+}
+
+document.getElementById('sourcesList').addEventListener('click', async e => {
+  const card = e.target.closest('[data-source]');
+  if (!card) return;
+  const key = card.dataset.source;
+  const msg = card.querySelector('.src-msg');
+  if (e.target.closest('.src-sync')) {
+    const btn = e.target.closest('.src-sync');
+    btn.disabled = true;
+    msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang quét toàn bộ sản phẩm (khoảng 1 phút)...';
+    try {
+      const json = await (await adminFetch(`/api/admin/sources/${encodeURIComponent(key)}/sync`, { method: 'POST', body: '{}' })).json();
+      if (!json.success) throw new Error(json.error);
+      await loadSources();
+      document.querySelector(`[data-source="${CSS.escape(key)}"] .src-msg`).innerText = json.message;
+      if (pricingState.source === key) { loadPricing(); loadPricingTable(); }
+    } catch (err) { msg.innerText = 'Lỗi: ' + err.message; btn.disabled = false; }
+  }
+  if (e.target.closest('.src-logout')) {
+    if (!await uiConfirm('Đăng xuất tài khoản đại lý và xoá mật khẩu đã lưu? Giá sẽ quay về giá công khai cho tới khi đăng nhập lại.')) return;
+    const json = await (await adminFetch(`/api/admin/sources/${encodeURIComponent(key)}/logout`, { method: 'POST', body: '{}' })).json();
+    await loadSources();
+    document.querySelector(`[data-source="${CSS.escape(key)}"] .src-msg`).innerText = json.message || json.error;
+  }
+});
+
+document.getElementById('sourcesList').addEventListener('submit', async e => {
+  const form = e.target;
+  const card = form.closest('[data-source]');
+  if (!card) return;
+  e.preventDefault();
+  const key = card.dataset.source;
+  const msg = card.querySelector('.src-msg');
+  const f = new FormData(form);
+  try {
+    let json;
+    if (form.classList.contains('src-login')) {
+      msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng nhập...';
+      json = await (await adminFetch(`/api/admin/sources/${encodeURIComponent(key)}/login`, { method: 'POST', body: JSON.stringify({ username: f.get('username'), password: f.get('password'), remember: f.get('remember') === 'on' }) })).json();
+    } else {
+      json = await (await adminFetch(`/api/admin/sources/${encodeURIComponent(key)}/settings`, { method: 'POST', body: JSON.stringify({
+        enabled: f.get('enabled') === 'on', intervalMinutes: Number(f.get('intervalMinutes')),
+        shipping: { hcmFreeFrom: Number(f.get('hcmFreeFrom')), hcmFee: Number(f.get('hcmFee')), otherFreeFrom: Number(f.get('otherFreeFrom')), otherFee: Number(f.get('otherFee')) }
+      }) })).json();
+    }
+    if (!json.success) throw new Error(json.error);
+    await loadSources();
+    document.querySelector(`[data-source="${CSS.escape(key)}"] .src-msg`).innerText = json.message;
+  } catch (err) {
+    msg.innerText = 'Lỗi: ' + err.message;
+  }
+});
+
+loadSources();
+setInterval(() => { if (!document.hidden && !document.querySelector('#sourcesList input:focus')) loadSources(); }, 60000);
 
 
 // ============================ PHÍ VẬN CHUYỂN & HẠN THANH TOÁN ============================

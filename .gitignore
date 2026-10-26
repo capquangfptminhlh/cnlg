@@ -31,3 +31,7 @@ data/deploy/
 data/update.lock
 data/update.rejected
 data/*.update-keep
+# Nguon si khac (TechMall, ...): san pham, danh muc, phien dang nhap; mat khau ma hoa tung nguon
+data/source-*.json
+data/source-*.json.tmp
+data/*-cred.json

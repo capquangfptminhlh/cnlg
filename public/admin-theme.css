@@ -298,3 +298,8 @@
   .orders-table tr:hover td { background: transparent; }
   .orders-table td button { min-height: 36px; }
 }
+
+/* Nguồn hàng sỉ */
+.sources-list { display: grid; gap: 14px; margin-top: 10px; }
+.source-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: #fff; }
+.source-card h4 { font-size: 16px; }

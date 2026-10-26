@@ -25,45 +25,58 @@ function getKey() {
   return Buffer.from(hex, 'hex');
 }
 
-function save(username, password) {
+/**
+ * Kho riêng cho từng nguồn hàng (vd create('techmall') → data/techmall-cred.json), dùng chung khoá data/cred.key.
+ * Mặc định (save/load/info/clear) là tài khoản DropBuy như trước.
+ */
+function create(name, file = path.join(path.dirname(CRED_FILE), `${name}-cred.json`)) {
+  return {
+    save: (username, password) => save(username, password, file),
+    load: () => load(file, name),
+    info: () => info(file),
+    clear: () => clear(file)
+  };
+}
+
+function save(username, password, file = CRED_FILE) {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', getKey(), iv);
   const data = Buffer.concat([cipher.update(JSON.stringify({ u: String(username), p: String(password) }), 'utf8'), cipher.final()]);
   const rec = { v: 1, iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: data.toString('base64'), username: String(username), saved_at: new Date().toISOString() };
-  fs.mkdirSync(path.dirname(CRED_FILE), { recursive: true });
-  fs.writeFileSync(`${CRED_FILE}.tmp`, JSON.stringify(rec), { mode: 0o600 });
-  fs.renameSync(`${CRED_FILE}.tmp`, CRED_FILE);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(`${file}.tmp`, JSON.stringify(rec), { mode: 0o600 });
+  fs.renameSync(`${file}.tmp`, file);
 }
 
 /** { username, password } hoặc null (chưa lưu / khoá đổi / file hỏng) */
-function load() {
+function load(file = CRED_FILE, name = 'DropBuy') {
   try {
-    if (!fs.existsSync(CRED_FILE)) return null;
-    const rec = JSON.parse(fs.readFileSync(CRED_FILE, 'utf8'));
+    if (!fs.existsSync(file)) return null;
+    const rec = JSON.parse(fs.readFileSync(file, 'utf8'));
     const decipher = crypto.createDecipheriv('aes-256-gcm', getKey(), Buffer.from(rec.iv, 'base64'));
     decipher.setAuthTag(Buffer.from(rec.tag, 'base64'));
     const plain = Buffer.concat([decipher.update(Buffer.from(rec.data, 'base64')), decipher.final()]).toString('utf8');
     const { u, p } = JSON.parse(plain);
     return { username: u, password: p };
   } catch (e) {
-    console.warn('[Vault] Không đọc được tài khoản DropBuy đã lưu:', e.message);
+    console.warn(`[Vault] Không đọc được tài khoản ${name} đã lưu:`, e.message);
     return null;
   }
 }
 
 /** Thông tin không nhạy cảm để hiện trong admin */
-function info() {
+function info(file = CRED_FILE) {
   try {
-    if (!fs.existsSync(CRED_FILE)) return { saved: false };
-    const rec = JSON.parse(fs.readFileSync(CRED_FILE, 'utf8'));
+    if (!fs.existsSync(file)) return { saved: false };
+    const rec = JSON.parse(fs.readFileSync(file, 'utf8'));
     return { saved: true, username: rec.username, saved_at: rec.saved_at };
   } catch (e) {
     return { saved: false };
   }
 }
 
-function clear() {
-  try { fs.unlinkSync(CRED_FILE); } catch (e) {}
+function clear(file = CRED_FILE) {
+  try { fs.unlinkSync(file); } catch (e) {}
 }
 
-module.exports = { save, load, info, clear };
+module.exports = { save: (u, p) => save(u, p), load: () => load(), info: () => info(), clear: () => clear(), create };

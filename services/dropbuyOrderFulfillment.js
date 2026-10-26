@@ -221,6 +221,14 @@ async function handOff(orderId, io) {
   const config = scraper.getConfig();
   const order = orderStore.getOrderById(orderId);
   if (!order || !readyStatus(order)) return { success: false, mode: 'NOT_READY' };
+  // Có món từ nguồn sỉ khác (TechMall…): hệ thống không tự đặt bên đó → nhân viên đặt tay cả đơn
+  const sourcesInOrder = new Set((order.items || []).map(i => i.source || 'dropbuy'));
+  const partners = [...sourcesInOrder].filter(s => s !== 'dropbuy');
+  if (partners.length) {
+    setSync(orderId, { status: 'WAITING_STAFF', note: `Chờ nhân viên đặt: hàng từ ${partners.join(', ')}${sourcesInOrder.has('dropbuy') ? ' và DropBuy' : ''}.` }, { needs_attention: true });
+    emit(io, order, order.status);
+    return { success: true, mode: 'STAFF' };
+  }
   if (!normalizeAutoOrder(config.autoOrder).enabled) {
     // Nhân viên tự đặt trên DropBuy: chỉ đánh dấu chờ xử lý, không đụng giỏ DropBuy dùng chung
     setSync(orderId, { status: 'WAITING_STAFF', note: 'Chờ nhân viên đặt đơn dropship trên DropBuy.' }, { needs_attention: true });
