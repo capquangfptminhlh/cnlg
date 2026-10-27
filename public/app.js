@@ -404,19 +404,35 @@ async function openProductDetail(productId) {
   searchDropdown.classList.add('hidden');
   productDetailModal.classList.add('open');
   modalQty = 1;
-  detailModalBody.innerHTML = `
-    <div style="text-align: center; padding: 60px;">
-      <i class="fa-solid fa-spinner fa-spin" style="font-size: 40px; color: var(--gold);"></i>
-      <p style="margin-top: 14px; font-weight: 700; color: #94a3b8;">Đang tải thông số kỹ thuật, phân loại & album ảnh...</p>
-    </div>`;
+
+  // Hiển thị tức thì (0ms) từ bộ nhớ đệm nếu sản phẩm vừa được bấm từ danh sách
+  const numId = Number(productId);
+  const initial = (typeof productCache !== 'undefined' && productCache.get(numId)) ||
+                  (state.products && state.products.find(p => p.id === numId));
+  if (initial) {
+    state.activeDetailProduct = initial;
+    setProductHash(initial);
+    state.selectedGalleryIndex = 0;
+    const vs = initial.variants || [];
+    const def = vs.find(v => v.is_default && v.in_stock) || vs.find(v => v.id === initial.variation_id && v.in_stock) || vs.find(v => v.in_stock) || null;
+    state.selectedVariantId = vs.length === 1 ? vs[0].id : vs.length > 1 ? (def ? def.id : null) : null;
+    renderDetailModal(initial);
+  } else {
+    detailModalBody.innerHTML = `
+      <div style="text-align: center; padding: 60px;">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 40px; color: var(--gold);"></i>
+        <p style="margin-top: 14px; font-weight: 700; color: #94a3b8;">Đang tải thông số kỹ thuật, phân loại & album ảnh...</p>
+      </div>`;
+  }
 
   try {
     const res = await fetch(`/api/products/${productId}`);
     const json = await res.json();
-    // User may have already closed the dialog before the product response arrives.
     if (requestVersion !== detailRequestVersion || !productDetailModal.classList.contains('open')) return;
     if (!json.success || !json.data) {
-      detailModalBody.innerHTML = `<p style="text-align: center; color: #ef4444;">Không thể tải chi tiết sản phẩm.</p>`;
+      if (!initial) {
+        detailModalBody.innerHTML = `<p style="text-align: center; color: #ef4444;">Không thể tải chi tiết sản phẩm.</p>`;
+      }
       return;
     }
 
@@ -424,15 +440,18 @@ async function openProductDetail(productId) {
     rememberProducts([{ ...prod, variants: undefined }]);
     state.activeDetailProduct = prod;
     setProductHash(prod);
-    state.selectedGalleryIndex = 0;
-    // Chọn sẵn phân loại mặc định còn hàng (nếu chỉ có 1 phân loại thì chọn luôn)
     const vs = prod.variants || [];
-    const def = vs.find(v => v.is_default && v.in_stock) || vs.find(v => v.id === prod.variation_id && v.in_stock) || vs.find(v => v.in_stock) || null;
-    state.selectedVariantId = vs.length === 1 ? vs[0].id : vs.length > 1 ? (def ? def.id : null) : null;
+    const curV = vs.find(v => String(v.id) === String(state.selectedVariantId));
+    if (!curV) {
+      const def = vs.find(v => v.is_default && v.in_stock) || vs.find(v => v.id === prod.variation_id && v.in_stock) || vs.find(v => v.in_stock) || null;
+      state.selectedVariantId = vs.length === 1 ? vs[0].id : vs.length > 1 ? (def ? def.id : null) : null;
+    }
     renderDetailModal(prod);
   } catch (err) {
     if (requestVersion !== detailRequestVersion || !productDetailModal.classList.contains('open')) return;
-    detailModalBody.innerHTML = `<p style="text-align: center; color: #ef4444;">Lỗi kết nối máy chủ.</p>`;
+    if (!initial) {
+      detailModalBody.innerHTML = `<p style="text-align: center; color: #ef4444;">Lỗi kết nối máy chủ.</p>`;
+    }
   }
 }
 
@@ -573,7 +592,7 @@ function renderDetailModal(prod) {
           <i class="fa-solid fa-shield-halved"></i> <span>Chính sách bảo hành: <strong>${esc(activeWarranty)}</strong></span>
           <small>${/^Không/i.test(activeWarranty) ? '• Đồng kiểm khi nhận' : '• Chính hãng NSX'}</small>
         </div>
-        ${!soldOut ? `<div class="detail-urgency-box"><div class="detail-urgency-top"><span class="detail-urgency-flame"><i class="fa-solid fa-fire-flame-curved"></i> SẮP HẾT HÀNG! Chỉ còn <b id="detailUrgentLeft">${urg.left}</b> suất giá sỉ cuối</span><span class="detail-urgency-viewers"><span class="live-viewer-dot"></span> <b id="detailViewerCount">${urg.viewers}</b> khách đang xem</span></div><div class="detail-urgency-bar"><span class="detail-urgency-fill" style="width:${urg.pct}%"></span><span class="detail-urgency-bar-label"><i class="fa-solid fa-bolt"></i> Đã săn ${urg.pct}% kho ưu đãi — Tranh thủ chốt đơn kẻo lỡ!</span></div></div>` : ''}
+        ${!soldOut ? `<div class="detail-urgency-box"><div class="detail-urgency-top"><span class="detail-urgency-flame"><i class="fa-solid fa-fire-flame-curved"></i> SẮP HẾT HÀNG! Chỉ còn <b id="detailUrgentLeft">${urg.left}</b> suất giá sỉ cuối</span><span class="detail-urgency-viewers"><span class="live-viewer-dot"></span> <b id="detailViewerCount">${urg.viewers}</b> khách đang xem</span></div><div class="detail-urgency-bar"><span class="detail-urgency-fill" style="width:${urg.pct}%"></span><span class="detail-urgency-bar-label"><i class="fa-solid fa-bolt"></i> Đã săn ${urg.pct}% — Tranh thủ chốt đơn!</span></div></div>` : ''}
 
 
         ${renderVariantPicker(prod)}

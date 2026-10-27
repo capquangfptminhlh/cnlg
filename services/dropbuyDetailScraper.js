@@ -76,7 +76,7 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
     try {
       const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
       const fresh = Date.now() - new Date(cached.cached_at || 0).getTime() < DETAIL_TTL_MS;
-      const validVariations = Array.isArray(cached.variations) && cached.variations.length > 0;
+      const validVariations = Array.isArray(cached.variations);
       const validDesc = !String(cached.description || '').trim().startsWith('{"lien-he"');
       if (fresh && cached.cache_version === CACHE_VERSION && validVariations && validDesc) return cached;
     } catch (e) {}

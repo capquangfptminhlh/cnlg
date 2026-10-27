@@ -663,9 +663,18 @@ app.get('/api/flash-sale', (req, res) => {
 });
 
 const liveRefreshAt = new Map();
+const productDetailCache = new Map();
+const PRODUCT_DETAIL_TTL_MS = 60000;
+
 app.get('/api/products/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const cached = productDetailCache.get(id);
+    if (cached && Date.now() - cached.at < PRODUCT_DETAIL_TTL_MS) {
+      res.setHeader('Cache-Control', 'public, max-age=30');
+      return res.json({ success: true, data: cached.data });
+    }
+
     const product = storeCatalog.findProduct(id);
     if (!product) {
       return res.status(404).json({ success: false, error: 'Product not found' });
@@ -692,19 +701,22 @@ app.get('/api/products/:id', async (req, res) => {
         : [{ id: product.variation_id, sku: product.sku, name: 'Mặc định', is_default: true, in_stock: product.in_stock !== false,
             price: product.price, original_price: pub.original_price || null, discount_percent: pub.discount_percent || 0, weight_gram: product.weight_gram || 0, image: null }];
 
-      return res.json({ success: true, data: {
+      const responseData = {
         ...pub, description: stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(d.description))), video_url: null,
         variation_options: product.variation_options || [],
         gallery: (d.gallery || []).map(g => ({ url: catalogImage.maskMediaUrl(g.url), thumb: catalogImage.maskMediaUrl(g.thumb || g.url) })),
         variants
-      } });
+      };
+      productDetailCache.set(id, { data: responseData, at: Date.now() });
+      res.setHeader('Cache-Control', 'public, max-age=30');
+      return res.json({ success: true, data: responseData });
     }
     const isDropbuy = !product.supplier || product.supplier === 'dropbuy';
     if (isDropbuy) {
       const last = liveRefreshAt.get(id) || 0;
-      if (Date.now() - last > 20000) {
+      if (Date.now() - last > 30000) {
         liveRefreshAt.set(id, Date.now());
-        await Promise.race([realtimeSync.liveCheck([id]), new Promise(r => setTimeout(r, 2500))]).catch(() => {});
+        realtimeSync.liveCheck([id]).catch(() => {});
       }
     }
     const freshProduct = scraper.getProducts().find(p => p.id === id) || product;
@@ -748,17 +760,31 @@ app.get('/api/products/:id', async (req, res) => {
     delete merged.cache_version;
     delete merged.cached_at;
     delete merged.fetch_failed;
-    merged.variants = (await variants.variantsWithPrices(freshProduct, detail).catch(() => [])).map(v => ({ ...v, image: v.image ? catalogImage.maskMediaUrl(v.image) : v.image }));
-    merged.variation_options = detail.variation_options || [];
+
+    const hasGroupedVariants = Array.isArray(product.variants) && product.variants.length > 0;
+    if (hasGroupedVariants) {
+      merged.variants = product.variants.map(v => ({
+        id: String(v.id), sku: v.sku || String(v.id), name: v.name, is_default: !!v.is_default, in_stock: v.in_stock !== false,
+        price: v.price, original_price: v.original_price || null,
+        discount_percent: v.original_price && v.original_price > v.price ? Math.round((1 - v.price / v.original_price) * 100) : 0,
+        weight_gram: v.weight_gram || 0,
+        warranty: stripSupplierText(v.warranty || product.warranty || 'Bảo hành chính hãng'),
+        image: v.image ? catalogImage.maskMediaUrl(v.image) : null
+      }));
+      merged.variation_options = product.variation_options || [];
+    } else {
+      merged.variants = (await variants.variantsWithPrices(freshProduct, detail).catch(() => [])).map(v => ({ ...v, image: v.image ? catalogImage.maskMediaUrl(v.image) : v.image }));
+      merged.variation_options = detail.variation_options || [];
+    }
     delete merged.variations;
+    productDetailCache.set(id, { data: merged, at: Date.now() });
+    res.setHeader('Cache-Control', 'public, max-age=30');
     res.json({ success: true, data: merged });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// --- Vận chuyển ---
-// Phường/xã mới (2 cấp) theo mã DropBuy – cần cho đơn dropship tự động
 app.get('/api/address/wards', async (req, res) => {
   try {
     const r = await vnAddress.wardsOfProvince(String(req.query.province || ''));
