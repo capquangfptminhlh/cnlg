@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { maskMediaUrl } = require('./catalogImage');
 const { stripSupplierText } = require('./security');
 
@@ -12,7 +13,19 @@ const INDEX_FILE = path.join(__dirname, '..', 'public', 'index.html');
 let template = null;
 let templateMtime = 0;
 
-const ASSET_VERSION = 'v=20261025_7';
+// An automatic content fingerprint prevents returning old CSS/JS after deployment.
+  // Compute once at server startup (the server restarts when a release is deployed).
+const ASSET_VERSION = (() => {
+  const html = fs.readFileSync(INDEX_FILE, 'utf8');
+  const assets = [...new Set([...html.matchAll(/(?:href|src)="(\/[a-zA-Z0-9_.-]+\.(?:css|js))"/g)].map(m => m[1]))];
+  const hash = crypto.createHash('sha256');
+  for (const asset of assets) {
+    const file = path.join(__dirname, '..', 'public', asset.slice(1));
+    hash.update(asset);
+    hash.update(fs.readFileSync(file));
+  }
+  return 'v=' + hash.digest('hex').slice(0, 12);
+})();
 function bustAssets(html) {
   return html
     .replace(/(href="\/[a-zA-Z0-9_\-\.]+\.css)(")/g, `$1?${ASSET_VERSION}$2`)
