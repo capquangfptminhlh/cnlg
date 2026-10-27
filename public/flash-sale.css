@@ -1336,9 +1336,12 @@ body.is-category-view #flashSaleSection {
     bottom: 74px;
     max-width: none;
   }
+  /* Fill the mobile gallery width rather than forcing a narrow fixed-size preview. */
   #productDetailModal .main-preview-box {
-    max-height: 220px !important;
-    height: 220px !important;
+    width: 100%;
+    height: auto !important;
+    max-height: none !important;
+    aspect-ratio: 1.25 / 1;
   }
   .detail-urgency-box {
     padding: 8px 10px;
