@@ -3,6 +3,8 @@ const state = {
   products: [],
   categories: [],
   currentCategory: 'all',
+  currentBrand: 'all',
+  brands: [],
   currentPage: 1,
   limit: 24,
   searchQuery: '',
@@ -140,6 +142,7 @@ async function fetchProducts(append = false) {
       limit: state.limit,
       category: state.currentCategory,
       search: state.searchQuery,
+      brand: state.currentBrand !== 'all' ? state.currentBrand : '',
       sort: state.sort,
       minPrice: state.minPrice,
       maxPrice: state.maxPrice
@@ -188,6 +191,52 @@ if (btnLoadMore) {
     btnLoadMore.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải thêm sản phẩm...';
     state.currentPage++;
     fetchProducts(true);
+  });
+}
+
+// --- Brand Filters ---
+async function loadBrands() {
+  const container = document.getElementById('brandPills');
+  if (!container) return;
+  try {
+    const res = await fetch('/api/brands');
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data) && json.data.length) {
+      state.brands = json.data;
+      renderBrandPills();
+    }
+  } catch (err) {
+    console.error('Lỗi tải danh mục thương hiệu:', err);
+  }
+}
+
+function renderBrandPills() {
+  const container = document.getElementById('brandPills');
+  if (!container) return;
+  const list = state.brands || [];
+  let html = `<button type="button" class="brand-pill ${state.currentBrand === 'all' ? 'active' : ''}" data-brand="all"><i class="fa-solid fa-border-all"></i> Tất cả</button>`;
+  for (const b of list) {
+    const isAct = state.currentBrand.toLowerCase() === b.name.toLowerCase();
+    const displayName = b.name.toLowerCase() === 'ulanzi' ? 'Ulanzi' : b.name;
+    html += `<button type="button" class="brand-pill ${isAct ? 'active' : ''}" data-brand="${esc(displayName)}" title="${esc(displayName)} (${b.count} SP)"><i class="fa-solid fa-gem"></i> ${esc(displayName)} <span class="brand-pill-count">${b.count}</span></button>`;
+  }
+  container.innerHTML = html;
+  container.querySelectorAll('.brand-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const b = btn.getAttribute('data-brand');
+      container.querySelectorAll('.brand-pill').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+      state.currentBrand = b;
+      state.currentPage = 1;
+      state.searchQuery = '';
+      if (typeof searchInput !== 'undefined' && searchInput) searchInput.value = '';
+      if (b === 'all') {
+        catalogTitle.innerText = state.currentCategory === 'all' ? 'Bảng Giá Sỉ Toàn Kho' : catalogTitle.innerText;
+      } else {
+        catalogTitle.innerText = `Thương hiệu ${b} chính hãng`;
+      }
+      fetchProducts();
+    });
   });
 }
 
@@ -287,6 +336,7 @@ function productCardHtml(p) {
       </div>
 
       <div class="card-details">
+        ${p.brand ? `<div class="card-brand-tag"><i class="fa-solid fa-gem"></i> ${esc(p.brand.toLowerCase() === 'ulanzi' ? 'Ulanzi' : p.brand)}</div>` : ''}
         <h3 class="card-title" title="${esc(p.name)}" onclick="openProductDetail(${p.id})">${esc(p.name)}</h3>
 
         <div class="card-pricing">
@@ -496,7 +546,7 @@ function renderDetailModal(prod) {
       <div class="detail-info">
         <div class="detail-head-row">
           <div class="detail-brand-badge">
-            <i class="fa-solid fa-store"></i> Hoàng Minh Store${prod.is_mall ? ' · Sản phẩm Mall' : ''}
+            ${prod.brand ? `<i class="fa-solid fa-gem"></i> Thương hiệu: <strong>${esc(prod.brand.toLowerCase() === 'ulanzi' ? 'Ulanzi' : prod.brand)}</strong>` : `<i class="fa-solid fa-store"></i> Hoàng Minh Store`}${prod.is_mall ? ' · Sản phẩm Mall' : ''}
           </div>
           <button type="button" class="detail-copy-link" onclick="copyProductLink()"><i class="fa-solid fa-link"></i> Sao chép link</button>
         </div>
@@ -1309,6 +1359,13 @@ function runSearch(){
   hideSearchSuggestions();
   state.searchQuery=searchInput.value.trim();
   state.currentPage=1;
+  state.currentBrand='all';
+  const brandPills = document.getElementById('brandPills');
+  if (brandPills) {
+    brandPills.querySelectorAll('.brand-pill').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-brand') === 'all');
+    });
+  }
   catalogTitle.innerText=state.searchQuery?'Kết quả cho "'+state.searchQuery+'"':'Tất Cả Sản Phẩm';
   fetchProducts();
 }
@@ -1350,6 +1407,7 @@ loadProvinces();
 loadCart();
 updateCartUI();
 fetchCategories();
+loadBrands();
 fetchProducts();
 refreshCartPrices();
 openFromHash();

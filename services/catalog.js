@@ -5,18 +5,84 @@
  */
 const scraper = require('./dropbuyScraper');
 const sources = require('./sources');
-
-const sourceProducts = () => sources.all().flatMap(s => s.store.getProducts().filter(p => !p.removed));
+const variantGrouper = require('./variantGrouper');
 
 // Hàng nguồn khác từng bị ghi lẫn vào file DropBuy (bản TechMall cũ, trường supplier) → không hiện, tránh trùng
 const isLegacyPartner = p => p.supplier && p.supplier !== 'dropbuy';
-const dropbuyProducts = () => scraper.getProducts().filter(p => !isLegacyPartner(p));
 
-function getProducts() {
-  return dropbuyProducts().concat(sourceProducts());
+let dropbuyGroupedCache = null;
+let lastDropbuyKey = null;
+
+function dropbuyProducts() {
+  const raw = scraper.getProducts().filter(p => !isLegacyPartner(p));
+  const key = `${raw.length}:${raw[0]?.updated_at || ''}`;
+  if (dropbuyGroupedCache && key === lastDropbuyKey) {
+    return dropbuyGroupedCache;
+  }
+  lastDropbuyKey = key;
+  dropbuyGroupedCache = variantGrouper.groupProducts(raw);
+  return dropbuyGroupedCache;
 }
 
-/** Dọn 1 lần lúc khởi động: gỡ hẳn hàng nguồn khác khỏi data/products.json (giờ mỗi nguồn có file riêng). */
+let sourceProductsCache = null;
+let lastSourceKey = null;
+
+function sourceProducts() {
+  const allSources = sources.all();
+  let totalLen = 0;
+  for (const s of allSources) {
+    const list = s.getProducts ? s.getProducts() : s.store.getProducts();
+    totalLen += list.length;
+  }
+  const key = `${totalLen}`;
+  if (sourceProductsCache && key === lastSourceKey) {
+    return sourceProductsCache;
+  }
+  lastSourceKey = key;
+  const rawSources = allSources.flatMap(s => (s.getProducts ? s.getProducts() : s.store.getProducts()).filter(p => !p.removed));
+  sourceProductsCache = variantGrouper.groupProducts(rawSources);
+  return sourceProductsCache;
+}
+
+let combinedCache = null;
+let lastCombinedKey = null;
+
+function getProducts() {
+  const dp = dropbuyProducts();
+  const sp = sourceProducts();
+  const key = `${dp.length}:${sp.length}:${dp[0]?.id || ''}:${sp[0]?.id || ''}`;
+  if (combinedCache && key === lastCombinedKey) {
+    return combinedCache;
+  }
+  lastCombinedKey = key;
+  combinedCache = dp.concat(sp);
+  return combinedCache;
+}
+
+let categoriesCache = null;
+let lastCategoriesKey = null;
+
+function getCategories() {
+  const sCats = scraper.getCategories();
+  const extCats = sources.all().flatMap(s => s.store.getCategories());
+  const key = `${sCats.length}:${extCats.length}`;
+  if (categoriesCache && key === lastCategoriesKey) {
+    return categoriesCache;
+  }
+  lastCategoriesKey = key;
+  categoriesCache = sCats.concat(extCats);
+  return categoriesCache;
+}
+
+function findProduct(id) {
+  const n = Number(id);
+  const s = sources.ofProduct(n);
+  if (s) {
+    return variantGrouper.findInGrouped(sourceProducts(), n) || null;
+  }
+  return variantGrouper.findInGrouped(dropbuyProducts(), n) || null;
+}
+
 function removeLegacyPartnerItems() {
   const all = scraper.getProducts();
   const keep = all.filter(p => !isLegacyPartner(p));
@@ -25,15 +91,4 @@ function removeLegacyPartnerItems() {
   return all.length - keep.length;
 }
 
-function getCategories() {
-  return scraper.getCategories().concat(...sources.all().map(s => s.store.getCategories()));
-}
-
-function findProduct(id) {
-  const n = Number(id);
-  const s = sources.ofProduct(n);
-  if (s) return s.store.getProducts().find(p => p.id === n && !p.removed) || null;
-  return dropbuyProducts().find(p => p.id === n) || null;
-}
-
-module.exports = { getProducts, getCategories, findProduct, sourceOf: sources.ofProduct, removeLegacyPartnerItems };
+module.exports = { getProducts, getCategories, findProduct, sourceOf: sources.ofProduct, removeLegacyPartnerItems, dropbuyProducts, sourceProducts };

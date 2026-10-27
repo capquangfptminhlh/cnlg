@@ -73,6 +73,17 @@ async function variantsWithPrices(product, detail, config = scraper.getConfig())
  * @returns {{ ok:boolean, live:boolean, name, variant_name, sku, variation_id, price, cost, cost_is_wholesale, fs_program_code, in_stock, weight_gram, message? }}
  */
 async function checkLine(product, variationId, config = scraper.getConfig()) {
+  // Nếu sản phẩm được gộp từ nhiều sản phẩm DropBuy (nhóm biến thể hoặc các kho)
+  if (Array.isArray(product.variants) && variationId) {
+    const matchedV = product.variants.find(v => String(v.id) === String(variationId) || String(v.product_id) === String(variationId));
+    if (matchedV && matchedV.product_id && matchedV.product_id !== product.id) {
+      const subProd = scraper.getProducts().find(p => p.id === matchedV.product_id);
+      if (subProd) {
+        return checkLine(subProd, matchedV.id === String(matchedV.product_id) ? null : matchedV.id, config);
+      }
+    }
+  }
+
   const ctx = scraper.getPricingContext(config);
   let detail = null;
   try {

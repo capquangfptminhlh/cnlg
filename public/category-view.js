@@ -136,10 +136,10 @@
     if (getComputedStyle(loadMore).display === 'none' || !loadMore.isConnected) return;
     if ((state.products.length || 0) >= (state.totalProducts ?? Infinity)) return;
     const r = loadMore.getBoundingClientRect();
-    if (r.top < window.innerHeight + 900) loadMore.click();
+    if (r.top < window.innerHeight + 250) loadMore.click();
   }
   if (loadMore && 'IntersectionObserver' in window) {
-    autoLoad = new IntersectionObserver(entries => { if (entries.some(en => en.isIntersecting)) maybeLoadMore(); }, { rootMargin: '0px 0px 900px 0px' });
+    autoLoad = new IntersectionObserver(entries => { if (entries.some(en => en.isIntersecting)) maybeLoadMore(); }, { rootMargin: '0px 0px 250px 0px' });
     autoLoad.observe(loadMore);
   }
   // Dự phòng: IntersectionObserver chỉ báo khi nút ĐI VÀO vùng nhìn – nếu nút đã nằm sẵn trong màn hình
@@ -163,8 +163,6 @@
     more.hidden = true;
     grid.classList.remove('is-switching');
     syncView();
-    // Màn hình cao / tải nhanh: nút "Tải thêm" vẫn trong vùng nhìn → tải tiếp
-    setTimeout(maybeLoadMore, 120);
   };
   window.addEventListener('storefront:products', done);
   window.addEventListener('storefront:error', () => { more.hidden = true; grid.classList.remove('is-switching'); });

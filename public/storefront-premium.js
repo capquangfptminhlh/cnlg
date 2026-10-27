@@ -88,7 +88,7 @@
     // Same public product photos the catalog uses. No fabricated merchandise.
     const candidates=products
       .filter(p=>p?.in_stock!==false&&p?.image)
-      .map(p=>({id:p.id,source:validURL(p.image_hd||p.image)}))
+      .map(p=>({id:p.id,source:validURL(p.image||p.image_hd)}))
       .filter(p=>p.source);
     if(!candidates.length||!gallery.length)return;
     const thisGeneration=++generation;

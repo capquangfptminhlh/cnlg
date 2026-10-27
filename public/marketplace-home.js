@@ -109,14 +109,18 @@
   async function loadFeatured() {
     try {
       const day = Math.floor(Date.now() / 86400000);
-      const res = await fetch('/api/products?inStock=1&limit=60&page=' + (day % 20 + 1));
+      const res = await fetch('/api/products?inStock=1&limit=12&page=' + (day % 10 + 1));
       const json = await res.json();
       const pool = (json.data || []).filter(p => p.image);
       pool.sort((a, b) => (Number(b.discount_percent) || 0) - (Number(a.discount_percent) || 0));
       if (pool.length >= 6) { featuredLoaded = true; renderFeatured(pool); }
     } catch (_) { /* giữ bản dự phòng */ }
   }
-  loadFeatured();
+  if (typeof requestIdleCallback !== 'undefined') {
+    requestIdleCallback(() => setTimeout(loadFeatured, 800));
+  } else {
+    setTimeout(loadFeatured, 1000);
+  }
   window.addEventListener('storefront:products', event => {
     if (!featuredLoaded) renderFeatured(event.detail && event.detail.products);
     updateHeartButtons();

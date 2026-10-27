@@ -239,21 +239,107 @@ function publicProduct(p) {
   return { ...rest, discount_percent: discount };
 }
 
-/** Danh mục cha bao gồm mọi danh mục con. */
-function categoryIdsFor(catId) {
-  const cats = storeCatalog.getCategories();
-  const ids = new Set([catId]);
-  let added = true;
-  while (added) {
-    added = false;
-    for (const c of cats) {
-      if (c.parent_id && ids.has(c.parent_id) && !ids.has(c.id)) {
-        ids.add(c.id);
-        added = true;
-      }
+// --- BỘ NHỚ ĐỆM TỐI ƯU HIỆU NĂNG DANH MỤC & SẢN PHẨM ---
+let lastCatalogRef = null;
+let lastCategoriesRef = null;
+let cachedSellable = null;
+let cachedBrandsJson = null;
+let cachedCategoriesJson = null;
+let cachedDefaultMixed = null;
+let cachedCategoryIdsMap = new Map();
+let lastFsSlot = -1;
+let cachedFsData = null;
+
+function ensureCatalogCaches() {
+  const rawProducts = storeCatalog.getProducts();
+  const rawCategories = storeCatalog.getCategories();
+  if (cachedSellable && rawProducts === lastCatalogRef && rawCategories === lastCategoriesRef) {
+    return;
+  }
+  lastCatalogRef = rawProducts;
+  lastCategoriesRef = rawCategories;
+
+  // 1. Phả hệ danh mục con -> cha (tìm nhanh O(1))
+  cachedCategoryIdsMap.clear();
+  const childrenMap = new Map();
+  for (const c of rawCategories) {
+    if (c.parent_id) {
+      if (!childrenMap.has(c.parent_id)) childrenMap.set(c.parent_id, []);
+      childrenMap.get(c.parent_id).push(c.id);
     }
   }
-  return ids;
+  for (const c of rawCategories) {
+    const ids = new Set([c.id]);
+    const queue = [c.id];
+    while (queue.length) {
+      const curr = queue.shift();
+      const kids = childrenMap.get(curr);
+      if (kids) {
+        for (const k of kids) {
+          if (!ids.has(k)) {
+            ids.add(k);
+            queue.push(k);
+          }
+        }
+      }
+    }
+    cachedCategoryIdsMap.set(c.id, ids);
+  }
+
+  // 2. Lọc sẵn sản phẩm đủ điều kiện mở bán & tiền xử lý chuỗi tìm kiếm
+  const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
+  const sellable = [];
+  const perCat = new Map();
+  const brandCounts = new Map();
+
+  for (const p of rawProducts) {
+    if (!(Number(p.price) > 0) || p.removed_from_dropbuy || !scraper.hasRealPhoto(p)) continue;
+    sellable.push(p);
+
+    perCat.set(p.category_id, (perCat.get(p.category_id) || 0) + 1);
+
+    const b = (p.brand || '').trim();
+    if (b) {
+      const normName = b.toLowerCase() === 'ulanzi' ? 'Ulanzi' : b;
+      brandCounts.set(normName, (brandCounts.get(normName) || 0) + 1);
+    }
+
+    const n = norm(p.name);
+    const nb = norm(p.brand || '');
+    p._normName = n;
+    p._normBrand = nb;
+    p._normSku = norm(p.sku);
+    p._hay = n + ' ' + p._normSku + (nb ? ' ' + nb : '');
+    p._tokens = new Set((n + ' ' + nb).split(/[^a-z0-9]+/));
+  }
+  cachedSellable = sellable;
+
+  // 3. Chuỗi JSON danh sách thương hiệu (phục vụ /api/brands trong 0.1ms)
+  const brands = [...brandCounts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+  cachedBrandsJson = JSON.stringify({ success: true, data: brands });
+
+  // 4. Chuỗi JSON danh mục kèm số lượng SP (phục vụ /api/categories trong 0.1ms)
+  const withCount = rawCategories.map(c => {
+    let n = 0;
+    const ids = cachedCategoryIdsMap.get(c.id) || new Set([c.id]);
+    for (const id of ids) n += perCat.get(id) || 0;
+    const { source, source_id, source_url, ...pub } = c;
+    return { ...pub, icon: c.icon ? catalogImage.maskMediaUrl(c.icon) : c.icon, product_count: n };
+  });
+  cachedCategoriesJson = JSON.stringify({ success: true, data: withCount });
+
+  // 5. Danh sách SP mặc định trang chủ (đã xen kẽ nguồn sỉ & ưu tiên còn hàng)
+  const mixed = mixSources(sellable);
+  cachedDefaultMixed = [...mixed.filter(p => p.in_stock !== false), ...mixed.filter(p => p.in_stock === false)];
+  cachedFsData = null; // Huỷ cache flash sale khi catalog đổi
+}
+
+/** Danh mục cha bao gồm mọi danh mục con. */
+function categoryIdsFor(catId) {
+  ensureCatalogCaches();
+  return cachedCategoryIdsMap.get(catId) || new Set([catId]);
 }
 
 /** Không để chữ "DropBuy" (nguồn hàng) lọt ra phía khách */
@@ -308,20 +394,19 @@ function paymentOptions(cfg = readConfig()) {
 
 app.get('/api/categories', (req, res) => {
   try {
-    // Đếm đúng như /api/products đang bán (bỏ SP chưa có giá / đã gỡ) để số trên menu khớp số trong trang danh mục
-    const perCat = new Map();
-    for (const p of storeCatalog.getProducts()) {
-      if (!(Number(p.price) > 0) || p.removed_from_dropbuy || !scraper.hasRealPhoto(p)) continue;
-      perCat.set(p.category_id, (perCat.get(p.category_id) || 0) + 1);
-    }
-    const cats = storeCatalog.getCategories();
-    const withCount = cats.map(c => {
-      let n = 0;
-      for (const id of categoryIdsFor(c.id)) n += perCat.get(id) || 0;
-      const { source, source_id, source_url, ...pub } = c;
-      return { ...pub, icon: c.icon ? catalogImage.maskMediaUrl(c.icon) : c.icon, product_count: n };
-    });
-    res.json({ success: true, data: withCount });
+    ensureCatalogCaches();
+    res.set('Cache-Control', 'public, max-age=60');
+    res.type('json').send(cachedCategoriesJson);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/brands', (req, res) => {
+  try {
+    ensureCatalogCaches();
+    res.set('Cache-Control', 'public, max-age=60');
+    res.type('json').send(cachedBrandsJson);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -366,11 +451,35 @@ function mixSources(products, every = 4) {
   const own = products.filter(p => !storeCatalog.sourceOf(p.id));
   const other = products.filter(p => storeCatalog.sourceOf(p.id));
   if (!other.length || !own.length) return products;
+
+  // Cân bằng các thương hiệu trong other (round-robin: Baseus, Vention, USAMS, Ulanzi, Mcdodo, Mark Ryden...)
+  // để trang chủ luôn có đa dạng thương hiệu thay vì dồn toàn bộ Baseus lên 200 trang đầu
+  const byBrand = new Map();
+  other.forEach(p => {
+    const rawB = p.brand || 'Khác';
+    const b = rawB.toLowerCase() === 'ulanzi' ? 'Ulanzi' : rawB;
+    if (!byBrand.has(b)) byBrand.set(b, []);
+    byBrand.get(b).push(p);
+  });
+  const balancedOther = [];
+  let added = true;
+  let round = 0;
+  while (added) {
+    added = false;
+    for (const list of byBrand.values()) {
+      if (round < list.length) {
+        balancedOther.push(list[round]);
+        added = true;
+      }
+    }
+    round++;
+  }
+
   const out = [];
   let i = 0;
   let j = 0;
-  while (i < own.length || j < other.length) {
-    if (j < other.length && (out.length % every === every - 1 || i >= own.length)) out.push(other[j++]);
+  while (i < own.length || j < balancedOther.length) {
+    if (j < balancedOther.length && (out.length % every === every - 1 || i >= own.length)) out.push(balancedOther[j++]);
     else out.push(own[i++]);
   }
   return out;
@@ -378,76 +487,93 @@ function mixSources(products, every = 4) {
 
 app.get('/api/products', (req, res) => {
   try {
-    const { category, search, page = 1, limit = 24, sort = 'default', minPrice, maxPrice, inStock, flashSale } = req.query;
-    let products = storeCatalog.getProducts();
-    // Không bán SP chưa có giá (DropBuy đôi khi để giá 0 khi ẩn giá / ngừng bán) hoặc chưa có ảnh thật
-    products = products.filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p));
+    const { category, search, brand, page = 1, limit = 24, sort = 'default', minPrice, maxPrice, inStock, flashSale } = req.query;
+    ensureCatalogCaches();
 
-    if (category && category !== 'all') {
-      const ids = categoryIdsFor(parseInt(category, 10));
-      products = products.filter(p => ids.has(p.category_id));
-    }
+    const isDefaultQuery = (!category || category === 'all') &&
+      !search &&
+      (!brand || brand === 'all') &&
+      !minPrice &&
+      !maxPrice &&
+      !inStock &&
+      !flashSale &&
+      sort === 'default';
 
-    // Tìm theo từng chữ (không cần đúng thứ tự, bỏ dấu, bỏ dấu cách thừa); kết quả sát nghĩa xếp trước
-    let relevance = null;
-    if (search) {
-      const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
-      const q = norm(search);
-      const words = q.split(' ').filter(Boolean);
-      // "đèn" và "đen" bỏ dấu đều là "den" → ưu tiên tên có đúng chữ có dấu người dùng gõ
-      const raw = String(search).toLowerCase().replace(/\s+/g, ' ').trim();
-      relevance = new Map();
-      products = products.filter(p => {
-        const name = norm(p.name);
-        const hay = name + ' ' + norm(p.sku);
-        const tokens = new Set(name.split(/[^a-z0-9]+/));
-        // chữ 1 ký tự ("ổ" → "o") phải khớp trọn chữ, không thì khớp gần như mọi tên
-        if (!words.every(w => (w.length === 1 ? tokens.has(w) : hay.includes(w)))) return false;
-        let score = 0;
-        if (name.includes(q)) score += 4;
-        if (name.startsWith(q)) score += 2;
-        score += words.filter(w => tokens.has(w)).length / words.length * 2;
-        if (String(p.name).toLowerCase().includes(raw)) score += 3;
-        if (norm(p.sku) === q) score += 10;
-        relevance.set(p.id, score);
-        return true;
-      });
-    }
-
-    if (minPrice) {
-      const min = parseInt(minPrice, 10);
-      products = products.filter(p => p.price >= min);
-    }
-    if (maxPrice) {
-      const max = parseInt(maxPrice, 10);
-      products = products.filter(p => p.price <= max);
-    }
-    if (inStock === '1') products = products.filter(p => p.in_stock !== false);
-    if (flashSale === '1') products = products.filter(p => p.is_flash_sale && p.in_stock !== false);
-
-    const validDisc = p => {
-      if (!p.original_price || p.original_price <= p.price) return 0;
-      const d = Math.round((1 - p.price / p.original_price) * 100);
-      return d > 70 ? 0 : d;
-    };
-
-    if (sort === 'price-asc') {
-      products.sort((a, b) => a.price - b.price);
-    } else if (sort === 'price-desc') {
-      products.sort((a, b) => b.price - a.price);
-    } else if (sort === 'name-asc') {
-      products.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-    } else if (sort === 'discount-desc') {
-      products.sort((a, b) => (validDisc(b) - validDisc(a)) || ((b.is_flash_sale ? 1 : 0) - (a.is_flash_sale ? 1 : 0)) || (a.price - b.price));
-    } else if (relevance) {
-      // Mặc định khi tìm kiếm: xếp theo độ khớp
-      products.sort((a, b) => relevance.get(b.id) - relevance.get(a.id));
+    let products;
+    if (isDefaultQuery) {
+      products = cachedDefaultMixed;
     } else {
-      // Mặc định: hàng các nguồn sỉ khác xen đều vào giữa hàng DropBuy, không bị dồn xuống cuối danh sách
-      products = mixSources(products);
+      products = cachedSellable;
+
+      if (category && category !== 'all') {
+        const ids = categoryIdsFor(parseInt(category, 10));
+        products = products.filter(p => ids.has(p.category_id));
+      }
+
+      if (brand && brand !== 'all') {
+        const normB = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
+        const targetBrand = normB(brand);
+        products = products.filter(p => (p._normBrand || normB(p.brand || '')) === targetBrand);
+      }
+
+      let relevance = null;
+      if (search) {
+        const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
+        const q = norm(search);
+        const words = q.split(' ').filter(Boolean);
+        const raw = String(search).toLowerCase().replace(/\s+/g, ' ').trim();
+        relevance = new Map();
+        products = products.filter(p => {
+          const name = p._normName || norm(p.name);
+          const brand = p._normBrand || norm(p.brand || '');
+          const hay = p._hay || (name + ' ' + norm(p.sku) + (brand ? ' ' + brand : ''));
+          const tokens = p._tokens || new Set((name + ' ' + brand).split(/[^a-z0-9]+/));
+          if (!words.every(w => (w.length === 1 ? tokens.has(w) : hay.includes(w)))) return false;
+          let score = 0;
+          if (name.includes(q)) score += 4;
+          if (name.startsWith(q)) score += 2;
+          score += words.filter(w => tokens.has(w)).length / words.length * 2;
+          if (String(p.name).toLowerCase().includes(raw)) score += 3;
+          if ((p._normSku || norm(p.sku)) === q) score += 10;
+          if (brand && brand === q) score += 20;
+          else if (brand && brand.includes(q)) score += 10;
+          relevance.set(p.id, score);
+          return true;
+        });
+      }
+
+      if (minPrice) {
+        const min = parseInt(minPrice, 10);
+        products = products.filter(p => p.price >= min);
+      }
+      if (maxPrice) {
+        const max = parseInt(maxPrice, 10);
+        products = products.filter(p => p.price <= max);
+      }
+      if (inStock === '1') products = products.filter(p => p.in_stock !== false);
+      if (flashSale === '1') products = products.filter(p => p.is_flash_sale && p.in_stock !== false);
+
+      const validDisc = p => {
+        if (!p.original_price || p.original_price <= p.price) return 0;
+        const d = Math.round((1 - p.price / p.original_price) * 100);
+        return d > 70 ? 0 : d;
+      };
+
+      if (sort === 'price-asc') {
+        products.sort((a, b) => a.price - b.price);
+      } else if (sort === 'price-desc') {
+        products.sort((a, b) => b.price - a.price);
+      } else if (sort === 'name-asc') {
+        products.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      } else if (sort === 'discount-desc') {
+        products.sort((a, b) => (validDisc(b) - validDisc(a)) || ((b.is_flash_sale ? 1 : 0) - (a.is_flash_sale ? 1 : 0)) || (a.price - b.price));
+      } else if (relevance) {
+        products.sort((a, b) => relevance.get(b.id) - relevance.get(a.id));
+      } else {
+        products = mixSources(products);
+      }
+      products = [...products.filter(p => p.in_stock !== false), ...products.filter(p => p.in_stock === false)];
     }
-    // Mọi kiểu sắp xếp: món còn hàng đứng trước (trước đây "giá thấp → cao" để 10/24 món đầu là món hết hàng)
-    products = [...products.filter(p => p.in_stock !== false), ...products.filter(p => p.in_stock === false)];
 
     const total = products.length;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -455,6 +581,7 @@ app.get('/api/products', (req, res) => {
     const startIndex = (pageNum - 1) * limitNum;
     const items = products.slice(startIndex, startIndex + limitNum).map(publicProduct);
 
+    res.set('Cache-Control', 'public, max-age=15');
     res.json({ success: true, total, page: pageNum, totalPages: Math.ceil(total / limitNum) || 1, data: items });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -464,7 +591,18 @@ app.get('/api/products', (req, res) => {
 // Khung giờ Flash Sale Giá Sỉ trực tiếp từ catalog thật (xoay theo khung 3 giờ giờ Việt Nam)
 app.get('/api/flash-sale', (req, res) => {
   try {
-    const sellable = scraper.getProducts().filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p) && p.in_stock !== false);
+    ensureCatalogCaches();
+    const vnOffsetMs = 7 * 3600 * 1000;
+    const slotMs = 3 * 3600 * 1000;
+    const nowMs = Date.now();
+    const slotIndex = Math.floor((nowMs + vnOffsetMs) / slotMs);
+
+    if (cachedFsData && lastFsSlot === slotIndex) {
+      res.set('Cache-Control', 'public, max-age=60');
+      return res.json(cachedFsData);
+    }
+
+    const sellable = cachedSellable.filter(p => p.in_stock !== false);
     const discOf = p => {
       if (!p.original_price || p.original_price <= p.price) return 0;
       const d = Math.round((1 - p.price / p.original_price) * 100);
@@ -473,10 +611,6 @@ app.get('/api/flash-sale', (req, res) => {
     const fsPool = sellable.filter(p => p.is_flash_sale && discOf(p) >= 15);
     const dealPool = fsPool.length >= 18 ? fsPool : sellable.filter(p => discOf(p) >= 25);
 
-    const vnOffsetMs = 7 * 3600 * 1000;
-    const slotMs = 3 * 3600 * 1000;
-    const nowMs = Date.now();
-    const slotIndex = Math.floor((nowMs + vnOffsetMs) / slotMs);
     const slotStartMs = slotIndex * slotMs - vnOffsetMs;
     const slotEndMs = slotStartMs + slotMs;
     const fmtHour = ms => {
@@ -504,8 +638,7 @@ app.get('/api/flash-sale', (req, res) => {
       round++;
     }
 
-    res.set('Cache-Control', 'public, max-age=60');
-    res.json({
+    const fsResult = {
       success: true,
       data: {
         slotLabel: `${fmtHour(slotStartMs)} – ${fmtHour(slotEndMs)}`,
@@ -519,7 +652,11 @@ app.get('/api/flash-sale', (req, res) => {
         },
         items: picked.map(publicProduct)
       }
-    });
+    };
+    lastFsSlot = slotIndex;
+    cachedFsData = fsResult;
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json(fsResult);
   } catch (err) {
     res.status(500).json({ success: false, error: stripSupplierText(err.message) });
   }
@@ -542,11 +679,24 @@ app.get('/api/products/:id', async (req, res) => {
       }
       const d = src.detail(product);
       const pub = publicProduct(product);
+      const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+      const variants = hasVariants
+        ? product.variants.map(v => ({
+            id: String(v.id), sku: v.sku || String(v.id), name: v.name, is_default: !!v.is_default, in_stock: v.in_stock !== false,
+            price: v.price, original_price: v.original_price || null,
+            discount_percent: v.original_price && v.original_price > v.price ? Math.round((1 - v.price / v.original_price) * 100) : 0,
+            weight_gram: v.weight_gram || 0,
+            warranty: stripSupplierText(v.warranty || product.warranty || 'Bảo hành chính hãng'),
+            image: v.image ? catalogImage.maskMediaUrl(v.image) : null
+          }))
+        : [{ id: product.variation_id, sku: product.sku, name: 'Mặc định', is_default: true, in_stock: product.in_stock !== false,
+            price: product.price, original_price: pub.original_price || null, discount_percent: pub.discount_percent || 0, weight_gram: product.weight_gram || 0, image: null }];
+
       return res.json({ success: true, data: {
-        ...pub, description: stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(d.description))), video_url: null, variation_options: [],
+        ...pub, description: stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(d.description))), video_url: null,
+        variation_options: product.variation_options || [],
         gallery: (d.gallery || []).map(g => ({ url: catalogImage.maskMediaUrl(g.url), thumb: catalogImage.maskMediaUrl(g.thumb || g.url) })),
-        variants: [{ id: product.variation_id, sku: product.sku, name: 'Mặc định', is_default: true, in_stock: product.in_stock !== false,
-          price: product.price, original_price: pub.original_price || null, discount_percent: pub.discount_percent || 0, weight_gram: product.weight_gram || 0, image: null }]
+        variants
       } });
     }
     const isDropbuy = !product.supplier || product.supplier === 'dropbuy';
@@ -706,6 +856,10 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY_PER_ITEM) {
         return res.status(400).json({ success: false, error: `Số lượng không hợp lệ (1–${MAX_QTY_PER_ITEM}).` });
       }
+      if (!known.has(id)) {
+        const found = storeCatalog.findProduct(id);
+        if (found) known.set(id, found);
+      }
       if (!known.has(id)) return res.status(400).json({ success: false, error: `Sản phẩm #${it?.id} không còn tồn tại.` });
       const vid = it?.variation_id ? String(it.variation_id) : null;
       const key = `${id}:${vid || ''}`;
@@ -723,7 +877,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     const checked = await Promise.all([...merged.values()].map(async l => {
       const src = storeCatalog.sourceOf(l.id);
       const prod = freshKnown.get(l.id) || known.get(l.id);
-      return { line: l, r: src ? await src.liveCheck(prod) : await variants.checkLine(prod, l.variation_id) };
+      return { line: l, r: src ? await src.liveCheck(prod, l.variation_id) : await variants.checkLine(prod, l.variation_id) };
     }));
     const problems = [];
     for (const { line, r } of checked) {
@@ -1103,6 +1257,12 @@ app.post('/api/admin/sync', requireAdmin, (req, res) => {
     .then(() => emitAdmin(io, 'CATALOG_SYNC_COMPLETED', { total: scraper.getProducts().length }))
     .catch(err => console.error('[Manual sync]:', err.message));
   res.json({ success: true, message: 'Đã bắt đầu quét lại toàn bộ kho DropBuy (giá + tồn kho).' });
+});
+
+app.post('/api/admin/restart', requireAdmin, (req, res) => {
+  res.json({ success: true, message: 'Cửa hàng đang khởi động lại (sẽ sẵn sàng sau ~5 giây)...' });
+  console.log('[Admin] Nhận lệnh khởi động lại từ trang quản trị. Đang thoát tiến trình...');
+  setTimeout(() => process.exit(0), 600);
 });
 
 let imageJobRunning = false;
@@ -1523,17 +1683,46 @@ function startTechmallSync(res, message) {
 app.post('/api/admin/techmall/sync', requireAdmin, (req, res) => startTechmallSync(res, 'Đang quét giá đại lý & tồn kho toàn bộ kho TechMall (khoảng 1–3 phút)...'));
 app.post('/api/admin/techmall/fetch-all', requireAdmin, (req, res) => startTechmallSync(res, 'Đang tải toàn bộ kho TechMall trong nền (khoảng 1–3 phút, SP mới cần thêm vài phút để đọc ảnh)...'));
 
+app.get('/api/admin/techmall/brands', requireAdmin, (req, res) => {
+  const srcTm = techmallSource();
+  const list = srcTm.store.getProducts().filter(p => !p.removed);
+  const counts = {};
+  list.forEach(p => {
+    const b = p.brand || 'Khác';
+    counts[b] = (counts[b] || 0) + 1;
+  });
+  const data = Object.entries(counts).map(([name, total]) => ({
+    name,
+    total,
+    sellable: list.filter(p => (p.brand || 'Khác') === name && isSellable(p)).length
+  })).sort((a, b) => b.total - a.total);
+  res.json({ success: true, data });
+});
+
 app.get('/api/admin/techmall/products', requireAdmin, (req, res) => {
-  const { search = '', page = 1, limit = 20, all = '' } = req.query;
+  const { search = '', page = 1, limit = 20, all = '', brand = '' } = req.query;
   const view = all === '1' ? 'all' : String(req.query.view || 'selling');
   const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
   const inView = { selling: isSellable, instock: p => p.in_stock !== false, waiting: p => p.in_stock !== false && !isSellable(p), out: p => p.in_stock === false, all: () => true }[view] || isSellable;
-  let list = techmallSource().store.getProducts().filter(p => !p.removed && inView(p));
-  if (search) list = list.filter(p => norm(p.name).includes(norm(search)) || norm(p.sku).includes(norm(search)) || String(p.id) === String(search));
+  const srcTm = techmallSource();
+  let list = (srcTm.getProducts ? srcTm.getProducts() : srcTm.store.getProducts()).filter(p => !p.removed && inView(p));
+  if (brand && brand !== 'all') {
+    list = list.filter(p => norm(p.brand || 'Khác') === norm(brand));
+  }
+  if (search) {
+    const filterFn = p => norm(p.name).includes(norm(search)) || norm(p.sku || '').includes(norm(search)) || norm(p.brand || '').includes(norm(search)) || String(p.id) === String(search) || (p.variants && p.variants.some(v => norm(v.name).includes(norm(search)) || norm(v.sku || '').includes(norm(search))));
+    const matched = list.filter(filterFn);
+    if (matched.length === 0 && view === 'selling') {
+      const allList = (srcTm.getProducts ? srcTm.getProducts() : srcTm.store.getProducts()).filter(p => !p.removed);
+      list = allList.filter(filterFn);
+    } else {
+      list = matched;
+    }
+  }
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const lim = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
   const rows = list.slice((pageNum - 1) * lim, pageNum * lim).map(p => ({
-    id: p.id, sku: p.sku, name: p.name, image: p.image, category_name: p.category_name, in_stock: p.in_stock !== false,
+    id: p.id, sku: p.sku, name: p.name, brand: p.brand, image: p.image, category_name: p.category_name, in_stock: p.in_stock !== false, variant_count: p.variant_count || 1,
     cost: p.supplier_cost, wholesale_price: p.dealer_price, retail_price: p.retail_price, price: p.price, rule: p.pricing_rule, source_url: p.source_url
   }));
   res.json({ success: true, total: list.length, page: pageNum, totalPages: Math.ceil(list.length / lim) || 1, data: rows });

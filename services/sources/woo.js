@@ -12,6 +12,7 @@
 const pricing = require('../pricing');
 const vaultLib = require('../credentialVault');
 const { createStore } = require('./store');
+const variantGrouper = require('../variantGrouper');
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36';
 const SPAN = 10_000_000; // mỗi nguồn dùng dải mã [idOffset, idOffset + SPAN)
@@ -265,7 +266,9 @@ function createWooSource(def) {
     const imgs = (raw.images || []).filter(i => i?.src && !/woocommerce-placeholder/i.test(i.src));
     const fromPage = !!def.resolvePageImages;
     const cat = pickCategory(raw.categories, catMap);
-    const brand = (raw.attributes || []).find(a => /thương hiệu|brand/i.test(a.name))?.terms?.[0]?.name;
+    const rawBrand = (raw.attributes || []).find(a => /thương hiệu|brand/i.test(a.name))?.terms?.[0]?.name;
+    const brandName = rawBrand ? htmlText(rawBrand) : null;
+    const brand = brandName && brandName.toLowerCase() === 'ulanzi' ? 'Ulanzi' : brandName;
     const weightKg = parseFloat(raw.weight);
     return {
       id: def.idOffset + raw.id,
@@ -277,7 +280,7 @@ function createWooSource(def) {
       slug: slugify(htmlText(raw.name)),
       category_id: cat.id,
       category_name: cat.name,
-      brand: brand ? htmlText(brand) : null,
+      brand: brand || null,
       // API ghi ảnh có hay không; ảnh thật (fromPage) đọc từ trang SP rồi mới gán – chưa đọc thì chưa lên kệ
       api_image: imgs[0]?.src || '',
       image: fromPage ? '' : (imgs[0] ? (imgs[0].thumbnail || imgs[0].src) : ''),
@@ -296,14 +299,16 @@ function createWooSource(def) {
     };
   }
 
+  const imageKey = p => p.api_image || p.source_url;
   const keepImages = (p, old) => {
     // Ảnh cũ vẫn đúng SP thì giữ (kể cả khi luật đọc trang đổi – đọc lại trong nền, SP không rớt khỏi kệ)
-    if (old && old.images_for && old.images_for === p.api_image) {
+    const key = imageKey(p);
+    if (old && old.images_for && old.images_for === key) {
       Object.assign(p, { image: old.image || '', image_hd: old.image_hd || '', gallery: old.gallery || [], images_for: old.images_for, images_v: old.images_v, ...(old.warranty ? { warranty: old.warranty } : {}) });
     }
     return p;
   };
-  const needsImages = p => !p.removed && p.api_image && (p.images_for !== p.api_image || p.images_v !== IMAGE_RULES_VERSION);
+  const needsImages = p => !p.removed && (p.api_image || p.source_url) && (p.images_for !== imageKey(p) || p.images_v !== IMAGE_RULES_VERSION);
 
   // Ảnh trên web nguồn có thể đã bị xoá (trang của họ cũng trắng) → chỉ nhận ảnh thật sự tải được
   async function alive(url) {
@@ -340,7 +345,7 @@ function createWooSource(def) {
           const live = await pickLiveImages(pageImages(html));
           // đã kiểm tra (kể cả khi không còn ảnh sống) → không đọc lại tới khi ảnh đổi
           Object.assign(p, {
-            images_for: p.api_image, images_v: IMAGE_RULES_VERSION,
+            images_for: imageKey(p), images_v: IMAGE_RULES_VERSION,
             image: live[0]?.card || '', image_hd: live[0]?.url || '',
             gallery: live.map(x => ({ url: x.url, thumb: x.thumb })),
             warranty: pageWarranty(html)
@@ -489,25 +494,34 @@ function createWooSource(def) {
   }
 
   /** Kiểm tra trực tiếp 1 SP với web nguồn (lúc khách mở chi tiết / đặt hàng): giá đại lý + tồn kho mới nhất. */
-  async function liveCheck(product) {
-    const base = { sku: product.sku, variation_id: product.variation_id, name: product.name, variant_name: null, weight_gram: product.weight_gram || 0, cost_is_wholesale: true };
+  async function liveCheck(product, variationId = null) {
+    let target = product;
+    let variantName = null;
+    if (variationId && Array.isArray(product.variants) && product.variants.length > 0) {
+      const v = product.variants.find(x => String(x.id) === String(variationId));
+      if (v) {
+        target = { ...product, ...v, id: v.product_id || product.id, variation_id: v.id, sku: v.sku, price: v.price, supplier_cost: v.supplier_cost, in_stock: v.in_stock };
+        variantName = v.name;
+      }
+    }
+    const base = { sku: target.sku, variation_id: target.variation_id, name: product.name, variant_name: variantName, weight_gram: target.weight_gram || 0, cost_is_wholesale: true };
     try {
       const cookie = await ensureSession().catch(() => null);
-      const res = await http(`/wp-json/wc/store/v1/products/${product.source_id}`, { cookie, timeout: 15000 });
+      const res = await http(`/wp-json/wc/store/v1/products/${target.source_id || target.id}`, { cookie, timeout: 15000 });
       if (res.status === 404) {
-        updateOne({ ...product, removed: true, in_stock: false });
-        return { ...base, ok: false, live: true, in_stock: false, price: product.price, cost: product.supplier_cost, message: `"${product.name}" không còn bán.` };
+        updateOne({ ...target, removed: true, in_stock: false });
+        return { ...base, ok: false, live: true, in_stock: false, price: target.price, cost: target.supplier_cost, message: `"${product.name}" không còn bán.` };
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const cats = store.getCategories();
       const fresh = applyPricing(mapItem(parseJsonLoose(await res.text()), new Map(cats.map(c => [c.id, c]))), rules(), pricing.rootCategoryMap(cats));
-      fresh.category_id = product.category_id;
+      fresh.category_id = target.category_id;
       updateOne({ ...fresh, removed: false });
       const ok = fresh.in_stock && fresh.price > 0;
       return { ...base, ok, live: true, in_stock: fresh.in_stock, price: fresh.price, cost: fresh.supplier_cost, message: ok ? null : `"${product.name}" vừa hết hàng.` };
     } catch (e) {
-      const ok = product.in_stock !== false && Number(product.price) > 0;
-      return { ...base, ok, live: false, in_stock: product.in_stock !== false, price: product.price, cost: product.supplier_cost, message: ok ? null : `"${product.name}" đã hết hàng.` };
+      const ok = target.in_stock !== false && Number(target.price) > 0;
+      return { ...base, ok, live: false, in_stock: target.in_stock !== false, price: target.price, cost: target.supplier_cost, message: ok ? null : `"${product.name}" đã hết hàng.` };
     }
   }
 
@@ -534,9 +548,16 @@ function createWooSource(def) {
     };
   }
 
+  function getGroupedProducts() {
+    const raw = store.getProducts();
+    if (def.groupVariants === false) return raw;
+    return variantGrouper.groupProducts(raw);
+  }
+
   return {
     def, store, vault, SPAN,
     setIo: x => { io = x; },
+    getProducts: getGroupedProducts,
     login, logout, ensureSession, syncAll, reprice, liveCheck, detail, shippingQuote, status, rules, shippingRules,
     _test: { mapItem, applyPricing, mapCategories, pickCategory }
   };

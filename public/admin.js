@@ -1389,6 +1389,22 @@ async function loadTechmallPricing() {
   }
 }
 
+async function loadTechmallBrands() {
+  const sel = document.getElementById('tmBrandFilter');
+  if (!sel) return;
+  try {
+    const res = await (await adminFetch('/api/admin/techmall/brands')).json();
+    if (!res.success || !Array.isArray(res.data)) return;
+    const curVal = sel.value || 'all';
+    let opts = '<option value="all">Tất cả thương hiệu (' + res.data.length + ')</option>';
+    for (const b of res.data) {
+      opts += '<option value="' + esc(b.name) + '">' + esc(b.name) + ' (' + b.total.toLocaleString('vi-VN') + (b.sellable ? ' · ' + b.sellable + ' có ảnh' : '') + ')</option>';
+    }
+    sel.innerHTML = opts;
+    sel.value = curVal;
+  } catch (e) {}
+}
+
 async function loadTechmallProducts(page = 1, search = '') {
   tmCurrentPage = page;
   tmSearchTerm = search;
@@ -1399,6 +1415,8 @@ async function loadTechmallProducts(page = 1, search = '') {
 
   try {
     const params = new URLSearchParams({ page: String(page), limit: '20', view: document.getElementById('tmViewFilter')?.value || 'selling' });
+    const brand = document.getElementById('tmBrandFilter')?.value;
+    if (brand && brand !== 'all') params.set('brand', brand);
     if (search) params.set('search', search);
 
     const res = await (await adminFetch('/api/admin/techmall/products?' + params.toString())).json();
@@ -1427,7 +1445,7 @@ async function loadTechmallProducts(page = 1, search = '') {
       rowsHtml += '<tr>' +
         '<td><img src="' + esc(p.image || '/favicon.svg') + '" alt="" style="width:44px; height:44px; object-fit:contain; border-radius:6px; border:1px solid #e2e8f0; background:#f8fafc;" onerror="this.src=\'/favicon.svg\'"></td>' +
         '<td>' +
-          '<div style="font-weight:600; color:#0f172a; max-width:320px; line-height:1.35; margin-bottom:2px;">' + esc(p.name) + '</div>' +
+          '<div style="font-weight:600; color:#0f172a; max-width:320px; line-height:1.35; margin-bottom:2px;">' + (p.brand ? '<span style="display:inline-block; font-size:11px; font-weight:700; background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; padding:1px 6px; border-radius:4px; margin-right:4px;">' + esc(p.brand) + '</span>' : '') + esc(p.name) + (p.variant_count > 1 ? ' <span style="display:inline-block; font-size:11px; font-weight:600; background:#e0f2fe; color:#0369a1; padding:1px 6px; border-radius:4px; vertical-align:middle;">' + p.variant_count + ' phân loại</span>' : '') + '</div>' +
           '<div style="font-size:11.5px; color:#64748b;">SKU: <code>' + esc(p.sku || p.id) + '</code> | ID: ' + p.id + '</div>' +
         '</td>' +
         '<td style="font-size:12.5px; color:#475569;">' + esc(p.category_name || 'Phụ kiện') + '</td>' +
@@ -1461,6 +1479,7 @@ async function loadTechmallProducts(page = 1, search = '') {
 function loadTechmallAll() {
   loadTechmallStatus();
   loadTechmallPricing();
+  loadTechmallBrands();
   loadTechmallProducts(1, tmSearchTerm);
 }
 
@@ -1617,3 +1636,18 @@ socket.on('ADMIN_TECHMALL_SYNC', () => {
 
 loadTechmallStatus();
 loadTechmallPricing();
+
+
+async function restartServer() {
+  if (!confirm('Bạn có chắc chắn muốn khởi động lại dịch vụ Store?\nHệ thống sẽ nạp lại toàn bộ mã nguồn mới nhất và sẵn sàng sau ~5 giây.')) return;
+  try {
+    const res = await fetch('/api/admin/restart', { method: 'POST' });
+    const data = await res.json();
+    alert(data.message || 'Đang khởi động lại cửa hàng...');
+  } catch (e) {
+    alert('Đã gửi yêu cầu khởi động lại.');
+  }
+  setTimeout(() => {
+    location.reload();
+  }, 6000);
+}

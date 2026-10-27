@@ -271,6 +271,106 @@ input, textarea, select { font-family: var(--font); }
 
 /* ─── FILTER BAR ─────────────────────────────────────────────────────── */
 .main-layout { padding-top: 28px; padding-bottom: 60px; }
+/* ─── BRAND FILTER BAR ──────────────────────────────────────────────── */
+.brand-bar {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(212, 175, 55, 0.05) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.18);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+}
+.brand-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.brand-bar-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--gold, #d4af37);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.brand-bar-sub {
+  font-size: 12px;
+  color: #94a3b8;
+}
+.brand-pills-wrap {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.brand-pills-wrap::-webkit-scrollbar {
+  height: 4px;
+}
+.brand-pills-wrap::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.25);
+  border-radius: 4px;
+}
+.brand-pill {
+  background: var(--bg-card, #16192b);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  color: var(--text-secondary, #cbd5e1);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.brand-pill:hover {
+  border-color: var(--border-gold, #d4af37);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.brand-pill.active {
+  background: linear-gradient(135deg, #d4af37, #f59e0b);
+  border-color: #d4af37;
+  color: #0f172a;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.35);
+}
+.brand-pill-count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+}
+.brand-pill.active .brand-pill-count {
+  background: rgba(0, 0, 0, 0.15);
+  color: #0f172a;
+}
+.card-brand-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold, #d4af37);
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  width: fit-content;
+}
+
 .filter-bar {
   display: flex; align-items: center; justify-content: space-between;
   gap: 16px; margin-bottom: 24px; flex-wrap: wrap;

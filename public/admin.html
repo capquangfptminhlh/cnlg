@@ -102,6 +102,7 @@
             <i class="fa-solid fa-bolt"></i>
             <span id="daemonBadgeText">Realtime: tồn kho 30s · giá 10p</span>
           </span>
+          <button type="button" class="btn-topbar-restart" onclick="restartServer()" title="Khởi động lại máy chủ cửa hàng để áp dụng mã nguồn mới" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px;"><i class="fa-solid fa-power-off"></i> Khởi động lại Store</button>
           <a href="/" class="btn-back-store"><i class="fa-solid fa-store"></i> Trang Khách Hàng</a>
         </div>
       </header>
@@ -753,6 +754,9 @@
                 <p class="help-text" style="margin:0;">Xem giá vốn đại lý, giá bán ra và trạng thái tồn kho 5 phút/lần.</p>
               </div>
               <div style="display:flex; gap:10px; align-items:center;">
+                <select id="tmBrandFilter" onchange="loadTechmallProducts(1, tmSearchTerm)" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; color:#0f172a; background:#f8fafc;">
+                  <option value="all">Tất cả thương hiệu (40+)</option>
+                </select>
                 <select id="tmViewFilter" onchange="loadTechmallProducts(1, tmSearchTerm)" style="height:38px; padding:0 8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
                   <option value="selling">Đang bán trên web</option>
                   <option value="waiting">Còn hàng – chờ ảnh</option>
