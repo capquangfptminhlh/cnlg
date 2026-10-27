@@ -528,11 +528,30 @@ function urgencyStatsFor(prod, v) {
   return { left, pct, viewers };
 }
 
+function getEffectiveGallery(prod, v) {
+  const baseGallery = Array.isArray(prod?.gallery) && prod.gallery.length > 0
+    ? prod.gallery.slice()
+    : [{ url: prod?.image_hd || prod?.image, thumb: prod?.image }];
+
+  if (v?.image) {
+    const existingIdx = baseGallery.findIndex(g => g.url === v.image || g.thumb === v.image);
+    if (existingIdx !== -1) {
+      return { list: baseGallery, activeIndex: existingIdx };
+    } else {
+      const vItem = { url: v.image, thumb: v.image };
+      return { list: [vItem, ...baseGallery], activeIndex: 0 };
+    }
+  }
+
+  const curIdx = Math.max(0, Math.min(baseGallery.length - 1, state.selectedGalleryIndex >= 0 ? state.selectedGalleryIndex : 0));
+  return { list: baseGallery, activeIndex: curIdx };
+}
+
 function renderDetailModal(prod) {
-  const gallery = prod.gallery && prod.gallery.length > 0 ? prod.gallery : [{ url: prod.image_hd || prod.image, thumb: prod.image }];
   const v = selectedVariant(prod);
+  const { list: gallery, activeIndex } = getEffectiveGallery(prod, v);
+  state.selectedGalleryIndex = activeIndex;
   const needsChoice = (prod.variants || []).length > 1;
-  const activeMedia = state.selectedGalleryIndex === -1 && v?.image ? { url: v.image } : gallery[Math.max(0, state.selectedGalleryIndex)] || gallery[0];
   const price = v ? v.price : prod.price;
   const original = v ? v.original_price : prod.original_price;
   const discount = v ? v.discount_percent : prod.discount_percent;
@@ -544,17 +563,35 @@ function renderDetailModal(prod) {
   detailModalBody.innerHTML = `
     <div class="product-detail-grid">
       <div class="detail-gallery">
-        <div class="main-preview-box" id="mainMediaBox">
-          ${activeMedia.is_video ? `
-            <video src="${esc(activeMedia.url)}" controls autoplay muted loop playsinline></video>
-          ` : `
-            <img src="${esc(activeMedia.url)}" alt="${esc(prod.name)}" id="mainPreviewImg">
-          `}
+        <div class="main-preview-box" id="mainMediaBox" aria-label="Album ảnh sản phẩm — Vuốt để chuyển ảnh">
+          <div class="gallery-carousel-track" id="galleryCarouselTrack">
+            ${gallery.map((item, idx) => `
+              <div class="gallery-slide${idx === activeIndex ? ' active' : ''}" data-index="${idx}">
+                ${item.is_video ? `
+                  <video src="${esc(item.url)}" controls autoplay muted loop playsinline></video>
+                ` : `
+                  <img src="${esc(item.url)}" alt="${esc(prod.name)} - Ảnh ${idx + 1}" ${idx === activeIndex ? 'id="mainPreviewImg"' : ''} loading="${idx === 0 ? 'eager' : 'lazy'}">
+                `}
+              </div>
+            `).join('')}
+          </div>
+
+          ${gallery.length > 1 ? `
+            <button type="button" class="gallery-nav-btn prev" onclick="navigateDetailGallery(-1); event.stopPropagation();" aria-label="Xem ảnh trước">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <button type="button" class="gallery-nav-btn next" onclick="navigateDetailGallery(1); event.stopPropagation();" aria-label="Xem ảnh tiếp theo">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+            <div class="gallery-counter-badge" id="galleryCounterBadge">
+              <span id="galleryCurrentIndex">${activeIndex + 1}</span>/${gallery.length}
+            </div>
+          ` : ''}
         </div>
 
         <div class="thumbs-strip">
           ${gallery.map((item, idx) => `
-            <button type="button" class="thumb-item ${idx === state.selectedGalleryIndex ? 'active' : ''}" aria-label="Xem ${item.is_video ? 'video' : 'ảnh'} ${idx + 1}" aria-pressed="${idx === state.selectedGalleryIndex}" onclick="switchDetailMedia(${idx})">
+            <button type="button" class="thumb-item ${idx === activeIndex ? 'active' : ''}" aria-label="Xem ${item.is_video ? 'video' : 'ảnh'} ${idx + 1}" aria-pressed="${idx === activeIndex}" onclick="switchDetailMedia(${idx})">
               <img src="${esc(item.thumb || item.url)}" alt="Ảnh ${idx + 1}">
               ${item.is_video ? `<div class="thumb-video-badge"><i class="fa-solid fa-play"></i></div>` : ''}
             </button>
@@ -634,12 +671,154 @@ function renderDetailModal(prod) {
       </div>
     </div>
   `;
+
+  setupGallerySwipe(gallery.length, activeIndex);
   window.dispatchEvent(new CustomEvent('storefront:detail-open', { detail: { id: prod.id } }));
 }
 
-function switchDetailMedia(index) {
+function syncGalleryUI(index, shouldScrollTrack = true) {
   state.selectedGalleryIndex = index;
-  renderDetailModal(state.activeDetailProduct);
+  const countEl = document.getElementById('galleryCurrentIndex');
+  if (countEl) countEl.innerText = index + 1;
+
+  const thumbs = document.querySelectorAll('.thumbs-strip .thumb-item');
+  thumbs.forEach((t, i) => {
+    const isActive = i === index;
+    t.classList.toggle('active', isActive);
+    t.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+  if (thumbs[index]) {
+    thumbs[index].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+
+  if (shouldScrollTrack) {
+    const track = document.getElementById('galleryCarouselTrack');
+    if (track) {
+      const slide = track.children[index];
+      if (slide) {
+        slide.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+      } else {
+        const slideWidth = track.clientWidth || 1;
+        track.scrollTo({ left: index * slideWidth, behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function switchDetailMedia(index) {
+  syncGalleryUI(index, true);
+}
+
+function navigateDetailGallery(delta) {
+  const prod = state.activeDetailProduct;
+  if (!prod) return;
+  const v = selectedVariant(prod);
+  const { list } = getEffectiveGallery(prod, v);
+  const total = list.length;
+  if (total <= 1) return;
+
+  let cur = state.selectedGalleryIndex >= 0 ? state.selectedGalleryIndex : 0;
+  let next = cur + delta;
+  if (next < 0) next = total - 1;
+  if (next >= total) next = 0;
+  switchDetailMedia(next);
+}
+
+function setupGallerySwipe(totalCount, initialIndex) {
+  const track = document.getElementById('galleryCarouselTrack');
+  if (!track || totalCount <= 1) return;
+
+  if (initialIndex > 0) {
+    requestAnimationFrame(() => {
+      const slide = track.children[initialIndex];
+      if (slide) {
+        track.scrollLeft = slide.offsetLeft;
+      } else {
+        const slideWidth = track.clientWidth || 1;
+        track.scrollLeft = initialIndex * slideWidth;
+      }
+    });
+  }
+
+  // 1. Đồng bộ khi cuộn / vuốt tự nhiên (hỗ trợ vuốt chạm cảm ứng mobile 60fps)
+  let scrollDebounce = null;
+  track.addEventListener('scroll', () => {
+    clearTimeout(scrollDebounce);
+    scrollDebounce = setTimeout(() => {
+      const slideWidth = track.clientWidth || 1;
+      const cur = Math.round(track.scrollLeft / slideWidth);
+      if (cur >= 0 && cur < totalCount && cur !== state.selectedGalleryIndex) {
+        syncGalleryUI(cur, false);
+      }
+    }, 45);
+  }, { passive: true });
+
+  // 2. Bắt cử chỉ vuốt nhanh (touch flick) trên điện thoại
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let isTouchActive = false;
+
+  track.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+    isTouchActive = true;
+  }, { passive: true });
+
+  track.addEventListener('touchend', (e) => {
+    if (!isTouchActive || e.changedTouches.length === 0) return;
+    isTouchActive = false;
+    const diffX = e.changedTouches[0].clientX - touchStartX;
+    const diffY = e.changedTouches[0].clientY - touchStartY;
+    const elapsed = Date.now() - touchStartTime;
+
+    if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY) * 1.2 && elapsed < 500) {
+      if (diffX < 0) {
+        navigateDetailGallery(1);
+      } else {
+        navigateDetailGallery(-1);
+      }
+    }
+  }, { passive: true });
+
+  // 3. Hỗ trợ kéo chuột trên máy tính (mouse drag to swipe)
+  let isMouseDown = false;
+  let mouseStartX = 0;
+  let mouseStartScroll = 0;
+  let hasDragged = false;
+
+  const onMouseMove = (e) => {
+    if (!isMouseDown) return;
+    const dx = e.pageX - mouseStartX;
+    if (Math.abs(dx) > 6) hasDragged = true;
+    track.scrollLeft = mouseStartScroll - dx;
+  };
+
+  const onMouseUp = () => {
+    if (!isMouseDown) return;
+    isMouseDown = false;
+    track.classList.remove('is-dragging');
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+    if (hasDragged) {
+      const slideWidth = track.clientWidth || 1;
+      const target = Math.round(track.scrollLeft / slideWidth);
+      switchDetailMedia(Math.max(0, Math.min(totalCount - 1, target)));
+    }
+  };
+
+  track.addEventListener('mousedown', (e) => {
+    if (e.target.tagName === 'VIDEO' || e.button !== 0) return;
+    isMouseDown = true;
+    hasDragged = false;
+    mouseStartX = e.pageX;
+    mouseStartScroll = track.scrollLeft;
+    track.classList.add('is-dragging');
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  });
 }
 
 let modalQty = 1;
