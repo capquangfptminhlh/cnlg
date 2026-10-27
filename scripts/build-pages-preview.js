@@ -8,7 +8,7 @@ const root=path.resolve(__dirname,'..');
 const dst=path.join(root,'.pages-preview-dist');
 const pub=path.join(root,'public');
 const allowed=[
-  'styles.css','marketplace.css','marketplace-v3.css','motion.css',
+  'styles.css','marketplace.css','marketplace-v3.css','motion.css','flash-sale.css',
   'app.js','marketplace-home.js','favorites.js','motion.js',
   'storefront-premium.css','storefront-premium.js','storefront-finish.css',
   'storefront-experience.css','dialogs.js','storefront-match.css','category-sheet.js','category-view.js'
@@ -23,6 +23,9 @@ for(const name of allowed){
   html=html.replaceAll('="/'+name+'"','="./'+name+'"');
 }
 html=html.replace(/<script src="\/socket\.io\/socket\.io\.js"><\/script>/,'');
+// Flash Sale uses production realtime purchase APIs; static demo includes only its
+// CSS so that the guarantee bar and product detail keep their true mobile layout.
+html=html.replace(/<script src="\/flash-sale\.js"><\/script>/,'');
 html=html.replaceAll('href="/"','href="./"');
 html=html.replace('<script src="./app.js"></script>',
   '<script src="./pages-preview.js"></script>\n  <script src="./app.js"></script>');
