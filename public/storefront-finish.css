@@ -171,6 +171,9 @@ button, a, input, select { touch-action:manipulation; }
   .card-heart{width:28px;height:28px;}
 }
 @media(max-width:370px){
+  /* On narrow phones the quick actions repeat bottom navigation and push
+     the first actual product below the fold. Use the bottom bar and filters. */
+  .market-discovery .market-shortcuts { display: none; }
   .market-banner-copy{max-width:67%;padding:18px 8px 9px 12px;}
   .market-banner-copy h1{font-size:19px !important;}
   .market-banner-copy p{font-size:8px;}
