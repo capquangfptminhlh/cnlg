@@ -219,6 +219,8 @@ function securityHeaders(req, res, next) {
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.set('X-Frame-Options', 'SAMEORIGIN');
   res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' ws: wss:; frame-ancestors 'self';");
+  res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   next();
 }
 

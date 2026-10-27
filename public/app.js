@@ -322,7 +322,7 @@ function productCardHtml(p) {
     const soldOut = p.in_stock === false;
     return `
     <div class="luxury-card${soldOut ? ' is-sold-out' : (p.is_flash_sale ? ' is-flash-card' : '')}" data-id="${p.id}">
-      <div class="card-media">
+      <div class="card-media" data-shop-product="${p.id}" onclick="openProductDetail(${p.id})" style="cursor:pointer;">
         ${productBadges(p)}
         ${!soldOut && p.discount_percent >= 20 ? `<span class="card-corner-off"><b>-${p.discount_percent}%</b><small>GIẢM</small></span>` : ''}
         <button type="button" class="card-heart" data-favorite-id="${p.id}" aria-label="Lưu sản phẩm" aria-pressed="false"><i class="fa-regular fa-heart"></i></button>
@@ -437,7 +437,7 @@ async function openProductDetail(productId) {
     }
 
     const prod = json.data;
-    rememberProducts([{ ...prod, variants: undefined }]);
+    rememberProducts([prod]);
     state.activeDetailProduct = prod;
     setProductHash(prod);
     const vs = prod.variants || [];
@@ -493,7 +493,7 @@ function renderVariantPicker(prod) {
   }
   return `
     <div class="variant-group">
-      <div class="variant-group-label">Phân loại:</div>
+      <div class="variant-group-label">${esc((prod.variation_options && prod.variation_options[0]?.display) || 'Phân loại')}:</div>
       <div class="variant-chips">
         ${vs.map(v => `<button type="button" class="variant-chip ${String(sel?.id) === String(v.id) ? 'active' : ''} ${v.in_stock ? '' : 'disabled'}" aria-pressed="${String(sel?.id) === String(v.id)}" ${v.in_stock ? `onclick="pickVariant('${v.id}')"` : 'disabled'} title="${v.in_stock ? '' : 'Hết hàng'}">${esc(v.name)}</button>`).join('')}
       </div>
@@ -778,7 +778,7 @@ async function refreshCartPrices() {
       const json = await res.json();
       if (!json.success) return;
       const p = json.data;
-      rememberProducts([{ ...p, variants: undefined }]);
+      rememberProducts([p]);
       for (const l of lines) {
         const v = l.variation_id ? (p.variants || []).find(x => x.id === l.variation_id) : null;
         if (p.in_stock === false || (l.variation_id && (!v || !v.in_stock))) { l.quantity = 0; removed.push(l.name); continue; }
@@ -795,7 +795,7 @@ async function refreshCartPrices() {
 function buyNowInstant(productId) {
   const product = productCache.get(productId);
   if (!product || product.in_stock === false) return;
-  if (product.variant_count !== 1) {
+  if ((product.variant_count || 1) > 1 || (Array.isArray(product.variants) && product.variants.length > 1)) {
     showToast('Vui lòng chọn phân loại (màu/size...) trước khi mua');
     openProductDetail(productId);
     return;
@@ -808,7 +808,7 @@ function buyNowInstant(productId) {
 function addToCart(productId, notify = true, qty = 1) {
   const product = productCache.get(productId);
   if (!product || product.in_stock === false) return;
-  if (product.variant_count !== 1) {
+  if ((product.variant_count || 1) > 1 || (Array.isArray(product.variants) && product.variants.length > 1)) {
     showToast('Vui lòng chọn phân loại (màu/size...) trước khi mua');
     openProductDetail(productId);
     return;
@@ -1021,6 +1021,12 @@ cancelCheckoutBtn.addEventListener('click', () => checkoutModal.classList.remove
 
 checkoutForm.addEventListener('submit', async e => {
   e.preventDefault();
+
+  if (!wardSelect.value || wardSelect.disabled) {
+    showToast('Vui lòng chọn Phường / Xã nhận hàng');
+    wardSelect.focus();
+    return;
+  }
 
   const customer = {
     name: document.getElementById('custName').value.trim(),

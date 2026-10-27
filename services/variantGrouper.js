@@ -280,6 +280,7 @@ function groupProducts(products = []) {
       return {
         id: String(it.variation_id || it.id),
         product_id: it.id,
+        source_id: it.source_id ?? (it.id >= 10000000 ? it.id % 10000000 : it.id),
         sku: it.sku || String(it.id),
         name: vGroup.name,
         is_default: false,

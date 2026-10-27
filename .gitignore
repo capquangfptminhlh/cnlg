@@ -6,32 +6,11 @@ sample_product_rsc.txt
 .DS_Store
 .env
 .env.local
+.agents/
 
-# Dữ liệu vận hành – có thể chứa cookie DropBuy, thông tin khách hàng, mật khẩu admin
-data/config.json
-data/orders.json
-data/admin-secret.json
-data/*.tmp
+# Dữ liệu vận hành & cache runtime – tuyệt đối không đưa lên git
+data/*
+!data/config.example.json
 
-# Nhật ký giao dịch ngân hàng & cache chi tiết sản phẩm
-data/payments.json
-data/products_detail/
-data/backups/
-data/address-v2.json
-data/cred.key
-data/dropbuy-cred.json
-data/dropbuy-cred.json.tmp
-
-# Ban sao cloudflared cho tunnel cua hang (~60 MB, khong dua len git)
+# Bản sao cloudflared cho tunnel của hàng (~60 MB, không đưa lên git)
 tools/*.exe
-# Khoa + cau hinh tunnel khi chay tren may chu (bi mat)
-data/tunnel/
-# Khoa deploy (chi doc) + file tam cua bo tu cap nhat tren may chu
-data/deploy/
-data/update.lock
-data/update.rejected
-data/*.update-keep
-# Nguon si khac (TechMall, ...): san pham, danh muc, phien dang nhap; mat khau ma hoa tung nguon
-data/source-*.json
-data/source-*.json.tmp
-data/*-cred.json

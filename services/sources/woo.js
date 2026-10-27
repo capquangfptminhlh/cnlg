@@ -500,14 +500,15 @@ function createWooSource(def) {
     if (variationId && Array.isArray(product.variants) && product.variants.length > 0) {
       const v = product.variants.find(x => String(x.id) === String(variationId));
       if (v) {
-        target = { ...product, ...v, id: v.product_id || product.id, variation_id: v.id, sku: v.sku, price: v.price, supplier_cost: v.supplier_cost, in_stock: v.in_stock };
+        target = { ...product, ...v, id: v.product_id || product.id, variation_id: v.id, sku: v.sku, price: v.price, supplier_cost: v.supplier_cost, in_stock: v.in_stock, source_id: v.source_id || product.source_id };
         variantName = v.name;
       }
     }
     const base = { sku: target.sku, variation_id: target.variation_id, name: product.name, variant_name: variantName, weight_gram: target.weight_gram || 0, cost_is_wholesale: true };
     try {
       const cookie = await ensureSession().catch(() => null);
-      const res = await http(`/wp-json/wc/store/v1/products/${target.source_id || target.id}`, { cookie, timeout: 15000 });
+      const targetSourceId = target.source_id || (target.id >= SPAN ? target.id % SPAN : target.id);
+      const res = await http(`/wp-json/wc/store/v1/products/${targetSourceId}`, { cookie, timeout: 15000 });
       if (res.status === 404) {
         updateOne({ ...target, removed: true, in_stock: false });
         return { ...base, ok: false, live: true, in_stock: false, price: target.price, cost: target.supplier_cost, message: `"${product.name}" không còn bán.` };

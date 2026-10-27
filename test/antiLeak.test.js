@@ -143,6 +143,90 @@ describe('Chống lộ nguồn hàng & Bảo mật (Anti-Leak)', () => {
     assert.equal(roomEvents[0].room, 'admins');
   });
 
+  test('publicProduct che giấu hoàn toàn thông tin giá vốn, kho và ảnh nguồn trong variants', () => {
+    const { publicProduct } = require('../server');
+    const mockProduct = {
+      id: 141328,
+      name: 'Bàn là hơi nước mini cầm tay Bizond / STMR-010116 DropBuy',
+      price: 298000,
+      original_price: 799000,
+      shop_id: 10426,
+      depot_code: 'DP-10426-9542-11431',
+      dropbuy_cost: 259000,
+      profit_margin: 39000,
+      pricing_rule: '% mặc định',
+      image: 'https://r6i.pen.dropbuy.vn/md/s-10426/p-141328/img.png',
+      image_hd: 'https://r6i.pen.dropbuy.vn/md/s-10426/p-141328/img_hd.png',
+      warranty: 'Bảo hành DropBuy 3 tháng',
+      _normName: 'ban la',
+      _normBrand: '',
+      _normSku: 's10426-141328',
+      _hay: 'ban la hoi nuoc',
+      _tokens: {},
+      variants: [
+        {
+          id: '9a07acaf-292f-4952-a589-f1406e74c5d8',
+          product_id: 141328,
+          sku: 'S10426-141328-150625',
+          name: 'Tiêu chuẩn DropBuy',
+          is_default: true,
+          in_stock: true,
+          price: 298000,
+          original_price: 799000,
+          dealer_price: 240000,
+          supplier_cost: 230000,
+          dropbuy_cost: 259000,
+          pricing_rule: '% mặc định',
+          profit_margin: 39000,
+          shop_id: 10426,
+          depot_code: 'DP-10426-9542-11431',
+          weight_gram: 500,
+          warranty: 'Bảo hành DropBuy 3 tháng',
+          image: 'https://r6i.pen.dropbuy.vn/md/s-10426/p-141328/variant.png',
+          image_hd: 'https://r6i.pen.dropbuy.vn/md/s-10426/p-141328/variant_hd.png'
+        }
+      ]
+    };
+
+    const pub = publicProduct(mockProduct);
+    const jsonStr = JSON.stringify(pub);
+
+    // Không chứa các từ khóa nguồn nhạy cảm
+    assert.doesNotMatch(jsonStr, SUPPLIER_RE);
+    assert.doesNotMatch(jsonStr, /r6i\.pen|r6s\.pen|dropbuy/i);
+
+    // Thuộc tính nhạy cảm phải bị loại bỏ ở cả cấp gốc và variants
+    assert.equal('dropbuy_cost' in pub, false);
+    assert.equal('profit_margin' in pub, false);
+    assert.equal('dealer_price' in pub, false);
+    assert.equal('supplier_cost' in pub, false);
+    assert.equal('shop_id' in pub, false);
+    assert.equal('depot_code' in pub, false);
+    assert.equal('_normName' in pub, false);
+    assert.equal('_tokens' in pub, false);
+
+    assert.ok(Array.isArray(pub.variants) && pub.variants.length === 1);
+    const v = pub.variants[0];
+    assert.equal('dropbuy_cost' in v, false);
+    assert.equal('profit_margin' in v, false);
+    assert.equal('dealer_price' in v, false);
+    assert.equal('supplier_cost' in v, false);
+    assert.equal('pricing_rule' in v, false);
+    assert.equal('shop_id' in v, false);
+    assert.equal('depot_code' in v, false);
+
+    // Ảnh phải được mask sang /cdn/
+    assert.match(pub.image, /^\/cdn\/md\//);
+    assert.match(v.image, /^\/cdn\/md\//);
+    assert.match(v.image_hd, /^\/cdn\/md\//);
+
+    // Tên và bảo hành phải được làm sạch câu chữ nhà cung cấp
+    assert.doesNotMatch(pub.name, /DropBuy/i);
+    assert.doesNotMatch(pub.warranty, /DropBuy/i);
+    assert.doesNotMatch(v.name, /DropBuy/i);
+    assert.doesNotMatch(v.warranty, /DropBuy/i);
+  });
+
   test('Cú pháp JavaScript của server.js và admin.js hợp lệ 100%', () => {
     for (const rel of ['server.js', 'public/admin.js', 'public/app.js']) {
       const code = fs.readFileSync(path.join(ROOT, rel), 'utf8');

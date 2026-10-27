@@ -135,21 +135,28 @@ app.get('/', (req, res) => {
 });
 
 app.get('/sp/:slugId', async (req, res) => {
-  const id = parseInt(String(req.params.slugId), 10);
-  const product = storeCatalog.findProduct(id);
-  if (!product) return res.redirect(302, '/');
-  // Sai slug (tên SP đổi) → chuyển về URL chuẩn
-  const canonical = seo.productPath(product);
-  if (decodeURIComponent(req.path) !== canonical) return res.redirect(301, canonical);
-  // Chỉ dùng chi tiết đã cache (không gọi DropBuy cho mỗi lượt bot Google/Facebook)
-  let detail = null;
-  const src = storeCatalog.sourceOf(id);
-  if (src) detail = src.detail(product);
-  else try {
-    const f = path.join(DATA_DIR, 'products_detail', `${id}.json`);
-    if (fs.existsSync(f)) detail = JSON.parse(fs.readFileSync(f, 'utf8'));
-  } catch (e) {}
-  res.type('html').send(seo.renderProductPage(req, product, detail, readConfig()));
+  try {
+    const id = parseInt(String(req.params.slugId), 10);
+    if (!Number.isFinite(id) || id <= 0) return res.redirect(302, '/');
+    const product = storeCatalog.findProduct(id);
+    if (!product) return res.redirect(302, '/');
+    // Sai slug (tên SP đổi) → chuyển về URL chuẩn
+    const canonical = seo.productPath(product);
+    let decodedPath = req.path;
+    try { decodedPath = decodeURIComponent(req.path); } catch {}
+    if (decodedPath !== canonical) return res.redirect(301, canonical);
+    // Chỉ dùng chi tiết đã cache (không gọi DropBuy cho mỗi lượt bot Google/Facebook)
+    let detail = null;
+    const src = storeCatalog.sourceOf(id);
+    if (src) detail = src.detail(product);
+    else try {
+      const f = path.join(DATA_DIR, 'products_detail', `${id}.json`);
+      if (fs.existsSync(f)) detail = JSON.parse(fs.readFileSync(f, 'utf8'));
+    } catch (e) {}
+    res.type('html').send(seo.renderProductPage(req, product, detail, readConfig()));
+  } catch (err) {
+    res.redirect(302, '/');
+  }
 });
 
 app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemapXml(req, storeCatalog.getProducts().filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p)))));
@@ -226,17 +233,43 @@ function publicProduct(p) {
   // Không lộ nguồn hàng cho khách: bỏ giá vốn/biên lãi và link/mã SP bên nguồn
   const { dropbuy_cost, profit_margin, is_wholesale_price, public_price, wholesale_price, pricing_rule, dropbuy_url, dropbuy_id,
     shop_name, fs_program_code, removed_from_dropbuy, stock_qty, warranty_type, warranty_duration, cost, supplier, techmall_id, permalink,
-    source, source_id, source_url, dealer_price, retail_price, supplier_cost, removed, description, gallery, api_image, images_for, images_v, ...rest } = p;
-  // "Giá gốc" nguồn đôi khi bị thổi (vd 574k so với 10 triệu = -94%) → giảm > 70% coi như không có giá gốc,
-  // tránh hiển thị khuyến mãi trông như giả
+    source, source_id, source_url, dealer_price, retail_price, supplier_cost, removed, description, gallery, api_image, images_for, images_v,
+    shop_id, depot_code, _normName, _normBrand, _normSku, _hay, _tokens, variants, ...rest } = p;
+
   if (rest.image) rest.image = catalogImage.maskMediaUrl(rest.image);
   if (rest.image_hd) rest.image_hd = catalogImage.maskMediaUrl(rest.image_hd);
   if (rest.warranty) rest.warranty = stripSupplierText(rest.warranty);
   if (rest.name) rest.name = stripSupplierText(rest.name);
   if (rest.description) rest.description = stripSupplierText(rest.description);
+
   const discount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
-  if (discount > 70) return { ...rest, original_price: null, discount_percent: 0 };
-  return { ...rest, discount_percent: discount };
+  const out = {
+    ...rest,
+    original_price: discount > 70 ? null : (p.original_price || null),
+    discount_percent: discount > 70 ? 0 : discount
+  };
+
+  if (Array.isArray(variants)) {
+    out.variants = variants.map(v => {
+      const vDisc = v.original_price && v.original_price > v.price ? Math.round((1 - v.price / v.original_price) * 100) : 0;
+      return {
+        id: String(v.id),
+        sku: v.sku || String(v.id),
+        name: stripSupplierText(v.name),
+        is_default: !!v.is_default,
+        in_stock: v.in_stock !== false,
+        price: v.price,
+        original_price: vDisc > 70 ? null : (v.original_price || null),
+        discount_percent: vDisc > 70 ? 0 : vDisc,
+        weight_gram: v.weight_gram || 0,
+        warranty: stripSupplierText(v.warranty || rest.warranty || 'Bảo hành chính hãng'),
+        image: v.image ? catalogImage.maskMediaUrl(v.image) : null,
+        image_hd: v.image_hd ? catalogImage.maskMediaUrl(v.image_hd) : null
+      };
+    });
+  }
+
+  return out;
 }
 
 // --- BỘ NHỚ ĐỆM TỐI ƯU HIỆU NĂNG DANH MỤC & SẢN PHẨM ---
@@ -665,6 +698,21 @@ app.get('/api/flash-sale', (req, res) => {
 const liveRefreshAt = new Map();
 const productDetailCache = new Map();
 const PRODUCT_DETAIL_TTL_MS = 60000;
+const PRODUCT_DETAIL_MAX_SIZE = 500;
+
+function setProductDetailCache(id, data) {
+  if (productDetailCache.size >= PRODUCT_DETAIL_MAX_SIZE) {
+    const now = Date.now();
+    for (const [k, v] of productDetailCache.entries()) {
+      if (now - v.at >= PRODUCT_DETAIL_TTL_MS) productDetailCache.delete(k);
+    }
+    while (productDetailCache.size >= PRODUCT_DETAIL_MAX_SIZE) {
+      const oldestKey = productDetailCache.keys().next().value;
+      productDetailCache.delete(oldestKey);
+    }
+  }
+  productDetailCache.set(id, { data, at: Date.now() });
+}
 
 app.get('/api/products/:id', async (req, res) => {
   try {
@@ -707,7 +755,7 @@ app.get('/api/products/:id', async (req, res) => {
         gallery: (d.gallery || []).map(g => ({ url: catalogImage.maskMediaUrl(g.url), thumb: catalogImage.maskMediaUrl(g.thumb || g.url) })),
         variants
       };
-      productDetailCache.set(id, { data: responseData, at: Date.now() });
+      setProductDetailCache(id, responseData);
       res.setHeader('Cache-Control', 'public, max-age=30');
       return res.json({ success: true, data: responseData });
     }
@@ -777,7 +825,7 @@ app.get('/api/products/:id', async (req, res) => {
       merged.variation_options = detail.variation_options || [];
     }
     delete merged.variations;
-    productDetailCache.set(id, { data: merged, at: Date.now() });
+    setProductDetailCache(id, merged);
     res.setHeader('Cache-Control', 'public, max-age=30');
     res.json({ success: true, data: merged });
   } catch (err) {
@@ -1754,6 +1802,26 @@ app.get('/api/admin/techmall/products', requireAdmin, (req, res) => {
   res.json({ success: true, total: list.length, page: pageNum, totalPages: Math.ceil(list.length / lim) || 1, data: rows });
 });
 
+// Bắt 404 cho toàn bộ API routes
+app.use('/api', (req, res) => {
+  res.status(404).json({ success: false, error: 'Endpoint không tồn tại' });
+});
+
+// Middleware xử lý ngoại lệ toàn cục (chống lộ stack trace / đường dẫn file)
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err instanceof URIError) {
+    return res.redirect(302, '/');
+  }
+  const isApi = (req.path || '').startsWith('/api');
+  const status = err.status || err.statusCode || (err instanceof SyntaxError && err.status === 400 ? 400 : 500);
+  const msg = err instanceof SyntaxError && status === 400 ? 'Dữ liệu JSON gửi lên không hợp lệ' : (err.message || 'Lỗi hệ thống');
+  if (isApi) {
+    return res.status(status).json({ success: false, error: stripSupplierText(msg) });
+  }
+  res.status(status).type('text/plain').send(stripSupplierText(msg));
+});
+
 process.on('uncaughtException', err => {
   console.error('[CRITICAL Uncaught Exception]:', err.message);
 });
@@ -1762,26 +1830,31 @@ process.on('unhandledRejection', reason => {
   console.error('[CRITICAL Unhandled Rejection]:', reason);
 });
 
-server.listen(PORT, () => {
-  getAdminPassword(); // tạo mật khẩu admin nếu chưa có
-  console.log(`================================================================`);
-  console.log(`🚀 HOANGMINH.COM x DROPBUY.VN RELAY SYSTEM RUNNING ON PORT ${PORT}`);
-  console.log(`🔗 Storefront: http://localhost:${PORT}`);
-  console.log(`🔗 Admin Console: http://localhost:${PORT}/admin.html`);
-  console.log(`================================================================`);
-  const legacy = storeCatalog.removeLegacyPartnerItems();
-  if (legacy) console.log(`[Nguồn hàng] Đã gỡ ${legacy} SP TechMall cũ khỏi data/products.json (nay ở data/source-techmall-*.json).`);
-  realtimeSync.startRealtimeSync(io);
-  sources.start(io, readConfig);
-  orderExpiry.startOrderExpiry(io, readConfig);
-  backup.startBackups();
-  watchdog.startWatchdog(io);
-  notify.startZaloBotPolling();
+if (require.main === module) {
+  server.listen(PORT, () => {
+    getAdminPassword(); // tạo mật khẩu admin nếu chưa có
+    console.log(`================================================================`);
+    console.log(`🚀 HOANGMINH.COM x DROPBUY.VN RELAY SYSTEM RUNNING ON PORT ${PORT}`);
+    console.log(`🔗 Storefront: http://localhost:${PORT}`);
+    console.log(`🔗 Admin Console: http://localhost:${PORT}/admin.html`);
+    console.log(`================================================================`);
+    const legacy = storeCatalog.removeLegacyPartnerItems();
+    if (legacy) console.log(`[Nguồn hàng] Đã gỡ ${legacy} SP TechMall cũ khỏi data/products.json (nay ở data/source-techmall-*.json).`);
+    realtimeSync.startRealtimeSync(io);
+    sources.start(io, readConfig);
+    orderExpiry.startOrderExpiry(io, readConfig);
+    backup.startBackups();
+    watchdog.startWatchdog(io);
+    notify.startZaloBotPolling();
 
-  // Định kỳ mỗi 2 phút đồng bộ trạng thái đơn hàng từ DropBuy đến khi hoàn tất
-  setInterval(() => {
-    dropbuyOrderFulfillment.syncDropbuyOrdersStatus(io).catch(err => {
-      console.warn('[DropBuy Sync Interval Error]:', err.message);
-    });
-  }, 2 * 60 * 1000).unref();
-});
+    // Định kỳ mỗi 2 phút đồng bộ trạng thái đơn hàng từ DropBuy đến khi hoàn tất
+    setInterval(() => {
+      dropbuyOrderFulfillment.syncDropbuyOrdersStatus(io).catch(err => {
+        console.warn('[DropBuy Sync Interval Error]:', err.message);
+      });
+    }, 2 * 60 * 1000).unref();
+  });
+}
+
+module.exports = { app, server, publicProduct };
+
