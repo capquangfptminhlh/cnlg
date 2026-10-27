@@ -239,14 +239,34 @@ const puppeteer=require('puppeteer-core');
     assert.equal(await page.$eval('#modalQtyDisplay',x=>x.textContent.trim()),'1');
     const productGeometry=await page.evaluate(()=>{
       const m=document.querySelector('#productDetailModal .product-modal-dialog');
+      const content=document.querySelector('#productDetailModal .detail-modal-content');
+      const grid=document.querySelector('#productDetailModal .product-detail-grid');
+      const gallery=document.querySelector('#productDetailModal .detail-gallery');
+      const info=document.querySelector('#productDetailModal .detail-info');
+      const preview=document.querySelector('#productDetailModal .main-preview-box');
+      const actions=document.querySelector('#productDetailModal .detail-actions-row');
+      const close=document.getElementById('closeDetailModalBtn');
       const thumbs=[...document.querySelectorAll('#productDetailModal .thumb-item')];
       const bounds=m.getBoundingClientRect();
+      const rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width}};
       return {right:bounds.right,width:bounds.width,height:bounds.height,
         docWidth:document.documentElement.scrollWidth,thumbs:thumbs.length,
-        buttons:thumbs.every(x=>x.tagName==='BUTTON'),aria:thumbs.every(x=>x.hasAttribute('aria-label'))};
+        buttons:thumbs.every(x=>x.tagName==='BUTTON'),aria:thumbs.every(x=>x.hasAttribute('aria-label')),
+        content:rect(content),grid:rect(grid),gallery:rect(gallery),info:rect(info),
+        preview:rect(preview),actions:rect(actions),closeFloat:getComputedStyle(close).float};
     });
     assert.ok(productGeometry.right<=mobile.width+2,
       'product sheet clips mobile: '+JSON.stringify(productGeometry));
+    assert.equal(productGeometry.closeFloat,'none','close button must not float over product grid');
+    assert.ok(productGeometry.content.width>=productGeometry.width-4 &&
+      productGeometry.grid.width>=productGeometry.width-4 &&
+      productGeometry.gallery.width>=productGeometry.width-4 &&
+      productGeometry.info.width>=productGeometry.width-4,
+      'product sheet leaves blank space on the right: '+JSON.stringify(productGeometry));
+    assert.ok(productGeometry.preview.width>=productGeometry.gallery.width-28 &&
+      productGeometry.actions.right<=productGeometry.right+2 &&
+      productGeometry.actions.left>=-2,
+      'product gallery or actions do not fit mobile sheet: '+JSON.stringify(productGeometry));
     assert.ok(productGeometry.buttons&&productGeometry.aria&&productGeometry.thumbs>0,
       'gallery thumbnails must be keyboard-accessible');
     await page.screenshot({path:join(screenshots,'detail-mobile.png')});
