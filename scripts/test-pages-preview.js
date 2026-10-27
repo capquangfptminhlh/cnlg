@@ -307,12 +307,20 @@ const puppeteer=require('puppeteer-core');
           heroLeft:Math.round(hero.left),heroRight:Math.round(hero.right),
           firstProductTop:Math.round(document.querySelector('#featuredProducts .featured-card').getBoundingClientRect().top+window.scrollY),
           featuredTop:Math.round(section.top+window.scrollY),
+          featuredBeforeFlash: !!(document.getElementById('featuredSection').compareDocumentPosition(document.getElementById('flashSaleSection')) & Node.DOCUMENT_POSITION_FOLLOWING),
+          guarantees: getComputedStyle(document.querySelector('.si-guarantee-bar')).display,
           photos:imgs.filter(x=>x.complete&&x.naturalWidth>0).length
         };
       });
       assert.ok(geometry.scrollWidth<=width+5,'horizontal overflow at '+width+': '+JSON.stringify(geometry));
       assert.ok(geometry.heroLeft>=-1&&geometry.heroRight<=width+1,'hero clipped at '+width+': '+JSON.stringify(geometry));
-      if(width===360)assert.ok(geometry.firstProductTop<670,'products too far down on small phones: '+JSON.stringify(geometry));
+      if(width===360){
+        assert.ok(geometry.featuredBeforeFlash,'featured products must precede flash carousel on phones');
+        assert.equal(geometry.guarantees,'flex','mobile guarantees must be a compact ribbon');
+        assert.ok(geometry.firstProductTop<670,'products too far down on small phones: '+JSON.stringify(geometry));
+      } else {
+        assert.equal(geometry.featuredBeforeFlash,false,'desktop section order should be restored');
+      }
       console.log('Responsive '+width+'px:',JSON.stringify(geometry));
     }
 
