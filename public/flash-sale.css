@@ -1304,7 +1304,29 @@ body.is-category-view #flashSaleSection {
     font-size: 14px;
     border-radius: 9px;
   }
-  .si-guarantee-item { gap: 8px; padding: 2px; }
+  /* Compact single-row guarantees: preserve all information without
+     forcing shoppers past two tall promotional rows. */
+  .si-guarantee-bar {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    padding: 8px;
+    gap: 8px;
+  }
+  .si-guarantee-bar::-webkit-scrollbar { display: none; }
+  .si-guarantee-item {
+    flex: 0 0 205px;
+    max-width: 78vw;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid #ffe0d6;
+    border-radius: 9px;
+    background: #fff;
+    scroll-snap-align: start;
+  }
   .si-guarantee-item strong { font-size: 11.5px; }
   .si-guarantee-item small { font-size: 10px; }
   .fs-header {
