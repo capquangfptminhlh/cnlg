@@ -220,6 +220,25 @@
     updateMobileCartCount();
   }
 
+  // Phones see real featured products before the tall Flash Sale carousel.
+  // Reorder DOM siblings without duplicating content or altering desktop order.
+  const featuredSection = document.getElementById('featuredSection');
+  const flashSaleSection = document.getElementById('flashSaleSection');
+  if (featuredSection && flashSaleSection && featuredSection.parentNode === flashSaleSection.parentNode) {
+    const narrowPhone = window.matchMedia('(max-width: 700px)');
+    const arrangeProductSections = () => {
+      const parent = featuredSection.parentNode;
+      if (!parent || flashSaleSection.parentNode !== parent) return;
+      if (narrowPhone.matches && featuredSection.nextElementSibling !== flashSaleSection) {
+        parent.insertBefore(featuredSection, flashSaleSection);
+      } else if (!narrowPhone.matches && flashSaleSection.nextElementSibling !== featuredSection) {
+        parent.insertBefore(flashSaleSection, featuredSection);
+      }
+    };
+    arrangeProductSections();
+    narrowPhone.addEventListener('change', arrangeProductSections);
+  }
+
   window.addEventListener('storefront:favorite-write', () => {
     saved = favorites();
     updateHeartButtons();
