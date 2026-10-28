@@ -52,7 +52,7 @@ const puppeteer=require('puppeteer-core');
       await page.click('#searchForm button[type=submit]');
       await page.waitForFunction(()=>document.querySelectorAll('#productGrid .product-card').length>0);
       await page.click('#resetCatalog');
-      await page.$eval('#productGrid [data-add]',el=>el.scrollIntoView({block:'center',inline:'nearest'}));
+      await page.$eval('#productGrid [data-add]',el=>el.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));
       const tapBefore=await page.$eval('#productGrid [data-add]',el=>{
         const r=el.getBoundingClientRect();
         const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
