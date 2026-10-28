@@ -22,6 +22,11 @@ describe('Chống lộ nguồn hàng & Bảo mật (Anti-Leak)', () => {
       'preview must never contact a source or production API');
     assert.match(html, /Giá demo/);
     assert.match(html, /disabled>Thanh toán/);
+    assert.match(html, /280 sản phẩm mẫu/);
+    assert.match(html, /id="catalogCategories"/);
+    assert.match(html, /id="priceRange"/);
+    assert.match(html, /id="loadSentinel"/);
+    assert.match(html, /observer\.observe\(\$\('loadSentinel'\)\)/);
   });
 
   test('Toàn bộ tài nguyên tĩnh công khai trong public/ tuyệt đối không chứa từ khoá nguồn cung cấp', () => {
