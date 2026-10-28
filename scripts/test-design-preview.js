@@ -53,7 +53,17 @@ const puppeteer=require('puppeteer-core');
       await page.waitForFunction(()=>document.querySelectorAll('#productGrid .product-card').length>0);
       await page.click('#resetCatalog');
       await page.$eval('#productGrid [data-add]',el=>el.scrollIntoView({block:'center',inline:'nearest'}));
+      const tapBefore=await page.$eval('#productGrid [data-add]',el=>{
+        const r=el.getBoundingClientRect();
+        const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+        return {x:r.x,y:r.y,w:r.width,h:r.height,hit:hit?.outerHTML.slice(0,180),scrollY:scrollY};
+      });
       await page.click('#productGrid [data-add]');
+      const countAfterTap=await page.$eval('#cartCount',el=>Number(el.textContent.trim()));
+      if(countAfterTap===0){
+        console.error('No cart update after user tap:',JSON.stringify({label,tapBefore,errors}));
+        await page.screenshot({path:path.join(out,label+'-tap-debug.png')});
+      }
       await page.waitForFunction(()=>Number(document.querySelector('#cartCount')?.textContent||0)>=1,{timeout:5000});
       const count=await page.$eval('#cartCount',el=>Number(el.textContent.trim()));
       assert.ok(count>=1,'add-to-cart failed');
