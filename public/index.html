@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#ee4d2d">
-  <title>Hoàng Minh Store | Tổng Kho Giá Sỉ • Flash Sale Phụ Kiện, Công Nghệ & Gia Dụng</title>
+  <title>BESI | Một nơi. Ngàn lựa chọn. — Mua lẻ giá tốt</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" href="/logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;450;500;550;600;650;700;750;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/marketplace.css">
@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="/storefront-experience.css">
   <link rel="stylesheet" href="/storefront-match.css">
   <link rel="stylesheet" href="/flash-sale.css">
+  <link rel="stylesheet" href="/besi-marketplace-2026.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -28,11 +29,11 @@
   <div class="top-bar">
     <div class="container flex-between">
       <div class="top-perks">
-        <span class="top-perk-hot"><i class="fa-solid fa-bolt"></i> TỔNG KHO GIÁ SỈ — MUA LẺ 1 MÓN CŨNG TÍNH GIÁ SỈ</span>
+        <span class="top-perk-hot"><i class="fa-solid fa-bolt"></i> BESI — MUA 1 MÓN VẪN CÓ GIÁ TỐT</span>
         <span class="perk-divider">•</span>
-        <span><i class="fa-solid fa-fire"></i> Rẻ hơn thị trường tới 70%</span>
+        <span><i class="fa-solid fa-fire"></i> Khám phá nhiều ngành hàng</span>
         <span class="perk-divider">•</span>
-        <span><i class="fa-solid fa-shield-halved"></i> Kiểm hàng ưng ý mới trả tiền (COD)</span>
+        <span><i class="fa-solid fa-shield-halved"></i> Theo dõi đơn hàng thuận tiện</span>
       </div>
       <div class="top-links">
         <a href="#" class="admin-link" id="openTrackBtn"><i class="fa-solid fa-magnifying-glass-location"></i> Tra cứu đơn hàng</a>
@@ -45,10 +46,10 @@
     <div class="container flex-between">
       <div class="header-left">
         <a href="/" class="brand-logo">
-          <span class="logo-mark" aria-hidden="true"><img src="/logo.svg" alt="" width="46" height="46" class="logo-mark-img"></span>
+          <span class="logo-mark" aria-hidden="true"><span class="logo-mark-letter">b.</span></span>
           <span class="logo-stack">
-            <span class="logo-text"><span class="logo-bold">Hoàng Minh</span> <span class="logo-accent">Store</span></span>
-            <span class="logo-sub"><i class="fa-solid fa-bolt"></i> Tổng Kho Giá Sỉ • Lẻ Rẻ Như Buôn • Chính Hãng</span>
+            <span class="logo-text"><span class="logo-bold">be</span><span class="logo-accent">si.</span></span>
+            <span class="logo-sub">MUA LẺ GIÁ TỐT</span>
           </span>
         </a>
       </div>
@@ -57,9 +58,9 @@
       <div class="search-wrapper">
         <div class="search-box">
           <i class="fa-solid fa-magnifying-glass search-icon"></i>
-          <input type="text" id="searchInput" placeholder="Săn deal giá sỉ tận kho: tai nghe, cáp sạc, pin dự phòng, gia dụng từ 9K..." autocomplete="off">
+          <input type="text" id="searchInput" placeholder="Bạn đang tìm điện thoại, gia dụng hay phụ kiện?" autocomplete="off">
           <button id="searchClearBtn" class="search-clear hidden">&times;</button>
-          <button id="searchBtn" class="search-submit">Tìm Kiếm</button>
+          <button id="searchBtn" class="search-submit">Tìm kiếm</button>
         </div>
         <!-- Live Autocomplete Dropdown -->
         <div id="searchDropdown" class="search-dropdown hidden"></div>
@@ -84,24 +85,24 @@
 
   <div class="container market-desktop-layout" id="discovery">
     <aside class="market-sidebar" id="categoryPanel" aria-label="Danh mục sản phẩm">
-      <div class="sidebar-heading"><i class="fa-solid fa-list"></i> DANH MỤC SẢN PHẨM</div>
+      <div class="sidebar-heading"><i class="fa-solid fa-list"></i> DANH MỤC KHÁM PHÁ</div>
       <nav class="cat-nav" aria-label="Các ngành hàng"><div class="cat-scroll" id="categoriesContainer"><button type="button" class="cat-btn active" data-id="all"><i class="fa-solid fa-border-all"></i> Tất cả sản phẩm</button></div></nav>
     </aside>
     <div class="market-discovery">
       <nav class="market-links" aria-label="Điều hướng cửa hàng">
-        <a class="active" href="/">Trang chủ</a><a href="#flashSaleSection" class="nav-flash-link"><i class="fa-solid fa-bolt"></i> Flash Sale</a><button type="button" class="nav-hot-link" data-store-action="under99"><i class="fa-solid fa-fire"></i> Xả Kho &lt; 99K</button><button type="button" data-store-action="sort-discount"><i class="fa-solid fa-gem"></i> Giảm Sâu Nhất</button><a href="#featuredSection">Gợi ý sỉ</a><a href="#categoryPanel">Danh mục</a><button type="button" data-store-action="favorites"><i class="fa-regular fa-heart"></i> Yêu thích</button><button type="button" data-store-action="track">Tra cứu đơn</button>
+        <a class="active" href="/">Trang chủ</a><a href="#catalog">Tất cả sản phẩm</a><a href="#categoryPanel">Danh mục</a><a href="#flashSaleSection" class="nav-flash-link"><i class="fa-solid fa-bolt"></i> Flash Sale</a><button type="button" data-store-action="sort-low">Giá tốt mỗi ngày</button><button type="button" data-store-action="sort-discount">Ưu đãi nổi bật</button><button type="button" data-store-action="favorites"><i class="fa-regular fa-heart"></i> Yêu thích</button><button type="button" data-store-action="track">Đơn hàng</button>
       </nav>
       <section class="market-hero" aria-label="Giới thiệu cửa hàng">
         <div class="market-main-banner">
           <div class="premium-orbit orbit-one" aria-hidden="true"></div><div class="premium-orbit orbit-two" aria-hidden="true"></div>
           <div class="market-banner-copy">
-            <div class="market-banner-label"><i class="fa-solid fa-bolt"></i> TỔNG KHO GIÁ SỈ HOÀNG MINH</div>
-            <span class="banner-overline">MUA LẺ 1 MÓN · TÍNH GIÁ SỈ TẬN GỐC</span>
-            <h1>Giá sỉ tận kho,<span><em>rẻ vô địch!</em></span></h1>
-            <p>Nhập trực tiếp tổng kho không qua trung gian — tiết kiệm tới 70% mỗi đơn hàng.</p>
-            <a href="#flashSaleSection" class="banner-shop-btn">Săn Giá Sỉ Ngay <i class="fa-solid fa-bolt"></i></a>
+            <div class="market-banner-label"><i class="fa-solid fa-bolt"></i> KHÁM PHÁ BESI MARKETPLACE</div>
+            <span class="banner-overline">MUA LẺ GIÁ TỐT · ĐA NGÀNH HÀNG</span>
+            <h1>Một nơi.<span><em>Ngàn lựa chọn.</em></span></h1>
+            <p>Công nghệ, thời trang, nhà cửa và mọi thứ bạn thích — khám phá một cách thông minh.</p>
+            <a href="#catalog" class="banner-shop-btn">Khám phá ngay <i class="fa-solid fa-arrow-right"></i></a>
             <div class="hero-si-pills"><span><i class="fa-solid fa-circle-check"></i> Lẻ = Giá sỉ</span><span><i class="fa-solid fa-fire"></i> Rẻ hơn tới 70%</span><span><i class="fa-solid fa-box-open"></i> Đồng kiểm COD</span></div>
-            <div class="banner-catalog-count">Kho sỉ sẵn có <strong id="heroTotalProd">—</strong> mặt hàng giá gốc tận xưởng</div>
+            <div class="banner-catalog-count">Khám phá <strong id="heroTotalProd">—</strong> sản phẩm trên BESI</div>
             <div class="banner-slides" aria-hidden="true"><span class="active"></span><span></span><span></span></div>
           </div>
           <div class="market-banner-art premium-gallery" aria-hidden="true">
@@ -109,14 +110,14 @@
             <div class="premium-product-shot primary has-photo"><span class="premium-shot-glow"></span><span class="premium-fallback-icon"><i class="fa-solid fa-headphones-simple"></i></span><img class="premium-product-image" id="heroProductImageA" src="/images/products/141008/photo_3.png" alt="" loading="eager"></div>
             <div class="premium-product-shot secondary"><span class="premium-fallback-icon"><i class="fa-solid fa-mobile-screen-button"></i></span><img class="premium-product-image" id="heroProductImageB" alt="" loading="eager"></div>
             <div class="premium-product-shot tertiary"><span class="premium-fallback-icon"><i class="fa-solid fa-gift"></i></span><img class="premium-product-image" id="heroProductImageC" alt="" loading="eager"></div>
-            <div class="premium-float-label"><i class="fa-solid fa-bolt"></i> GIÁ SỈ TỪ 1 MÓN · GIẢM TỚI 70%</div>
-            <div class="hero-si-stamp" aria-hidden="true"><strong>100%</strong><span>GIÁ SỈ KHO</span></div>
+            <div class="premium-float-label"><i class="fa-solid fa-bolt"></i> MUA LẺ · GIÁ TỐT</div>
+            <div class="hero-si-stamp" aria-hidden="true"><strong>BESI</strong><span>GIÁ TỐT</span></div>
           </div>
         </div>
         <div class="market-banner-side">
-          <button type="button" class="market-mini-promo promo-coral" data-store-action="flash-sale"><span>⚡ ĐANG NỔ DEAL KHUNG GIỜ</span><strong>Flash Sale Giá Sỉ</strong><small id="promoFlashCount">1.900+ deal giảm tới 70% <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-bolt" aria-hidden="true"></i></button>
-          <button type="button" class="market-mini-promo promo-apricot" data-store-action="under99"><span>🔥 XẢ KHO ĐỒNG GIÁ</span><strong>Săn Hàng Dưới 99K</strong><small id="promoUnder99Count">3.100+ món siêu rẻ <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i></button>
-          <button type="button" class="market-mini-promo promo-blue" data-store-action="sort-low"><span>💎 BẢNG GIÁ TỔNG KHO</span><strong>Xếp Giá Rẻ Nhất Lên</strong><small>Mua 1 món cũng giá sỉ <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-tags" aria-hidden="true"></i></button>
+          <button type="button" class="market-mini-promo promo-coral" data-store-action="flash-sale"><span>⚡ KHU ƯU ĐÃI</span><strong>Flash Sale</strong><small id="promoFlashCount">Xem các deal đang có <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-bolt" aria-hidden="true"></i></button>
+          <button type="button" class="market-mini-promo promo-apricot" data-store-action="under99"><span>🔥 BỘ SƯU TẬP GIÁ TỐT</span><strong>Dưới 99K</strong><small id="promoUnder99Count">Khám phá sản phẩm phù hợp <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i></button>
+          <button type="button" class="market-mini-promo promo-blue" data-store-action="sort-low"><span>💎 DÀNH CHO BẠN</span><strong>Giá tốt mỗi ngày</strong><small>Xem sản phẩm theo mức giá <i class="fa-solid fa-arrow-right"></i></small><i class="fa-solid fa-tags" aria-hidden="true"></i></button>
         </div>
       </section>
       <section class="market-shortcuts" aria-label="Tiện ích mua sắm">
@@ -135,21 +136,86 @@
   <section class="container si-guarantee-bar" id="siGuaranteeBar" aria-label="Cam kết giá sỉ tận kho">
     <div class="si-guarantee-item">
       <span class="si-guarantee-icon"><i class="fa-solid fa-tags"></i></span>
-      <div><strong>Mua 1 Món Cũng Giá Sỉ</strong><small>Giá xuất thẳng tổng kho, không qua trung gian</small></div>
+      <div><strong>Mua lẻ giá tốt</strong><small>Không cần mua số lượng lớn</small></div>
     </div>
     <div class="si-guarantee-item">
       <span class="si-guarantee-icon is-fire"><i class="fa-solid fa-fire-flame-curved"></i></span>
-      <div><strong>Rẻ Hơn Lẻ Tới 70%</strong><small>5.800+ sản phẩm giảm sâu thực tế mỗi ngày</small></div>
+      <div><strong>Khám phá đa ngành</strong><small>Từ công nghệ đến phong cách</small></div>
     </div>
     <div class="si-guarantee-item">
       <span class="si-guarantee-icon is-bolt"><i class="fa-solid fa-bolt"></i></span>
-      <div><strong>Quét Giá Sỉ Tự Động</strong><small>Đồng bộ tồn kho &amp; hạ giá Flash Sale mỗi 10 phút</small></div>
+      <div><strong>Kho ưu đãi</strong><small>Xem mức giá và chương trình đang áp dụng</small></div>
     </div>
     <div class="si-guarantee-item">
       <span class="si-guarantee-icon is-shield"><i class="fa-solid fa-shield-halved"></i></span>
-      <div><strong>Đồng Kiểm Mới Trả Tiền</strong><small>Mở hộp kiểm tra ưng ý mới thanh toán COD</small></div>
+      <div><strong>Hỗ trợ mua sắm</strong><small>Theo dõi đơn và liên hệ hỗ trợ thuận tiện</small></div>
     </div>
   </section>
+
+  <!-- Products Main Content -->
+  <main class="container main-layout" id="catalog">
+    
+    <!-- Brand Filter Bar -->
+    <div class="brand-bar" id="brandBar" aria-label="Lọc theo thương hiệu chính hãng">
+      <div class="brand-bar-header">
+        <span class="brand-bar-title"><i class="fa-solid fa-tags"></i> Khám phá theo thương hiệu</span>
+        <span class="brand-bar-sub">Baseus, Vention, Ulanzi, Mcdodo, USAMS, Mark Ryden, HiFuture, SoundPeats...</span>
+      </div>
+      <div class="brand-pills-wrap" id="brandPills">
+        <button type="button" class="brand-pill active" data-brand="all"><i class="fa-solid fa-border-all"></i> Tất cả thương hiệu</button>
+      </div>
+    </div>
+
+    <!-- Filter & Sort Bar -->
+    <div class="filter-bar">
+      <div class="filter-left">
+        <div class="premium-catalog-heading"><span class="premium-heading-kicker">KHÁM PHÁ KHÔNG GIỚI HẠN</span><h2 class="catalog-title" id="catalogTitle">Khám phá hàng trăm lựa chọn</h2></div>
+        <span class="catalog-badge" id="catalogCount">Đang tải...</span>
+      </div>
+
+      <div class="filter-right">
+        <!-- Price range pills -->
+        <div class="price-filters">
+          <button class="price-pill active" data-min="" data-max="">Tất cả giá</button>
+          <button class="price-pill pill-flash" data-flash="1" data-min="" data-max=""><i class="fa-solid fa-bolt"></i> Flash Sale</button>
+          <button class="price-pill pill-hot" data-min="0" data-max="99000"><i class="fa-solid fa-fire"></i> &lt; 99K</button>
+          <button class="price-pill" data-min="0" data-max="500000">&lt; 500K</button>
+          <button class="price-pill" data-min="500000" data-max="1000000">500K - 1TR</button>
+          <button class="price-pill" data-min="1000000" data-max="2000000">1TR - 2TR</button>
+          <button class="price-pill" data-min="2000000" data-max="">&gt; 2TR</button>
+        </div>
+
+        <!-- Sort dropdown -->
+        <div class="sort-wrapper">
+          <select id="sortSelect" class="custom-select">
+            <option value="default">Sắp xếp: Đề xuất giá tốt</option>
+            <option value="discount-desc">🔥 Ưu đãi nổi bật</option>
+            <option value="price-asc">Giá: Thấp đến Cao</option>
+            <option value="price-desc">Giá: Cao đến Thấp</option>
+            <option value="name-asc">Tên: A - Z</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Grid -->
+    <div class="product-grid" id="productGrid">
+      <!-- Injected via JS -->
+    </div>
+
+    <!-- Load More Action -->
+    <div class="flex-center" style="margin: 32px 0 16px 0;">
+      <button class="btn-load-more" id="btnLoadMore">
+        <i class="fa-solid fa-angles-down"></i> Xem thêm sản phẩm
+      </button>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-wrapper flex-center" id="pagination">
+      <!-- Injected via JS -->
+    </div>
+  </main>
+
 
   <!-- ⚡ FLASH SALE KHUNG GIỜ (Shopee × Taobao Style) -->
   <section class="container flash-sale-section" id="flashSaleSection" aria-label="Flash Sale Giá Sỉ" hidden>
@@ -184,70 +250,6 @@
     <div class="featured-header"><div class="premium-section-heading"><span class="si-section-kicker"><i class="fa-solid fa-gem"></i> TUYỂN CHỌN TỔNG KHO</span><h2>Top Deal Giá Sỉ Hôm Nay</h2></div><a href="#catalog">Xem toàn bộ kho <i class="fa-solid fa-chevron-right"></i></a></div>
     <div class="featured-grid" id="featuredProducts"></div>
   </section>
-
-  <!-- Products Main Content -->
-  <main class="container main-layout" id="catalog">
-    
-    <!-- Brand Filter Bar -->
-    <div class="brand-bar" id="brandBar" aria-label="Lọc theo thương hiệu chính hãng">
-      <div class="brand-bar-header">
-        <span class="brand-bar-title"><i class="fa-solid fa-gem"></i> Thương hiệu chính hãng</span>
-        <span class="brand-bar-sub">Baseus, Vention, Ulanzi, Mcdodo, USAMS, Mark Ryden, HiFuture, SoundPeats...</span>
-      </div>
-      <div class="brand-pills-wrap" id="brandPills">
-        <button type="button" class="brand-pill active" data-brand="all"><i class="fa-solid fa-border-all"></i> Tất cả thương hiệu</button>
-      </div>
-    </div>
-
-    <!-- Filter & Sort Bar -->
-    <div class="filter-bar">
-      <div class="filter-left">
-        <div class="premium-catalog-heading"><span class="premium-heading-kicker">TỔNG KHO GIÁ SỈ TRỰC TIẾP</span><h2 class="catalog-title" id="catalogTitle">Bảng Giá Sỉ Toàn Kho</h2></div>
-        <span class="catalog-badge" id="catalogCount">Đang tải...</span>
-      </div>
-
-      <div class="filter-right">
-        <!-- Price range pills -->
-        <div class="price-filters">
-          <button class="price-pill active" data-min="" data-max="">Tất cả giá</button>
-          <button class="price-pill pill-flash" data-flash="1" data-min="" data-max=""><i class="fa-solid fa-bolt"></i> Flash Sale</button>
-          <button class="price-pill pill-hot" data-min="0" data-max="99000"><i class="fa-solid fa-fire"></i> &lt; 99K</button>
-          <button class="price-pill" data-min="0" data-max="500000">&lt; 500K</button>
-          <button class="price-pill" data-min="500000" data-max="1000000">500K - 1TR</button>
-          <button class="price-pill" data-min="1000000" data-max="2000000">1TR - 2TR</button>
-          <button class="price-pill" data-min="2000000" data-max="">&gt; 2TR</button>
-        </div>
-
-        <!-- Sort dropdown -->
-        <div class="sort-wrapper">
-          <select id="sortSelect" class="custom-select">
-            <option value="default">Sắp xếp: Đề xuất giá tốt</option>
-            <option value="discount-desc">🔥 Giảm sâu nhất (Giá sỉ)</option>
-            <option value="price-asc">Giá: Thấp đến Cao</option>
-            <option value="price-desc">Giá: Cao đến Thấp</option>
-            <option value="name-asc">Tên: A - Z</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- Product Grid -->
-    <div class="product-grid" id="productGrid">
-      <!-- Injected via JS -->
-    </div>
-
-    <!-- Load More Action -->
-    <div class="flex-center" style="margin: 32px 0 16px 0;">
-      <button class="btn-load-more" id="btnLoadMore">
-        <i class="fa-solid fa-angles-down"></i> Xem thêm sản phẩm
-      </button>
-    </div>
-
-    <!-- Pagination -->
-    <div class="pagination-wrapper flex-center" id="pagination">
-      <!-- Injected via JS -->
-    </div>
-  </main>
 
   <section class="container market-footer-offers" aria-label="Hỗ trợ mua sắm">
     <div class="market-footer-offer offer-red"><span><i class="fa-solid fa-bolt-lightning"></i> CAM KẾT GIÁ SỈ 100%</span><strong>Mua lẻ 1 món vẫn tính giá sỉ tận gốc</strong><a href="#flashSaleSection">SĂN FLASH SALE <i class="fa-solid fa-arrow-right"></i></a></div>
@@ -555,11 +557,9 @@
   <footer class="main-footer">
     <div class="container footer-content flex-between">
       <div class="footer-brand">
-        <div class="brand-logo">
-          <img src="/favicon.svg" alt="" width="30" height="30" class="footer-logo-img"><span class="logo-bold">Hoàng Minh</span> <span class="logo-accent">Store</span>
-        </div>
-        <p>Cửa hàng phụ kiện, công nghệ và tiện ích Hoàng Minh. Chọn sản phẩm trực tuyến, kiểm tra hàng rồi thanh toán khi nhận (COD), tra cứu đơn hàng bằng mã đơn.</p>
-        <p class="copyright">© 2026 Hoàng Minh Store. All rights reserved.</p>
+        <div class="brand-logo"><span class="logo-bold">be</span><span class="logo-accent">si.</span></div>
+        <p>BESI — nền tảng khám phá sản phẩm đa ngành. Mua sắm tiện lợi, theo dõi đơn hàng và nhận hỗ trợ từ một nơi.</p>
+        <p class="copyright">© 2026 BESI. All rights reserved.</p>
       </div>
       <div class="footer-badges">
         <div class="badge-item"><i class="fa-solid fa-shield-check"></i> Thông tin theo từng sản phẩm</div>
