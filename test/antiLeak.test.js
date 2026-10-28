@@ -10,6 +10,20 @@ const SUPPLIER_RE = /drop\s*buy|r6[is]\.pen|\bfoxing\b|\bdalon\b|fs_program_code
 const ADMIN_GATED_FILES = new Set(['admin.html', 'admin.js', 'admin-portal.css', 'admin-theme.css']);
 
 describe('Chống lộ nguồn hàng & Bảo mật (Anti-Leak)', () => {
+
+  test('BESI design preview must be standalone and never expose product sources', () => {
+    const html = fs.readFileSync(path.join(ROOT, 'design-preview/index.html'), 'utf8');
+    assert.match(html, /<title>BESI/);
+    assert.match(html, /noindex,nofollow,noarchive/);
+    assert.doesNotMatch(html, SUPPLIER_RE);
+    assert.doesNotMatch(html, /cnlg|techmall|hstatic|foxing|source_url|supplier_cost|dealer_price|api_image/i);
+    assert.doesNotMatch(html, /(?:src|href)\s*=\s*["']https?:\/\//i, 'preview must not load remote assets');
+    assert.doesNotMatch(html, /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource/i,
+      'preview must never contact a source or production API');
+    assert.match(html, /Giá demo/);
+    assert.match(html, /disabled>Thanh toán/);
+  });
+
   test('Toàn bộ tài nguyên tĩnh công khai trong public/ tuyệt đối không chứa từ khoá nguồn cung cấp', () => {
     const pubDir = path.join(ROOT, 'public');
     const walk = dir => {
