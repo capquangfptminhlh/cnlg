@@ -40,7 +40,7 @@ jobs:
           node --check scripts/test-design-preview.js
           test "$(find .pages-preview-dist -type f | wc -l)" -eq 1
           ! grep -Eiq 'dropbuy|cnlg|wholesale_price|supplier_cost|source_url|api_image' .pages-preview-dist/index.html
-      - name: Headless Chrome QA: desktop, mobile, filters, cart, safety
+      - name: "Headless Chrome QA - desktop, mobile, filters, cart, safety"
         run: node scripts/test-design-preview.js
       - name: Save actual desktop and mobile screenshots
         if: always()
