@@ -360,3 +360,60 @@ body, button, input, select, textarea {
   letter-spacing: -0.015em !important;
   color: #0f172a !important;
 }
+
+
+/* Mobile header sizing: override global typography without widening the viewport. */
+@media (max-width: 700px) {
+  .main-header .container {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) 40px !important;
+    grid-template-areas: "logo cart" "search search" !important;
+    gap: 8px 10px !important;
+  }
+  .main-header .header-left,
+  .main-header .header-right,
+  .main-header .logo-stack,
+  .main-header .search-wrapper {
+    min-width: 0;
+  }
+  .main-header .brand-logo {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding-left: 0 !important;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .main-header .brand-logo::before { content: none !important; }
+  .main-header .logo-mark { flex: 0 0 34px; width: 34px; height: 34px; }
+  .main-header .logo-stack { flex: 1 1 auto; overflow: hidden; }
+  .main-header .logo-text {
+    font-size: clamp(14px, 4.2vw, 18px) !important;
+    line-height: 1.12 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .main-header .logo-sub {
+    display: block;
+    max-width: 100%;
+    font-size: clamp(8px, 2.2vw, 10px) !important;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .main-header .search-wrapper { width: 100%; max-width: 100%; margin: 0; }
+  .main-header .search-box { width: 100%; min-width: 0; max-width: 100%; }
+  .main-header .search-box input { min-width: 0; }
+  .main-header .header-right { justify-content: flex-end; }
+  #productGrid.product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  #productGrid .luxury-card,
+  #productGrid .card-details { min-width: 0; }
+  #productGrid .card-title { overflow-wrap: anywhere; }
+}
