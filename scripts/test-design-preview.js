@@ -55,8 +55,12 @@ const puppeteer=require('puppeteer-core');
       await page.click('#productGrid [data-add]');
       const count=await page.$eval('#cartCount',el=>Number(el.textContent.trim()));
       assert.ok(count>=1,'add-to-cart failed');
-      const checkout=await page.$eval('#drawer',el=>el.outerHTML);
-      assert.match(checkout,/disabled>Thanh toán/,'real checkout must be disabled in demo');
+      const checkout=await page.$eval('#drawer button[disabled]',el=>({
+        disabled:el.disabled,
+        label:el.textContent.trim()
+      }));
+      assert.equal(checkout.disabled,true,'real checkout must be disabled in demo');
+      assert.match(checkout.label,/Thanh toán/);
       assert.deepEqual(errors,[],'JS page errors: '+errors.join('; '));
       console.log(label+': PASS',JSON.stringify(initial));
       await page.close();
