@@ -135,3 +135,17 @@ test('Đơn hàng ảo nhảy liên tục + Bảo hành DropBuy chính xác + Hi
   assert.match(appJs, /is-urgent-buy/);
   assert.match(mHome, /fs-warranty-line/);
 });
+
+
+test('mobile header remains compact after global typography overrides',()=>{
+  const css=read('public/storefront-match.css');
+  const mobileStart=css.lastIndexOf('/* Mobile header sizing: override global typography');
+  assert.ok(mobileStart>css.lastIndexOf('font-size: 23px !important'),
+    'mobile logo size must override the final desktop font declaration');
+  const mobile=css.slice(mobileStart);
+  assert.match(mobile, /@media \(max-width: 700px\)/);
+  assert.match(mobile, /font-size: clamp\(14px, 4\.2vw, 18px\) !important/);
+  assert.match(mobile, /grid-template-columns: minmax\(0, 1fr\) 40px !important/);
+  assert.match(mobile, /#productGrid\.product-grid/);
+  assert.match(mobile, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+});
