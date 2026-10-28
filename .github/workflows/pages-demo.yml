@@ -1,19 +1,16 @@
-name: Storefront Demo (Cloudflare Pages)
+name: BESI Marketplace Safe Demo (Cloudflare Pages)
 
 on:
   push:
     branches: [main]
     paths:
-      - "public/**"
-      - "scripts/pages-preview.js"
-      - "scripts/build-pages-preview.js"
-      - "scripts/test-pages-preview.js"
-      - "scripts/cache-preview-images.js"
+      - "design-preview/**"
+      - "scripts/test-design-preview.js"
       - ".github/workflows/pages-demo.yml"
   workflow_dispatch:
 
 concurrency:
-  group: "storefront-demo"
+  group: "besi-marketplace-demo"
   cancel-in-progress: true
 
 permissions:
@@ -21,44 +18,41 @@ permissions:
 
 jobs:
   build:
-    name: Package safe static storefront
+    name: Build and QA isolated storefront demo
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     env:
-      HAS_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+      HAS_CF_DEPLOY_CREDS: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install browser test dependencies
+      - name: Install headless browser test library
         run: npm ci --ignore-scripts
-      - name: Verify existing storefront
+      - name: Verify actual BESI storefront scripts
+        run: npm run test:ui
+      - name: Build isolated demo from synthetic catalog ONLY
         run: |
-          npm run test:ui
-          node --check scripts/pages-preview.js
-          node --check scripts/build-pages-preview.js
-      - name: Build Pages artifact (synthetic catalog only)
-        run: |
-          node scripts/build-pages-preview.js
-          for file in .pages-preview-dist/*.js; do node --check "$file"; done
-      - name: Cache safe public thumbnails
-        run: node scripts/cache-preview-images.js
-        env:
-          CATALOG_IMAGE_LIMIT: "1321"
-      - name: Run headless Chrome smoke tests
-        run: node scripts/test-pages-preview.js
-      - name: Upload desktop and mobile screenshots
-        uses: actions/upload-artifact@v4
+          set -euo pipefail
+          mkdir -p .pages-preview-dist
+          cp design-preview/index.html .pages-preview-dist/index.html
+          node --check scripts/test-design-preview.js
+          test "$(find .pages-preview-dist -type f | wc -l)" -eq 1
+          ! grep -Eiq 'dropbuy|cnlg|wholesale_price|supplier_cost|source_url|api_image' .pages-preview-dist/index.html
+      - name: Headless Chrome QA: desktop, mobile, filters, cart, safety
+        run: node scripts/test-design-preview.js
+      - name: Save actual desktop and mobile screenshots
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: storefront-demo-screenshots
+          name: besi-marketplace-demo-screenshots
           path: preview-test-artifacts
           if-no-files-found: warn
-      # Bản trưng bày công khai trên Cloudflare Pages (repo vẫn riêng tư). Cần 2 secret của repo:
-      # CLOUDFLARE_API_TOKEN (quyền "Cloudflare Pages: Edit") và CLOUDFLARE_ACCOUNT_ID. Chưa có thì bỏ qua bước này.
-      - name: Deploy demo to Cloudflare Pages
-        if: env.HAS_CF_TOKEN == 'true' && github.ref == 'refs/heads/main'
+      # Deploy ONLY the single-file demo. Never deploy the private source catalog,
+      # admin screens, credentials, or production storefront/server code.
+      - name: Publish isolated demo to Cloudflare Pages
+        if: env.HAS_CF_DEPLOY_CREDS == 'true' && github.ref == 'refs/heads/main'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
