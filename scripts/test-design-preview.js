@@ -52,7 +52,9 @@ const puppeteer=require('puppeteer-core');
       await page.click('#searchForm button[type=submit]');
       await page.waitForFunction(()=>document.querySelectorAll('#productGrid .product-card').length>0);
       await page.click('#resetCatalog');
+      await page.$eval('#productGrid [data-add]',el=>el.scrollIntoView({block:'center',inline:'nearest'}));
       await page.click('#productGrid [data-add]');
+      await page.waitForFunction(()=>Number(document.querySelector('#cartCount')?.textContent||0)>=1,{timeout:5000});
       const count=await page.$eval('#cartCount',el=>Number(el.textContent.trim()));
       assert.ok(count>=1,'add-to-cart failed');
       const checkout=await page.$eval('#drawer button[disabled]',el=>({
