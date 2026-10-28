@@ -61,14 +61,31 @@
         ${kids.map(k => `<button type="button" class="cat-sub ${String(k.id) === String(cat.id) ? 'active' : ''}" data-cat-go="${k.id}">${escH(k.name)} <small>${fmt(k.product_count)}</small></button>`).join('')}
       </div>` : ''}`;
     head.hidden = false;
-    head.querySelector('.cat-sub.active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    const subs = head.querySelector('.cat-subs');
+    const activeSub = subs?.querySelector('.cat-sub.active');
+    if (subs && activeSub) {
+      subs.scrollLeft = activeSub.offsetLeft - (subs.clientWidth - activeSub.clientWidth) / 2;
+    }
   }
 
+  let lastRenderedCatId = null;
   function syncView() {
     const id = String(state.currentCategory);
     const inView = id !== 'all' && !!catById(id) && !state.searchQuery;
     document.body.classList.toggle('is-category-view', inView);
-    if (inView) renderHead(); else head.hidden = true;
+    if (inView) {
+      if (lastRenderedCatId !== id || !head.children.length) {
+        lastRenderedCatId = id;
+        renderHead();
+      } else {
+        const pCount = head.querySelector('.cat-view-title p');
+        const total = state.totalProducts ?? state.products.length;
+        if (pCount) pCount.innerText = `${fmt(total)} sản phẩm${state.minPrice || state.maxPrice ? ' (đang lọc theo giá)' : ''}`;
+      }
+    } else {
+      head.hidden = true;
+      lastRenderedCatId = null;
+    }
     // Hết mục
     const loaded = state.products.length;
     const total = state.totalProducts ?? loaded;

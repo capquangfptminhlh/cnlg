@@ -310,8 +310,8 @@ function renderProducts(appendFrom = null) {
     return;
   }
 
-  // Tải thêm (cuộn vô hạn): chỉ chèn thẻ mới, không vẽ lại hàng nghìn thẻ đã có
-  if (appendFrom != null && appendFrom > 0 && productGrid.children.length === appendFrom) {
+  // Tải thêm (cuộn vô hạn): chỉ chèn thẻ mới, không vẽ lại các thẻ đã có để tránh giật scroll
+  if (appendFrom != null && appendFrom > 0 && appendFrom < state.products.length && productGrid.children.length > 0) {
     productGrid.insertAdjacentHTML('beforeend', state.products.slice(appendFrom).map(productCardHtml).join(''));
     return;
   }

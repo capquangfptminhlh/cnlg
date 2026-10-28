@@ -69,9 +69,16 @@
     const target = document.getElementById('catalog');
     if (!target) return;
     let done = false;
-    const go = () => { if (done) return; done = true; target.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    let fallbackTimer = null;
+    const go = () => {
+      if (done) return;
+      done = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (typeof state !== 'undefined' && state.loadingMore) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
     window.addEventListener('storefront:products', () => setTimeout(go, 50), { once: true });
-    setTimeout(go, 2500); // dự phòng khi mạng chậm / lỗi
+    fallbackTimer = setTimeout(go, 2500); // dự phòng khi mạng chậm / lỗi
   }
 
   function choose(id) {
