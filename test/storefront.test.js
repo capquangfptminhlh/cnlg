@@ -149,3 +149,27 @@ test('mobile header remains compact after global typography overrides',()=>{
   assert.match(mobile, /#productGrid\.product-grid/);
   assert.match(mobile, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 });
+
+
+test('approved BESI design is product-first and responsive',()=>{
+  const css=read('public/besi-marketplace-2026.css');
+  const index=read('public/index.html');
+  assert.match(index, /<title>BESI/);
+  assert.match(index, /Be\+Vietnam\+Pro:wght@400;500;600;700;800;900/);
+  assert.match(index, /class="logo-mark-letter">b\.<\/span>/);
+  assert.match(index, /href="\/besi-logo\.svg"/);
+  assert.match(index, /href="\/besi-marketplace-2026\.css"/);
+  assert.ok(index.indexOf('/besi-marketplace-2026.css')>index.indexOf('/flash-sale.css'),
+    'final brand layer must load after previous CSS layers');
+  assert.ok(index.indexOf('id="catalog"')<index.indexOf('id="flashSaleSection"'),
+    'show full product catalog ahead of campaigns');
+  for (const id of ['searchInput','categoriesContainer','productGrid','sortSelect','btnLoadMore','openCartBtn','checkoutForm']) {
+    assert.match(index,new RegExp('id="'+id+'"'));
+  }
+  assert.match(css, /#productGrid\.product-grid\s*\{\s*grid-template-columns:\s*repeat\(6,minmax\(0,1fr\)\)/);
+  assert.match(css, /@media \(max-width: 700px\)/);
+  assert.match(css, /grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)\s*!important/);
+  assert.match(css, /font-family:\s*var\(--font\)\s*!important/);
+  assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
+  assert.doesNotMatch(css,/drop\s*buy|source_url|supplier_cost|wholesale_price|api_image/i);
+});
