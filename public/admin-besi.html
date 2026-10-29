@@ -20,6 +20,7 @@
     <a href="#feed"><span>⇣</span> Nhập bảng hàng</a>
     <a href="#catalog"><span>▤</span> Danh mục hợp nhất</a>
     <a href="#pricing"><span>％</span> Chính sách giá</a>
+    <a href="#specCoverage"><span>⌕</span> Kiểm tra thông số thiếu</a>
     <a href="#allocation"><span>↗</span> Phân đơn đa kho</a>
     <div class="aside-bottom"><a href="/admin.html">← Quay về quản trị</a><small>Chỉ quản trị viên truy cập · Không tự gửi đơn</small></div>
   </aside>
@@ -73,6 +74,18 @@
         <div class="section-head"><div><small>04 / MASTER CATALOG</small><h2>Danh mục sản phẩm BESI</h2></div><span class="tag">Không lộ nguồn</span></div>
         <p class="hint">Một sản phẩm chung có thể lấy từ nhiều tổng kho. Mã BESI được tạo riêng, không hiển thị mã nguồn hay giá mua.</p>
         <div class="table-wrap"><table><thead><tr><th>Mã BESI</th><th>Sản phẩm</th><th>Giá lẻ</th><th>Từ 5</th><th>Từ 20</th></tr></thead><tbody id="catalogRows"><tr><td colspan="5">Đang tải…</td></tr></tbody></table></div>
+      </section>
+      <section class="panel span2" id="specCoverage">
+        <div class="section-head"><div><small>05 / SEARCH QUALITY</small><h2>Hàng thiếu thông số cần chuẩn hóa</h2></div><span class="tag warning">Báo cáo từ danh mục thật</span></div>
+        <p class="hint">Sản phẩm vẫn có thể hiện trong phần “Có thể phù hợp” trên BESI. Danh sách dưới đây giúp kiểm tra mô tả đầu cáp, chiều dài, công suất, màu để cải thiện độ chính xác. Không thay đổi hàng nguồn.</p>
+        <div class="stats">
+          <div class="stat"><small>Sản phẩm cáp tìm thấy</small><strong id="specCableTotal">–</strong></div>
+          <div class="stat"><small>Biến thể đã nhận diện đầu cáp</small><strong id="specIndexedTotal">–</strong></div>
+          <div class="stat"><small>SP cần kiểm tra thông số</small><strong id="specCoverageCount">–</strong></div>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Mã BESI</th><th>Tên sản phẩm</th><th>Lý do cần kiểm tra</th></tr></thead><tbody id="specCoverageRows"><tr><td colspan="3">Đang tải báo cáo…</td></tr></tbody></table></div>
+        <div class="besi-spec-review-actions"><button type="button" id="besiSpecReviewMore" class="secondary" hidden>Xem thêm 50 mã cần chuẩn hóa</button></div>
+        <p class="hint">Duyệt từng trang 50 sản phẩm để kiểm tra đủ toàn bộ mã cần chuẩn hóa trong danh mục.</p>
       </section>
       <section class="panel span2" id="allocation">
         <div class="section-head"><div><small>05 / SMART SOURCING</small><h2>Lập phương án chia đơn đa tổng kho</h2></div><span class="tag warning">DRAFT · Chưa đặt hàng thật</span></div>

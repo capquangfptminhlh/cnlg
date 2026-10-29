@@ -86,3 +86,21 @@
  .besi-spec-product-buy{font-size:10px}
 }
 @media(prefers-reduced-motion:reduce){.besi-spec-options span,.besi-spec-open-text i{transition:none}}
+
+/* Coverage-aware results: candidate products are visible, never mislabelled confirmed. */
+.besi-spec-possible{margin-top:21px;padding:17px 0 2px;border-top:1px solid #e8edf3}
+.besi-spec-possible[hidden]{display:none!important}
+.besi-spec-possible-heading{margin-bottom:14px}
+.besi-spec-possible-heading strong{font-size:15px;font-weight:800;color:#29354c}
+.besi-spec-possible-heading strong i{color:#c47a2f;margin-right:6px}
+.besi-spec-possible-heading p{font-size:11px;color:#7b8798;margin:5px 0}
+.besi-spec-product-uncertain{border-style:dashed!important;border-color:#f0d7ba!important}
+.besi-spec-uncertain-label{display:block;background:#fff7ed;border-radius:6px;padding:5px 7px;
+  font-size:9.5px;line-height:1.35;color:#9d5a1f;font-weight:700}
+.besi-spec-possible .besi-spec-product-buy{background:#fff8ed;border-color:#f6ddba;color:#a35b1f}
+.besi-spec-possible .besi-spec-product-buy:hover{background:#f6e7d0;color:#713d17}
+@media(max-width:700px){
+  .besi-spec-possible{margin-top:14px;padding-top:14px}
+  .besi-spec-possible-heading strong{font-size:13px}
+  .besi-spec-uncertain-label{font-size:9px}
+}

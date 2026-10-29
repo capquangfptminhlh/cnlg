@@ -551,21 +551,45 @@ function specificationIndex(){
 app.get('/api/products/specs', rateLimit('besi-specs', 60e3, 60), (req,res)=>{
   try{
     const found=besiSpecs.searchIndex(specificationIndex(),req.query);
-    const data=found.matched.map(({product,variant})=>{
+    const project=(row,reasons=[])=>{
+      const {product,variant}=row;
       const pub=publicProduct(product);
       const matched=variant?(pub.variants||[]).find(v=>String(v.id)===String(variant.id)):null;
       return {...pub,matched_variant:matched?{
         id:matched.id,name:matched.name,price:matched.price,
         image:matched.image||null,in_stock:matched.in_stock
-      }:null};
-    });
+      }:null,verified_spec:reasons.length===0,
+        missing_specs:reasons};
+    };
+    const data=found.matched.map(row=>project(row));
+    const possible=found.possible.map(({row,reasons})=>project(row,reasons));
     res.set('Cache-Control','public, max-age=20');
     return res.json({success:true,total:found.total,page:found.page,
-      totalPages:found.totalPages,data});
+      totalPages:found.totalPages,data,
+      possibleTotal:found.possibleTotal,possiblePage:found.possiblePage,
+      possiblePages:found.possiblePages,possible});
   }catch(e){
     const status=e.status===400?400:500;
     return res.status(status).json({success:false,
       error:status===400?'Bộ lọc thông số không hợp lệ':'Không thể tìm kiếm lúc này'});
+  }
+});
+
+/** Admin coverage dashboard: which source names require manual spec verification?
+ * No supplier metadata or internal source prices are returned.
+ */
+app.get('/api/admin/besi/spec-coverage', requireAdmin, (req,res)=>{
+  try{
+    const summary=besiSpecs.coverage(specificationIndex(),{page:req.query.page||1,limit:50});
+    res.set('Cache-Control','no-store').json({success:true,
+      cableProducts:summary.cableProducts,indexedVariations:summary.indexedVariations,
+      needsReview:summary.reviewCount,page:summary.page,totalPages:summary.totalPages,
+      review:summary.review.map(({product,reason})=>{
+        const pub=publicProduct(product);
+        return {id:pub.id,name:pub.name,reason};
+      })});
+  }catch(_){
+    res.status(500).json({success:false,error:'Không thể tạo báo cáo thông số'});
   }
 });
 

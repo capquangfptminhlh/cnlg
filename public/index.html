@@ -208,7 +208,7 @@
             <button type="button" id="besiApplySpecs" class="besi-spec-apply"><i class="fa-solid fa-magnifying-glass"></i> Tìm sản phẩm phù hợp</button>
             <button type="button" id="besiResetSpecs" class="besi-spec-reset"><i class="fa-solid fa-rotate-left"></i> Bỏ lọc</button>
           </div>
-          <p class="besi-spec-hint">Chỉ hiển thị thông số có trong tên hoặc phân loại hàng thực tế. Giá và tồn kho được lấy từ danh mục BESI, không tự tạo sản phẩm.</p>
+          <p class="besi-spec-hint">Kết quả đúng thông số được tách riêng. Những mã thiếu thông số sẽ nằm trong mục “Có thể phù hợp” để khách vẫn tìm thấy, nhưng cần xác minh trước khi chọn mua.</p>
         </div>
       </details>
     </section>
@@ -219,6 +219,14 @@
       </div>
       <div class="product-grid besi-spec-grid" id="besiSpecGrid"></div>
       <div class="besi-spec-load"><button type="button" id="besiSpecLoadMore" class="btn-load-more" hidden>Xem thêm kết quả</button></div>
+      <aside class="besi-spec-possible" id="besiSpecPossible" hidden aria-label="Sản phẩm chưa đủ thông số">
+        <div class="besi-spec-possible-heading">
+          <div><strong><i class="fa-solid fa-circle-question"></i> Có thể phù hợp — cần kiểm tra phân loại</strong>
+          <p id="besiSpecPossibleStatus">Một số mã hàng chưa ghi đủ chiều dài, công suất hoặc đầu cáp. BESI không ẩn các mã này.</p></div>
+        </div>
+        <div class="product-grid besi-spec-grid" id="besiSpecPossibleGrid"></div>
+        <div class="besi-spec-load"><button type="button" id="besiSpecPossibleMore" class="besi-spec-reset" hidden>Xem thêm sản phẩm chưa rõ thông số</button></div>
+      </aside>
     </section>
 
     <!-- Brand Filter Bar -->
