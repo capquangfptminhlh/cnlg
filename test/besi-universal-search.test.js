@@ -1,0 +1,131 @@
+'use strict';
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const discover=require('../services/besi/universalDiscovery');
+const root=path.resolve(__dirname,'..');
+const load=path=>fs.readFileSync(require('node:path').join(root,path),'utf8');
+const cats=[
+ {id:10,name:'Điện thoại và phụ kiện',parent_id:null},
+ {id:11,name:'Ốp lưng',parent_id:10},
+ {id:20,name:'Thời trang',parent_id:null},
+ {id:21,name:'Quần áo',parent_id:20},
+ {id:22,name:'Giày dép',parent_id:20},
+ {id:30,name:'Gia dụng',parent_id:null},
+ {id:31,name:'Dụng cụ nhà bếp',parent_id:30}
+];
+const p=(id,name,category_id,extra={})=>({id,name,category_id,price:120000,in_stock:true,...extra});
+const fixture=[
+ p(1,'Ốp lưng iPhone 16 Pro Max silicone đen',11,{brand:'BESI',price:39000}),
+ p(2,'Áo thun cotton size XL màu trắng',21,{brand:'Áo Việt',price:149000}),
+ p(3,'Giày thể thao Nike size 42 màu đen',22,{brand:'Nike',price:490000}),
+ p(4,'Bình giữ nhiệt inox 500ml xanh',31,{brand:'LocknLock',price:169000}),
+ p(5,'Sạc dự phòng 20000mAh 30W',10,{brand:'Anker',price:279000}),
+ p(6,'Dây cáp USB-C to Lightning 2m 20W',10,{price:45000}),
+ p(7,'Ốp lưng iPhone 16 có nhiều mẫu ốp màu',11,{price:29000,variant_count:4}),
+ p(8,'Áo polo cotton',21,{price:199000,variants:[
+   {id:'M',name:'Size M đen',price:199000,in_stock:true},
+   {id:'XL',name:'Size XL đen',price:219000,in_stock:true},
+   {id:'XXL',name:'Size XXL đen',price:239000,in_stock:false}
+ ]}),
+ p(9,'Áo sơ mi cotton màu trắng',21,{price:99000}),
+ p(10,'Giày chạy bộ size 43',22,{price:590000,in_stock:false}),
+ p(11,'Túi đeo chéo chất liệu da thật',20,{price:320000})
+];
+const index=()=>discover.compile(fixture,cats);
+test('universal index covers unrelated industries, nested categories and actual category counts',()=>{
+ const idx=index(),out=discover.facetOptions(idx);
+ assert.equal(out.total,10,'out-of-stock product not counted');
+ assert.ok(out.categories.some(x=>x.id===20&&x.count>=4));
+ assert.ok(out.categories.some(x=>x.id===21&&x.count===3));
+ assert.ok(out.categories.some(x=>x.id===31&&x.name==='Dụng cụ nhà bếp'));
+ assert.ok(out.brands.some(x=>x.value==='Nike'));
+ assert.equal(discover.search(idx,{category:20}).total,4);
+ assert.equal(discover.search(idx,{category:21}).total,3);
+ assert.equal(discover.search(idx,{category:31}).total,1);
+});
+test('full industry product name and category search is accent-insensitive, paginated',()=>{
+ const idx=index();
+ assert.equal(discover.search(idx,{q:'ao cotton'}).total,3);
+ assert.equal(discover.search(idx,{q:'giay size 42'}).total,1);
+ assert.equal(discover.search(idx,{q:'binh giu nhiet'}).total,1);
+ assert.equal(discover.search(idx,{q:'dien thoai',category:31}).total,0);
+ const page1=discover.search(idx,{q:'cotton',page:1,limit:2});
+ const page2=discover.search(idx,{q:'cotton',page:2,limit:2});
+ assert.equal(page1.total,4);
+ assert.equal(page1.matched.length,2);
+ assert.equal(page2.matched.length,2);
+ assert.equal(new Set([...page1.matched,...page2.matched].map(x=>x.product.id)).size,4);
+});
+test('real source-derived size, material, model, price and brand facets',()=>{
+ const idx=index();
+ assert.equal(discover.search(idx,{category:21,attr:'size',value:'XL'}).total,2);
+ assert.equal(discover.search(idx,{category:21,attr:'size',value:'XXL'}).total,0);
+ assert.equal(discover.search(idx,{category:21,attr:'material',value:'cotton'}).total,3);
+ assert.equal(discover.search(idx,{category:22,attr:'size',value:'42'}).total,1);
+ assert.equal(discover.search(idx,{attr:'model',value:'iphone-16-pro-max'}).total,1);
+ assert.equal(discover.search(idx,{brand:'Nike',minPrice:400000,maxPrice:500000}).total,1);
+ assert.equal(discover.search(idx,{brand:'Nike',maxPrice:100000}).total,0);
+ const options=discover.facetOptions(idx,{category:21});
+ assert.ok(options.facets.size.some(x=>x.value==='XL'));
+ assert.ok(options.facets.material.some(x=>x.value==='cotton'));
+ assert.ok(options.facets.color.some(x=>x.value==='trang'));
+ assert.ok(!options.facets.size.some(x=>x.value==='42'));
+});
+test('incomplete source variants show as possible, never confirmed and never fake a price',()=>{
+ const idx=index();
+ const selected=discover.search(idx,{category:11,attr:'color',value:'den'});
+ assert.equal(selected.total,1);
+ assert.equal(selected.possibleTotal,1);
+ assert.equal(selected.matched[0].product.id,1);
+ assert.equal(selected.possible[0].row.product.id,7);
+ const xl=discover.search(idx,{category:21,attr:'size',value:'XL'});
+ assert.ok(xl.matched.some(x=>x.variant?.id==='XL'&&x.variant.price===219000));
+ assert.ok(!xl.matched.some(x=>x.variant?.id==='XXL'));
+});
+test('dynamic facets include phone specs and cables but do not infer unrelated size',()=>{
+ const parsed=discover.parseAttrs('Dây cáp USB-C to Lightning 2m 20W');
+ assert.equal(parsed.length[0],'2');
+ assert.equal(parsed.connector[0],'c-lightning');
+ assert.equal(parsed.watt[0],'20');
+ assert.deepEqual(discover.sizes('Cáp Lightning chuẩn 2m'),[]);
+ const wardrobe=discover.parseAttrs('Giày size 42 chất liệu da thật','Giày dép');
+ assert.ok(wardrobe.size.includes('42'));
+ assert.ok(wardrobe.material.includes('leather'));
+ const idx=index();
+ assert.ok(discover.facetOptions(idx).facets.capacity.some(x=>x.value==='20000'));
+});
+test('rejects unknown categories, forged attrs, huge query, bad prices and broken pagination',()=>{
+ const idx=index();
+ for(const q of [{category:999},{attr:'supplier_cost',value:'1000'},
+  {attr:'size',value:'XSSSSSS'},{attr:'size',value:'../etc'},
+  {minPrice:-100},{minPrice:100000,maxPrice:10000},{maxPrice:1e12},
+  {page:0},{possiblePage:-1},{limit:999},{sort:'random'},
+  {q:'a'.repeat(200)}]){
+  assert.throws(()=>discover.search(idx,q),e=>e.status===400,JSON.stringify(q));
+ }
+});
+test('server performs public-only DTO projection and UI uses non-HTML DOM for source values',()=>{
+ const server=load('server.js'),html=load('public/index.html'),
+  js=load('public/besi-universal.js'),css=load('public/besi-universal.css');
+ assert.match(server,/app\.get\('\/api\/products\/discover\/options'/);
+ assert.match(server,/app\.get\('\/api\/products\/discover'/);
+ assert.match(server,/besiUniversal\.compile\(cachedSellable,storeCatalog\.getCategories\(\)\)/);
+ assert.match(server,/const pub=publicProduct\(row\.product\)/);
+ assert.match(server,/cachedUniversalDiscovery = null/);
+ assert.match(html,/id="besiUniversalFinder"/);
+ assert.match(html,/id="besiUniversalForm"/);
+ assert.match(html,/id="besiUniversalAttribute"/);
+ assert.match(html,/id="besiUniversalPossibleGrid"/);
+ assert.match(html,/\/besi-universal\.js/);
+ assert.match(html,/\/besi-universal\.css/);
+ assert.doesNotThrow(()=>new vm.Script(js));
+ assert.match(js,/\/api\/products\/discover\/options\?/);
+ assert.match(js,/\/api\/products\/discover\?/);
+ assert.match(js,/document\.createDocumentFragment\(\)/);
+ assert.doesNotMatch(js,/innerHTML|supplier_cost|source_url|dealer_price|wholesale_price/i);
+ assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
+ const cable=load('public/besi-spec-filters.js'),special=load('public/besi-category-facets.js');
+ assert.match(cable,/besi:universal-filters-start/);
+ assert.match(special,/besi:universal-filters-start/);
+});
