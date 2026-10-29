@@ -74,11 +74,11 @@ function connectorHints(text){
   if(!found.size)for(const type of CONNECTORS)found.add(type);
   return found;
 }
-function buildIndex(products){
+function buildIndex(products,reviewedRecords={}){
   const buckets=new Map([...CONNECTORS].map(type=>[type,[]]));
   const uncertain=new Map([...CONNECTORS].map(type=>[type,[]]));
   const review=[];
-  let indexed=0,cableProducts=0;
+  let indexed=0,cableProducts=0,reviewedVariations=0;
   for(const p of products||[]){
     if(!p||p.in_stock===false||!Number.isSafeInteger(Number(p.id))||!(Number(p.price)>0))continue;
     const title=norm(p.name);
@@ -97,10 +97,22 @@ function buildIndex(products){
     for(const v of vars){
       if(v&&(v.in_stock===false||!(Number(v.price)>0)))continue;
       const variantText=norm(v?.name),combined=title+' '+variantText;
-      const type=connectorOf(combined);
-      const length=lengthOf(variantText)||lengthOf(title);
-      const watt=powerOf(variantText)||powerOf(title);
-      const color=colorOf(variantText)||colorOf(title);
+      // Overrides apply only to the exact live product/variation ID. A
+      // product-level review never silently blesses all choices on a listing.
+      const key=String(p.id)+':'+String(v?.id||'');
+      const override=reviewedRecords[key];
+      const isVerified=override?.verified===true
+        && Number(override.productId)===Number(p.id)
+        && String(override.variantId||'')===String(v?.id||'')
+        && !needsVariantDetail;
+      const type=isVerified?override.connector:connectorOf(combined);
+      const length=isVerified?(override.length??(lengthOf(variantText)||lengthOf(title))):
+        (lengthOf(variantText)||lengthOf(title));
+      const watt=isVerified?(override.power??(powerOf(variantText)||powerOf(title))):
+        (powerOf(variantText)||powerOf(title));
+      const color=isVerified?(override.color||colorOf(variantText)||colorOf(title)):
+        (colorOf(variantText)||colorOf(title));
+      if(isVerified)reviewedVariations++;
       const row={product:p,variant:v||null,length,watt,color,type,
         unverifiedReason:needsVariantDetail?'Chưa xác minh từng phân loại và giá':null};
       if(type&&!needsVariantDetail){
@@ -123,7 +135,7 @@ function buildIndex(products){
       review.push({product:p,reason:!classified?'unknown_connector':'missing_spec'});
     }
   }
-  return {buckets,uncertain,review,indexed,cableProducts,productCount:products?.length||0};
+  return {buckets,uncertain,review,indexed,cableProducts,reviewedVariations,productCount:products?.length||0};
 }
 function validate(query={}){
   const type=String(query.type??'c-lightning');
@@ -182,7 +194,7 @@ function coverage(index,{page=1,limit=50}={}){
   if(!Number.isSafeInteger(p)||p<1||p>10000
     ||!Number.isSafeInteger(l)||l<1||l>100)throw Object.assign(
       new Error('Trang báo cáo không hợp lệ'),{status:400});
-  return {cableProducts:index.cableProducts,indexedVariations:index.indexed,
+  return {cableProducts:index.cableProducts,indexedVariations:index.indexed,reviewedVariations:index.reviewedVariations||0,
     reviewCount:index.review.length,page:p,
     totalPages:Math.ceil(index.review.length/l)||1,
     review:index.review.slice((p-1)*l,p*l)};

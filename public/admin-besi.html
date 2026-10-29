@@ -83,8 +83,45 @@
           <div class="stat"><small>Biến thể đã nhận diện đầu cáp</small><strong id="specIndexedTotal">–</strong></div>
           <div class="stat"><small>SP cần kiểm tra thông số</small><strong id="specCoverageCount">–</strong></div>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Mã BESI</th><th>Tên sản phẩm</th><th>Lý do cần kiểm tra</th></tr></thead><tbody id="specCoverageRows"><tr><td colspan="3">Đang tải báo cáo…</td></tr></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Mã BESI</th><th>Tên sản phẩm</th><th>Lý do cần kiểm tra</th><th>Kiểm duyệt</th></tr></thead><tbody id="specCoverageRows"><tr><td colspan="4">Đang tải báo cáo…</td></tr></tbody></table></div>
         <div class="besi-spec-review-actions"><button type="button" id="besiSpecReviewMore" class="secondary" hidden>Xem thêm 50 mã cần chuẩn hóa</button></div>
+        <div class="besi-spec-editor" id="besiSpecEditor" hidden>
+          <div class="section-head">
+            <div><small>KIỂM DUYỆT THÔNG SỐ</small><h2>Chuẩn hóa sản phẩm: <span id="besiReviewTitle"></span></h2></div>
+            <button type="button" class="secondary" id="besiReviewClose">Đóng</button>
+          </div>
+          <p class="hint">BESI chỉ gợi ý dựa trên tên hàng; anh cần xác nhận đầu cáp và thông số thực tế. Nếu có nhiều phân loại, phải duyệt riêng từng phân loại. Không thay đổi giá và tồn kho.</p>
+          <form id="besiReviewForm" class="fields">
+            <label>Mã sản phẩm <input id="besiReviewId" type="number" min="1" readonly required></label>
+            <label>Phân loại cần duyệt <select id="besiReviewVariant" required></select></label>
+            <label>Đầu cáp (bắt buộc xác minh)
+              <select id="besiReviewConnector" required>
+                <option value="">Chọn sau khi kiểm tra</option>
+                <option value="c-lightning">USB-C → Lightning</option>
+                <option value="a-lightning">USB-A → Lightning</option>
+                <option value="c-c">USB-C → USB-C</option>
+                <option value="a-c">USB-A → USB-C</option>
+                <option value="lightning">Lightning (chưa rõ đầu nguồn)</option>
+              </select>
+            </label>
+            <label>Chiều dài <select id="besiReviewLength">
+              <option value="">Chưa xác định</option><option value="0.5">0,5m</option><option value="1">1m</option>
+              <option value="1.2">1,2m</option><option value="1.5">1,5m</option><option value="2">2m</option><option value="3">3m</option>
+            </select></label>
+            <label>Công suất <select id="besiReviewPower">
+              <option value="">Chưa xác định</option><option value="20">20W</option><option value="30">30W</option>
+              <option value="60">60W</option><option value="100">100W</option>
+            </select></label>
+            <label>Màu sắc <select id="besiReviewColor">
+              <option value="">Chưa xác định</option><option value="den">Đen</option><option value="trang">Trắng</option><option value="xanh">Xanh</option>
+            </select></label>
+            <label class="besi-review-confirm"><input type="checkbox" id="besiReviewConfirm" required> Tôi đã kiểm tra thông số thực tế của đúng phân loại này, không chỉ dựa trên gợi ý.</label>
+            <button type="button" class="secondary" id="besiReviewAskAI"><i class="fa-solid fa-wand-magic-sparkles"></i> AI gợi ý (nội bộ)</button>
+            <button type="submit" class="primary">Lưu thông số đã xác minh</button>
+            <button type="button" class="secondary" id="besiReviewUndo">Hủy xác minh đã lưu</button>
+          </form>
+          <p class="hint" id="besiReviewAdvice" aria-live="polite"></p>
+        </div>
         <p class="hint">Duyệt từng trang 50 sản phẩm để kiểm tra đủ toàn bộ mã cần chuẩn hóa trong danh mục.</p>
       </section>
       <section class="panel span2" id="allocation">

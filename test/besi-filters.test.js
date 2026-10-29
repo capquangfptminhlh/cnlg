@@ -91,7 +91,7 @@ test('malformed filter and pagination return 400-class rejection',()=>{
 test('server implements invalidated full-catalog cache and public-only result projection',()=>{
   const server=fs.readFileSync(path.join(ROOT,'server.js'),'utf8');
   assert.match(server,/app\.get\('\/api\/products\/specs'/);
-  assert.match(server,/besiSpecs\.buildIndex\(cachedSellable\)/);
+  assert.match(server,/besiSpecs\.buildIndex\(cachedSellable,reviewed\.records\)/);
   assert.match(server,/cachedSpecsIndex = null/);
   assert.match(server,/besiSpecs\.searchIndex\(specificationIndex\(\),req\.query\)/);
   assert.match(server,/const pub=publicProduct\(product\)/);

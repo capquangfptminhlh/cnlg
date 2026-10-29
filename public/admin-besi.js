@@ -28,6 +28,88 @@
     td.colSpan=columns;td.textContent=text;tr.append(td);tbody.append(tr);
   }
   let policy={};
+  // Human-in-the-loop attribute verification: no AI/regex suggestion is
+  // promoted into a verified facet without explicit administrator approval.
+  let reviewData=null;
+  const fields={connector:'besiReviewConnector',length:'besiReviewLength',
+    power:'besiReviewPower',color:'besiReviewColor'};
+  function showReviewVariant(){
+    if(!reviewData)return;
+    const v=reviewData.variations.find(x=>String(x.id)===String($('besiReviewVariant').value));
+    if(!v)return;
+    const data=v.verified||v.proposed||{};
+    for(const [key,id] of Object.entries(fields))$(id).value=data[key]==null?'':String(data[key]);
+    $('besiReviewConfirm').checked=false;
+    $('besiReviewAdvice').textContent=v.verified
+      ?'Thông số này đã được xác minh. Có thể sửa sau khi đối chiếu thực tế.'
+      :'Đây chỉ là gợi ý tự động từ tên hàng, chưa xác minh. Kiểm tra nhãn hoặc thông tin phân loại trước khi lưu.';
+  }
+  async function openReview(id){
+    const response=await request('/api/admin/besi/spec-review/'+encodeURIComponent(id));
+    reviewData=response;
+    $('besiReviewId').value=response.product.id;
+    $('besiReviewTitle').textContent=response.product.name;
+    const select=$('besiReviewVariant');
+    select.replaceChildren();
+    for(const v of response.variations){
+      const opt=document.createElement('option');
+      opt.value=v.id;
+      opt.textContent=(v.name||'Thông số sản phẩm')+(v.verified?' ✓ Đã xác minh':'')
+        +(v.in_stock?'':' · Hết hàng');
+      select.append(opt);
+    }
+    showReviewVariant();
+    $('besiSpecEditor').hidden=false;
+    $('besiSpecEditor').scrollIntoView({behavior:'smooth',block:'center'});
+  }
+  $('besiReviewVariant')?.addEventListener('change',showReviewVariant);
+  $('besiReviewClose')?.addEventListener('click',()=>{$('besiSpecEditor').hidden=true;});
+  $('besiReviewAskAI')?.addEventListener('click',async()=>{
+    const button=$('besiReviewAskAI'),id=Number($('besiReviewId').value);
+    if(!reviewData||!id)return;
+    button.disabled=true;
+    try{
+      const result=await request('/api/admin/besi/spec-ai-suggest/'+id,'POST',
+        {variantId:$('besiReviewVariant').value});
+      for(const [key,field] of Object.entries(fields)){
+        // AI never overwrites a field with null or a saved human verification.
+        const current=reviewData.variations.find(x=>String(x.id)===String($('besiReviewVariant').value));
+        if(current?.verified)continue;
+        if(result.data[key]!==null&&result.data[key]!==undefined)$(field).value=String(result.data[key]);
+      }
+      $('besiReviewConfirm').checked=false;
+      $('besiReviewAdvice').textContent='AI chỉ đưa ra gợi ý, chưa xác minh. Hãy đối chiếu thông số trên phân loại thực tế trước khi lưu.';
+      message('Đã nhận gợi ý AI nội bộ; chưa lưu bất kỳ thông số nào.');
+    }catch(e){message(e.message,true);}
+    finally{button.disabled=false;}
+  });
+  $('besiReviewForm')?.addEventListener('submit',event=>{
+    event.preventDefault();
+    submit(event.currentTarget,async()=>{
+      if(!$('besiReviewConfirm').checked)throw Error('Cần xác nhận thông số đã được kiểm tra thực tế.');
+      const productId=Number($('besiReviewId').value);
+      const input={productId,variantId:$('besiReviewVariant').value,
+        confirmed:true,connector:$('besiReviewConnector').value,
+        length:$('besiReviewLength').value||null,
+        power:$('besiReviewPower').value||null,
+        color:$('besiReviewColor').value||null};
+      if(!confirm('Lưu thông số chuẩn của đúng phân loại? Việc này sẽ thay đổi kết quả lọc sản phẩm.'))return;
+      await request('/api/admin/besi/spec-review/'+productId,'PUT',input);
+      message('Đã xác minh thuộc tính. Chỉ mục tìm kiếm sẽ cập nhật ngay.');
+      await openReview(productId);await refreshCoverage(1);
+    });
+  });
+  $('besiReviewUndo')?.addEventListener('click',async()=>{
+    if(!reviewData)return;
+    const id=Number($('besiReviewId').value),variantId=$('besiReviewVariant').value;
+    if(!confirm('Hủy xác minh và trả về nhận diện từ tên sản phẩm?'))return;
+    try{
+      await request('/api/admin/besi/spec-review/'+id+'?'+new URLSearchParams({variantId}),'DELETE');
+      message('Đã hủy xác minh thông số');
+      await openReview(id);await refreshCoverage(1);
+    }catch(e){message(e.message,true);}
+  });
+
   let coveragePage=0,coveragePages=1,coverageBusy=false;
   async function refreshCoverage(page=1){
     if(coverageBusy)return;
@@ -41,12 +123,16 @@
       const tbody=$('specCoverageRows');
       if(page===1)tbody.replaceChildren();
       if(!report.review?.length&&page===1)
-        empty(tbody,3,'Chưa có sản phẩm nào cần kiểm tra hoặc danh mục chưa có cáp sạc.');
+        empty(tbody,4,'Chưa có sản phẩm nào cần kiểm tra hoặc danh mục chưa có cáp sạc.');
       for(const item of report.review||[]){
         const tr=document.createElement('tr');
         cell(tr,item.id);cell(tr,item.name,true);
         cell(tr,item.reason==='unknown_connector'?'Chưa xác định rõ đầu kết nối':'Thiếu chiều dài, công suất hoặc màu');
-        tbody.append(tr);
+        const action=cell(tr,'');
+        const button=document.createElement('button');
+        button.type='button';button.className='secondary';button.textContent='Kiểm duyệt';
+        button.addEventListener('click',()=>openReview(item.id).catch(e=>message(e.message,true)));
+        action.append(button);tbody.append(tr);
       }
       coveragePage=Number(report.page)||page;
       coveragePages=Number(report.totalPages)||1;
@@ -159,6 +245,6 @@
     refreshCoverage(coveragePage+1).catch(e=>message('Lỗi xem thêm thông số: '+e.message,true));
   });
   refreshCoverage().catch(e=>{
-    empty($('specCoverageRows'),3,'Chưa tải được báo cáo: '+e.message);
+    empty($('specCoverageRows'),4,'Chưa tải được báo cáo: '+e.message);
   });
 })();
