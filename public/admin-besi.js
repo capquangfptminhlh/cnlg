@@ -28,19 +28,30 @@
     td.colSpan=columns;td.textContent=text;tr.append(td);tbody.append(tr);
   }
   let policy={};
-  async function refreshCoverage(){
-    const report=await request('/api/admin/besi/spec-coverage');
-    $('specCableTotal').textContent=Number(report.cableProducts||0).toLocaleString('vi-VN');
-    $('specIndexedTotal').textContent=Number(report.indexedVariations||0).toLocaleString('vi-VN');
-    $('specCoverageCount').textContent=Number(report.needsReview||0).toLocaleString('vi-VN');
-    const tbody=$('specCoverageRows');tbody.replaceChildren();
-    if(!report.review?.length)empty(tbody,3,'Chưa có sản phẩm nào cần kiểm tra hoặc danh mục chưa có cáp sạc.');
-    for(const item of report.review||[]){
-      const tr=document.createElement('tr');
-      cell(tr,item.id);cell(tr,item.name,true);
-      cell(tr,item.reason==='unknown_connector'?'Chưa xác định rõ đầu kết nối':'Thiếu chiều dài, công suất hoặc màu');
-      tbody.append(tr);
-    }
+  let coveragePage=0,coveragePages=1,coverageBusy=false;
+  async function refreshCoverage(page=1){
+    if(coverageBusy)return;
+    coverageBusy=true;
+    const more=$('besiSpecReviewMore');more.disabled=true;
+    try{
+      const report=await request('/api/admin/besi/spec-coverage?page='+page);
+      $('specCableTotal').textContent=Number(report.cableProducts||0).toLocaleString('vi-VN');
+      $('specIndexedTotal').textContent=Number(report.indexedVariations||0).toLocaleString('vi-VN');
+      $('specCoverageCount').textContent=Number(report.needsReview||0).toLocaleString('vi-VN');
+      const tbody=$('specCoverageRows');
+      if(page===1)tbody.replaceChildren();
+      if(!report.review?.length&&page===1)
+        empty(tbody,3,'Chưa có sản phẩm nào cần kiểm tra hoặc danh mục chưa có cáp sạc.');
+      for(const item of report.review||[]){
+        const tr=document.createElement('tr');
+        cell(tr,item.id);cell(tr,item.name,true);
+        cell(tr,item.reason==='unknown_connector'?'Chưa xác định rõ đầu kết nối':'Thiếu chiều dài, công suất hoặc màu');
+        tbody.append(tr);
+      }
+      coveragePage=Number(report.page)||page;
+      coveragePages=Number(report.totalPages)||1;
+      more.hidden=coveragePage>=coveragePages;
+    }finally{coverageBusy=false;more.disabled=false;}
   }
   async function refresh(){
     const [over,catalog]=await Promise.all([
@@ -144,6 +155,9 @@
     });
   });
   refresh().catch(e=>message(e.message,true));
+  $('besiSpecReviewMore')?.addEventListener('click',()=>{
+    refreshCoverage(coveragePage+1).catch(e=>message('Lỗi xem thêm thông số: '+e.message,true));
+  });
   refreshCoverage().catch(e=>{
     empty($('specCoverageRows'),3,'Chưa tải được báo cáo: '+e.message);
   });
