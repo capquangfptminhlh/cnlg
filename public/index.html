@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#ee4d2d">
-  <title>BESI | Một nơi. Ngàn lựa chọn. — Mua lẻ giá tốt</title>
+  <title>BESI | Sàn mua lẻ giá tốt, nhập sỉ từ nhiều tổng kho</title>
   <link rel="icon" type="image/svg+xml" href="/besi-logo.svg">
   <link rel="apple-touch-icon" href="/besi-logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/storefront-match.css">
   <link rel="stylesheet" href="/flash-sale.css">
   <link rel="stylesheet" href="/besi-marketplace-2026.css">
+  <link rel="stylesheet" href="/besi-marketplace-v5.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -98,10 +99,10 @@
           <div class="market-banner-copy">
             <div class="market-banner-label"><i class="fa-solid fa-bolt"></i> KHÁM PHÁ BESI MARKETPLACE</div>
             <span class="banner-overline">MUA LẺ GIÁ TỐT · ĐA NGÀNH HÀNG</span>
-            <h1>Một nơi.<span><em>Ngàn lựa chọn.</em></span></h1>
-            <p>Công nghệ, thời trang, nhà cửa và mọi thứ bạn thích — khám phá một cách thông minh.</p>
+            <h1>Một nơi.<span><em>Muôn vàn lựa chọn.</em></span></h1>
+            <p>Hàng nghìn sản phẩm đa ngành, mua lẻ tiện lợi và nhập sỉ số lượng lớn ngay tại BESI.</p>
             <a href="#catalog" class="banner-shop-btn">Khám phá ngay <i class="fa-solid fa-arrow-right"></i></a>
-            <div class="hero-si-pills"><span><i class="fa-solid fa-circle-check"></i> Lẻ = Giá sỉ</span><span><i class="fa-solid fa-fire"></i> Rẻ hơn tới 70%</span><span><i class="fa-solid fa-box-open"></i> Đồng kiểm COD</span></div>
+            <div class="hero-si-pills"><span><i class="fa-solid fa-circle-check"></i> Mua lẻ giá tốt</span><span><i class="fa-solid fa-box-open"></i> Đa ngành hàng</span></div>
             <div class="banner-catalog-count">Khám phá <strong id="heroTotalProd">—</strong> sản phẩm trên BESI</div>
             <div class="banner-slides" aria-hidden="true"><span class="active"></span><span></span><span></span></div>
           </div>
@@ -124,10 +125,10 @@
         <a href="#flashSaleSection" class="market-shortcut"><span class="shortcut-icon shortcut-hot"><b class="shortcut-pop">HOT</b><i class="fa-solid fa-bolt"></i></span><span>Flash Sale</span></a>
         <button type="button" class="market-shortcut" data-store-action="under99"><span class="shortcut-icon shortcut-voucher"><b class="shortcut-pop">99K</b><i class="fa-solid fa-fire-flame-curved"></i></span><span>Dưới 99K</span></button>
         <a href="#categoryPanel" class="market-shortcut"><span class="shortcut-icon shortcut-ship"><i class="fa-solid fa-layer-group"></i></span><span>Danh mục</span></a>
-        <button type="button" class="market-shortcut" data-store-action="sort-low"><span class="shortcut-icon shortcut-new"><b class="shortcut-pop is-gold">SỈ</b><i class="fa-solid fa-coins"></i></span><span>Rẻ Nhất Kho</span></button>
+        <button type="button" class="market-shortcut" data-store-action="sort-low"><span class="shortcut-icon shortcut-new"><b class="shortcut-pop is-gold">SỈ</b><i class="fa-solid fa-coins"></i></span><span>Giá tốt</span></button>
         <a href="#featuredSection" class="market-shortcut"><span class="shortcut-icon shortcut-cup"><i class="fa-solid fa-star"></i></span><span>Gợi ý</span></a>
         <button type="button" class="market-shortcut" data-store-action="track"><span class="shortcut-icon shortcut-brand"><i class="fa-solid fa-box"></i></span><span>Đơn hàng</span></button>
-        <button type="button" class="market-shortcut" data-store-action="sort-discount"><span class="shortcut-icon shortcut-combo"><b class="shortcut-pop">-70%</b><i class="fa-solid fa-percent"></i></span><span>Giảm Sâu</span></button>
+        <button type="button" class="market-shortcut" data-store-action="sort-discount"><span class="shortcut-icon shortcut-combo"><b class="shortcut-pop">DEAL</b><i class="fa-solid fa-percent"></i></span><span>Ưu đãi</span></button>
         <button type="button" class="market-shortcut" data-store-action="favorites"><span class="shortcut-icon shortcut-more"><i class="fa-regular fa-heart"></i></span><span>Yêu thích</span></button>
       </section>
     </div>
@@ -156,10 +157,10 @@
   <main class="container main-layout" id="catalog">
     
     <!-- Brand Filter Bar -->
-    <div class="brand-bar" id="brandBar" aria-label="Lọc theo thương hiệu chính hãng">
+    <div class="brand-bar" id="brandBar" aria-label="Lọc theo thương hiệu">
       <div class="brand-bar-header">
         <span class="brand-bar-title"><i class="fa-solid fa-tags"></i> Khám phá theo thương hiệu</span>
-        <span class="brand-bar-sub">Baseus, Vention, Ulanzi, Mcdodo, USAMS, Mark Ryden, HiFuture, SoundPeats...</span>
+        <span class="brand-bar-sub">Khám phá các thương hiệu và nhóm sản phẩm trên BESI</span>
       </div>
       <div class="brand-pills-wrap" id="brandPills">
         <button type="button" class="brand-pill active" data-brand="all"><i class="fa-solid fa-border-all"></i> Tất cả thương hiệu</button>
@@ -169,7 +170,7 @@
     <!-- Filter & Sort Bar -->
     <div class="filter-bar">
       <div class="filter-left">
-        <div class="premium-catalog-heading"><span class="premium-heading-kicker">KHÁM PHÁ KHÔNG GIỚI HẠN</span><h2 class="catalog-title" id="catalogTitle">Khám phá hàng trăm lựa chọn</h2></div>
+        <div class="premium-catalog-heading"><span class="premium-heading-kicker">KHÁM PHÁ KHÔNG GIỚI HẠN</span><h2 class="catalog-title" id="catalogTitle">Kho sản phẩm BESI – mua lẻ và nhập sỉ</h2></div>
         <span class="catalog-badge" id="catalogCount">Đang tải...</span>
       </div>
 
