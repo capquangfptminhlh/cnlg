@@ -200,3 +200,15 @@ test('UI explicitly separates uncertain products and supports independently page
   assert.match(script,/product\.verified_spec!==false/);
   assert.doesNotMatch(script,/source_url|supplier_cost|wholesale_price|dealer_price/i);
 });
+
+test('missing keyword in title is rescued by cable category or explicit connector, not charger category',()=>{
+  const index=facets.buildIndex([
+    {id:601,name:'Baseus C to IP 2m',category_name:'Cáp sạc điện thoại',price:59000,in_stock:true},
+    {id:602,name:'Baseus USB-C to Lightning 2m',price:49000,in_stock:true},
+    {id:603,name:'Củ sạc Baseus USB-C PD 30W',category_name:'Cáp sạc',price:99000,in_stock:true}
+  ]);
+  const res=query(index,{length:2});
+  assert.equal(res.total,2);
+  assert.deepEqual(new Set(res.matched.map(r=>r.product.id)),new Set([601,602]));
+  assert.ok(!res.matched.some(r=>r.product.id===603));
+});
