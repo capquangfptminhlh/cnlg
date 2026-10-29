@@ -112,3 +112,89 @@ test('front-end queries only server index, shows exact result counts and opens c
   assert.match(css,/@media\(max-width:700px\)/);
   assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
 });
+
+
+test('alias dictionary handles C-to-iP, C2L, TC2IP, C2C, A2C and lightning misspellings',()=>{
+  assert.equal(facets.connectorOf('Cáp sạc C to IP 20W'), 'c-lightning');
+  assert.equal(facets.connectorOf('Cáp C2L 2m'), 'c-lightning');
+  assert.equal(facets.connectorOf('Cáp TC2IP 1m'), 'c-lightning');
+  assert.equal(facets.connectorOf('Cáp Type-C to Lighting'), 'c-lightning');
+  assert.equal(facets.connectorOf('Cáp C2C 100W'), 'c-c');
+  assert.equal(facets.connectorOf('Cáp A2C 2m'), 'a-c');
+  assert.equal(facets.connectorOf('Cáp USB A to Lightning 1m'), 'a-lightning');
+  assert.equal(facets.connectorOf('Dây sạc iPhone PD 2m'), 'lightning');
+});
+test('unknown length appears as possible, not confirmed or permanently lost',()=>{
+  const items=[
+    {id:1,name:'Cáp USB-C to Lightning 2m 20W Đen',price:39000,in_stock:true},
+    {id:2,name:'Cáp USB-C to Lightning 20W Đen',price:40000,in_stock:true},
+    {id:3,name:'Cáp USB-C to Lightning 1m 20W Đen',price:29000,in_stock:true},
+    {id:4,name:'Cáp sạc iPhone PD 20W',price:49000,in_stock:true},
+    {id:5,name:'Ốp lưng iPhone',price:25000,in_stock:true}
+  ];
+  const index=facets.buildIndex(items);
+  const result=query(index,{length:2,power:20,color:'den'});
+  assert.equal(result.total,1,'2m declared, other specs declared');
+  assert.equal(result.matched[0].product.id,1);
+  const ids=result.possible.map(({row})=>row.product.id);
+  assert.ok(ids.includes(2),'Cable without length must be discoverable as uncertain');
+  assert.ok(ids.includes(4),'iPhone PD shorthand must be discoverable as uncertain');
+  assert.ok(!ids.includes(3),'Known 1m cable must not appear as 2m candidate');
+  assert.ok(!ids.includes(5),'Phone cases must not be offered as cables');
+  assert.ok(result.possibleTotal>=2);
+  assert.match(result.possible.find(x=>x.row.product.id===2).reasons.join(' '),/Chưa rõ chiều dài/);
+});
+test('unrecognized connector but explicit cable length is still suggested, never verified',()=>{
+  const index=facets.buildIndex([
+    {id:21,name:'Dây sạc nhanh iPhone 2m',price:39000,in_stock:true},
+    {id:22,name:'Cáp sạc PD 2m',price:29000,in_stock:true}
+  ]);
+  const selected=query(index,{length:2});
+  assert.equal(selected.total,0);
+  assert.equal(selected.possibleTotal,2);
+  assert.ok(selected.possible.every(x=>x.reasons.includes('Đầu kết nối chưa rõ')));
+});
+test('candidate pagination reports exact totals, never duplicates products already verified',()=>{
+  const products=Array.from({length:20},(_,i)=>({
+    id:200+i,name:'Cáp USB-C to Lightning 20W Mẫu '+i,
+    price:49000+i,in_stock:true
+  }));
+  products.push({id:300,name:'Cáp USB-C to Lightning 2m 20W',price:39000,in_stock:true});
+  const index=facets.buildIndex(products);
+  const first=query(index,{length:2,possiblePage:1});
+  const second=query(index,{length:2,possiblePage:2});
+  assert.equal(first.total,1);
+  assert.equal(first.possibleTotal,20);
+  assert.equal(first.possiblePages,3);
+  assert.equal(first.possible.length,8);
+  assert.equal(second.possible.length,8);
+  assert.equal(new Set([...first.possible,...second.possible].map(x=>x.row.product.id)).size,16);
+  assert.ok(first.possible.every(x=>x.row.product.id!==300));
+});
+test('coverage report lists under-specified products privately, without creating fake data',()=>{
+  const index=facets.buildIndex([
+    {id:1,name:'Cáp USB C to Lightning 2m 20W Đen',price:29000,in_stock:true},
+    {id:2,name:'Cáp sạc PD iPhone',price:27000,in_stock:true},
+    {id:3,name:'Ốp iPhone',price:20000,in_stock:true}
+  ]);
+  const summary=facets.coverage(index);
+  assert.equal(summary.cableProducts,2);
+  assert.ok(summary.reviewCount>=1);
+  assert.ok(summary.review.some(x=>x.product.id===2&&x.reason==='unknown_connector'));
+  assert.ok(!summary.review.some(x=>x.product.id===3));
+  const server=fs.readFileSync(path.join(ROOT,'server.js'),'utf8');
+  assert.match(server,/\/api\/admin\/besi\/spec-coverage/);
+  assert.match(server,/requireAdmin/);
+  assert.match(server,/const possible=found\.possible\.map/);
+  assert.match(server,/possibleTotal:found\.possibleTotal/);
+});
+test('UI explicitly separates uncertain products and supports independently paged candidate results',()=>{
+  assert.match(html,/id="besiSpecPossible"/);
+  assert.match(html,/id="besiSpecPossibleGrid"/);
+  assert.match(html,/id="besiSpecPossibleMore"/);
+  assert.match(script,/stateUi\.possibleTotal/);
+  assert.match(script,/async function loadPossible/);
+  assert.match(script,/Chưa đủ thông số/);
+  assert.match(script,/product\.verified_spec!==false/);
+  assert.doesNotMatch(script,/source_url|supplier_cost|wholesale_price|dealer_price/i);
+});
