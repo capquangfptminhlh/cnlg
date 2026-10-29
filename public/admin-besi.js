@@ -64,6 +64,25 @@
   }
   $('besiReviewVariant')?.addEventListener('change',showReviewVariant);
   $('besiReviewClose')?.addEventListener('click',()=>{$('besiSpecEditor').hidden=true;});
+  $('besiReviewAskAI')?.addEventListener('click',async()=>{
+    const button=$('besiReviewAskAI'),id=Number($('besiReviewId').value);
+    if(!reviewData||!id)return;
+    button.disabled=true;
+    try{
+      const result=await request('/api/admin/besi/spec-ai-suggest/'+id,'POST',
+        {variantId:$('besiReviewVariant').value});
+      for(const [key,field] of Object.entries(fields)){
+        // AI never overwrites a field with null or a saved human verification.
+        const current=reviewData.variations.find(x=>String(x.id)===String($('besiReviewVariant').value));
+        if(current?.verified)continue;
+        if(result.data[key]!==null&&result.data[key]!==undefined)$(field).value=String(result.data[key]);
+      }
+      $('besiReviewConfirm').checked=false;
+      $('besiReviewAdvice').textContent='AI chỉ đưa ra gợi ý, chưa xác minh. Hãy đối chiếu thông số trên phân loại thực tế trước khi lưu.';
+      message('Đã nhận gợi ý AI nội bộ; chưa lưu bất kỳ thông số nào.');
+    }catch(e){message(e.message,true);}
+    finally{button.disabled=false;}
+  });
   $('besiReviewForm')?.addEventListener('submit',event=>{
     event.preventDefault();
     submit(event.currentTarget,async()=>{
