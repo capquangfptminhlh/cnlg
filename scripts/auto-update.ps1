@@ -55,8 +55,8 @@ function RestartStore([string]$expectedCommit) {
   # Only terminate the production Node process when Windows watchdog
   # is configured to bring it back. Otherwise leave it running and rollback.
   $task = Get-ScheduledTask -TaskName 'HoangMinh Store' -ErrorAction SilentlyContinue
-  if (-not $task -or $task.State -eq 'Disabled') {
-    Log 'KHÔNG restart: chưa có tác vụ HoangMinh Store bật watchdog. Cần chạy install-server-windows hoặc cấu hình supervisor.'
+  if (-not $task -or $task.State -ne 'Running') {
+    Log 'KHÔNG restart: tác vụ HoangMinh Store không chạy watchdog. Cần chạy install-server-windows hoặc cấu hình supervisor.'
     return $false
   }
   $c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
