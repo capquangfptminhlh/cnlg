@@ -130,3 +130,33 @@ test('server performs public-only DTO projection and UI uses non-HTML DOM for so
  assert.match(cable,/besi:universal-filters-start/);
  assert.match(special,/besi:universal-filters-start/);
 });
+
+test('standalone size variants and RAM/ROM fields stay separate',()=>{
+ const idx=discover.compile([
+  p(201,'Áo cotton Polo',21,{variants:[
+    {id:'M',name:'M',price:100000,in_stock:true},
+    {id:'XL',name:'XL',price:110000,in_stock:true}]}),
+  p(202,'Giày chạy bộ Nike',22,{variants:[
+    {id:'42',name:'42',price:500000,in_stock:true},
+    {id:'43',name:'43',price:500000,in_stock:false}]}),
+  p(203,'Điện thoại RAM 8GB ROM 256GB',10)
+ ],cats);
+ assert.equal(discover.search(idx,{attr:'size',value:'XL'}).total,1);
+ assert.equal(discover.search(idx,{attr:'size',value:'42'}).total,1);
+ assert.equal(discover.search(idx,{attr:'size',value:'43'}).total,0);
+ assert.deepEqual(discover.memory('RAM 8GB ROM 256GB','ram'),['8gb']);
+ assert.deepEqual(discover.memory('RAM 8GB ROM 256GB','storage'),['256gb']);
+});
+test('a 20k item full-industry catalog remains searchable with page-level responses',()=>{
+ const source=Array.from({length:20000},(_,i)=>({
+  id:i+10000,name:i%2?'Ốp lưng iPhone 16 Pro Max đen':'Áo cotton size XL trắng',
+  brand:i%2?'BESI':'Áo Việt',price:100000+i,
+  category_id:i%2?11:21,in_stock:true
+ }));
+ const idx=discover.compile(source,cats);
+ const res=discover.search(idx,{category:21,attr:'size',value:'XL',limit:24,page:1});
+ assert.equal(res.total,10000);
+ assert.equal(res.matched.length,24);
+ assert.equal(res.possibleTotal,0);
+ assert.ok(discover.facetOptions(idx,{category:11}).facets.model.some(x=>x.value==='iphone-16-pro-max'));
+});
