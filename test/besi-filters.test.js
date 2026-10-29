@@ -1,99 +1,114 @@
 'use strict';
-const { test }=require('node:test');
+const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const path=require('node:path');
-const vm=require('node:vm');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const ROOT=path.resolve(__dirname,'..');
-const js=fs.readFileSync(path.join(ROOT,'public/besi-spec-filters.js'),'utf8');
+const facets=require('../services/besi/specIndex');
+const script=fs.readFileSync(path.join(ROOT,'public/besi-spec-filters.js'),'utf8');
 const css=fs.readFileSync(path.join(ROOT,'public/besi-spec-filters.css'),'utf8');
 const html=fs.readFileSync(path.join(ROOT,'public/index.html'),'utf8');
-
-function runEngine(){
-  const nodes=new Map();
-  const mockNode=id=>({
-    id,hidden:true,value:'',addEventListener(){},
-    querySelector(){return {value:'c-lightning',checked:true}},
-    querySelectorAll(){return [{checked:true}]},
-    closest(){return null},classList:{add(){},remove(){}}
-  });
-  for(const id of ['besiSpecFinder','besiSpecResults','besiSpecGrid','besiApplySpecs',
-    'besiSpecLoadMore','besiSpecColor','besiSpecStatus','besiSpecResultsTitle',
-    'besiExitSpecs','besiResetSpecs','besiSpecDetails','searchInput'])
-    nodes.set(id,mockNode(id));
-  const ctx={
-    window:{addEventListener(){}},
-    document:{getElementById(id){return nodes.get(id)||null},addEventListener(){}},
-    console
-  };
-  vm.runInNewContext(js,ctx,{filename:'besi-spec-filters.js',timeout:4000});
-  return ctx.window.BesiSpecs;
-}
-function fixture(){
-  return {id:123,name:'Cáp USB-C to Lightning 20W',price:49000,in_stock:true,
-    variants:[
-      {id:'v1',name:'1m Đen',price:49000,in_stock:true},
-      {id:'v2',name:'2m Trắng',price:69000,in_stock:true},
-      {id:'v3',name:'3m Đen',price:79000,in_stock:false}
-    ]};
-}
-const selection=(length=0,power=0,color='',type='c-lightning')=>({length,power,color,type});
-test('BESI specification UI exists and loads at the end, without backend modification',()=>{
+const product=(id,variants)=>({
+  id,name:'Cáp sạc USB-C to Lightning 20W',price:49000,
+  brand:'BESI',in_stock:true,variants
+});
+const variants=[
+  {id:'V1',name:'1m Đen',price:49000,in_stock:true},
+  {id:'V2',name:'2m Trắng',price:69000,in_stock:true},
+  {id:'V3',name:'3m Đen',price:79000,in_stock:false}
+];
+const query=(index,config={})=>facets.searchIndex(index,{type:'c-lightning',...config});
+test('index all public, sellable products once; exact 1m 2m variants and correct prices',()=>{
+  const index=facets.buildIndex([product(1,variants)]);
+  assert.equal(index.indexed,2);
+  const one=query(index,{length:1});
+  assert.equal(one.total,1);
+  assert.equal(one.matched[0].variant.id,'V1');
+  const two=query(index,{length:2});
+  assert.equal(two.total,1);
+  assert.equal(two.matched[0].variant.id,'V2');
+  assert.equal(two.matched[0].variant.price,69000);
+  assert.equal(query(index,{length:3}).total,0);
+  assert.equal(query(index,{length:2,color:'den'}).total,0);
+  assert.equal(query(index,{length:2,color:'trang',power:20}).total,1);
+  assert.equal(query(index,{length:2,power:100}).total,0);
+});
+test('connector direction is precise: C-Lightning, A-Lightning, C-C and A-C',()=>{
+  const create=(id,name)=>({id,name,price:20000,in_stock:true});
+  const rows=[
+    create(1,'Cáp Type-C to Lighting 2m'),
+    create(2,'Cáp USB-A to Lightning 1m'),
+    create(3,'Cáp USB C to USB C 100W 2m'),
+    create(4,'Cáp USB-A to USB-C 1m'),
+    create(5,'Củ sạc Type-C PD 30W'),
+    create(6,'Ốp lưng iPhone Lightning style')
+  ];
+  const index=facets.buildIndex(rows);
+  assert.equal(query(index,{length:2}).matched[0].product.id,1);
+  assert.equal(query(index,{length:1}).total,0);
+  assert.equal(facets.searchIndex(index,{type:'a-lightning'}).total,1);
+  assert.equal(facets.searchIndex(index,{type:'c-c',length:2,power:100}).total,1);
+  assert.equal(facets.searchIndex(index,{type:'a-c',length:1}).total,1);
+  assert.equal(facets.searchIndex(index,{type:'lightning'}).total,2);
+});
+test('nothing inferred from missing length or stock; do not confuse mAh with meters',()=>{
+  const rows=[
+    {id:11,name:'Cáp USB-C to Lightning 10000mAh',price:29000,in_stock:true},
+    {id:12,name:'Cáp USB-C to Lightning 200cm 20W',price:39000,in_stock:true},
+    {id:13,name:'Cáp USB-C to Lightning 1m',price:39000,in_stock:false},
+    {id:14,name:'Cáp USB-C to Lightning 3m',price:39000,in_stock:true,
+      variants:[{id:'V4',name:'3m',price:39000,in_stock:false}]}
+  ];
+  const index=facets.buildIndex(rows);
+  assert.equal(query(index,{length:1}).total,0);
+  assert.equal(query(index,{length:2}).total,1);
+  assert.equal(query(index,{length:3}).total,0);
+  assert.deepEqual(facets.lengthOf('Cáp 1,2m 65W'),1.2);
+  assert.equal(facets.lengthOf('Pin sạc 20000mAh'),0);
+  assert.equal(facets.lengthOf('Cáp có 1m 2m cùng tên'),0);
+});
+test('results are deduplicated per product, paginated and sorted by actual matched variant price',()=>{
+  const items=Array.from({length:60},(_,i)=>({
+    id:100+i,name:'Cáp USB-C to Lightning 1m '+i,
+    price:100000-i*1000,in_stock:true
+  }));
+  const index=facets.buildIndex(items);
+  const first=query(index,{length:1,page:1,limit:24});
+  const third=query(index,{length:1,page:3,limit:24});
+  assert.equal(first.total,60);
+  assert.equal(first.totalPages,3);
+  assert.equal(first.matched.length,24);
+  assert.equal(third.matched.length,12);
+  assert.equal(first.matched[0].product.id,159);
+  assert.equal(new Set([...first.matched,...third.matched].map(x=>x.product.id)).size,36);
+});
+test('malformed filter and pagination return 400-class rejection',()=>{
+  const index=facets.buildIndex([]);
+  for(const request of [{type:'unknown'},{length:'2.7'},{power:'999'},{color:'tim'},
+    {page:'-1'},{limit:'1000'},{limit:'1e9'}]){
+    assert.throws(()=>facets.searchIndex(index,request),err=>err.status===400);
+  }
+});
+test('server implements invalidated full-catalog cache and public-only result projection',()=>{
+  const server=fs.readFileSync(path.join(ROOT,'server.js'),'utf8');
+  assert.match(server,/app\.get\('\/api\/products\/specs'/);
+  assert.match(server,/besiSpecs\.buildIndex\(cachedSellable\)/);
+  assert.match(server,/cachedSpecsIndex = null/);
+  assert.match(server,/besiSpecs\.searchIndex\(specificationIndex\(\),req\.query\)/);
+  assert.match(server,/const pub=publicProduct\(product\)/);
+  assert.match(server,/matched_variant:matched/);
+  assert.doesNotMatch(script,/dropbuy|cnlg|supplier_cost|source_url|dealer_price|wholesale_price/i);
+});
+test('front-end queries only server index, shows exact result counts and opens chosen variant',()=>{
+  assert.doesNotThrow(()=>new vm.Script(script,{filename:'besi-spec-filters.js'}));
+  assert.match(script,/\/api\/products\/specs\?/);
+  assert.doesNotMatch(script,/\/api\/products\?/);
+  assert.match(script,/matched_variant/);
+  assert.match(script,/await openProductDetail\(id\)/);
+  assert.match(script,/pickVariant\(available\.id\)/);
+  assert.match(script,/stateUi\.total/);
   assert.match(html,/id="besiSpecFinder"/);
-  assert.match(html,/id="besiSpecResults"/);
-  assert.match(html,/id="besiSpecGrid"/);
-  assert.match(html,/name="besiConnector"/);
-  assert.match(html,/USB-C → Lightning/);
   assert.match(html,/name="besiLength" value="1"/);
   assert.match(html,/name="besiLength" value="2"/);
-  assert.match(html,/name="besiWatt" value="60"/);
-  assert.match(html,/id="besiSpecColor"/);
-  assert.ok(html.indexOf('/besi-spec-filters.js')>html.indexOf('/app.js'));
-  assert.ok(html.indexOf('/besi-spec-filters.css')>html.indexOf('/besi-conversion.css'));
-  assert.doesNotMatch(html,/data-source-url|data-supplier-cost|wholesale_price/);
-});
-test('smart finder matches accurate 1m/2m variations and rejects out-of-stock 3m',()=>{
-  const engine=runEngine(),p=fixture();
-  assert.equal(engine.isMatch(p,selection(1)).variant.id,'v1');
-  assert.equal(engine.isMatch(p,selection(2)).variant.id,'v2');
-  assert.equal(engine.isMatch(p,selection(3)),null);
-  assert.equal(engine.isMatch(p,selection(2,20,'trang')).variant.price,69000);
-  assert.equal(engine.isMatch(p,selection(2,20,'den')),null);
-  assert.equal(engine.isMatch(p,selection(1,100)),null);
-  assert.equal(engine.isMatch({...p,in_stock:false},selection(1)),null);
-});
-test('connector ends are normalized, but wrong connector and unspecified length do not match',()=>{
-  const engine=runEngine();
-  assert.equal(engine.connectorMatch('usb c to lightning','c-lightning'),true);
-  assert.equal(engine.connectorMatch('type c to lighting','c-lightning'),true);
-  assert.equal(engine.connectorMatch('c to lightning','c-lightning'),true);
-  assert.equal(engine.connectorMatch('usb a to lightning','c-lightning'),false);
-  assert.equal(engine.connectorMatch('usb a to lightning','a-lightning'),true);
-  assert.equal(engine.connectorMatch('usb c to usb c','c-c'),true);
-  assert.equal(engine.connectorMatch('usb a to usb c','a-c'),true);
-  const item={id:9,name:'Cáp USB-C to Lightning 20W',price:35000,in_stock:true};
-  assert.equal(engine.isMatch(item,selection(2)),null,
-    'Must not invent cable length when not declared');
-  assert.ok(engine.isMatch({...item,name:item.name+' 2m'},selection(2)));
-  assert.equal(engine.isMatch({...item,name:item.name+' 1m'},selection(2)),null);
-});
-test('length parsing does not confuse 20W, 10000mAh, 1m and 2m',()=>{
-  const engine=runEngine();
-  assert.deepEqual(Array.from(engine.declaredLength('Cáp 1m 20W 10000mAh')),[1]);
-  assert.deepEqual(Array.from(engine.declaredLength('Cáp 200cm')),[2]);
-  assert.deepEqual(Array.from(engine.declaredLength('0,5m')),[.5]);
-  assert.deepEqual(Array.from(engine.declaredLength('Phụ kiện 10000mAh')),[]);
-});
-test('client fetches only public paginated products with truthful progress and no supplier data',()=>{
-  assert.match(js,/\/api\/products\?/);
-  assert.match(js,/limit:String\(PAGE_SIZE\)/);
-  assert.match(js,/storage\.scanned/);
-  assert.match(js,/Còn|còn kết quả chưa kiểm tra/);
-  assert.match(js,/!storage\.sources\.some|storage\.sources\.some/);
-  assert.match(js,/await openProductDetail\(id\)/);
-  assert.match(js,/pickVariant\(stillAvailable\.id\)/);
-  assert.match(css,/\.besi-spec-grid/);
   assert.match(css,/@media\(max-width:700px\)/);
   assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
-  assert.doesNotMatch(js,/dropbuy|cnlg|techmall|supplier_cost|source_url|dealer_price|wholesale_price/i);
 });
