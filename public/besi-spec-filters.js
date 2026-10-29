@@ -56,18 +56,20 @@
     const text=accentless(allNames.join(' '));
     if(!connectorMatch(text,f.type))return null;
     const inStock=matchingVariants(p,f);
+    const titleText=accentless(p.name);
+    const wantedLength=f.length>0;
+    if(wantedLength&&!variants.length&&!declaredLength(titleText)
+      .some(n=>Math.abs(n-f.length)<.001))return null;
+    const passesExtra=text=>
+      (!f.power||new RegExp('(^|[^\\d])'+f.power+'\\s*w(?![a-z])').test(text))
+      &&(!f.color||new RegExp('(^|[^a-z])'+f.color+'([^a-z]|$)').test(text));
     let chosen=null;
-    if(f.length){
-      const lengthInTitle=declaredLength(accentless(p.name))
-        .some(n=>Math.abs(n-f.length)<.001);
-      if(variants.length){
-        if(!inStock.length)return null;
-        chosen=inStock[0];
-      }else if(!lengthInTitle)return null;
-    }else if(variants.length&&!inStock.length)return null;
-    const check=accentless(p.name+' '+(chosen?.name||''));
-    if(f.power&&!new RegExp('(^|[^\\d])'+f.power+'\\s*w(?![a-z])').test(check))return null;
-    if(f.color&&!new RegExp('(^|[^a-z])'+f.color+'([^a-z]|$)').test(check))return null;
+    if(variants.length){
+      if(!inStock.length)return null;
+      // Length, power and color can be declared in a specific variation, not only the parent.
+      chosen=inStock.find(v=>passesExtra(titleText+' '+accentless(v.name)))||null;
+      if(!chosen)return null;
+    }else if(!passesExtra(titleText))return null;
     return {p,variant:chosen};
   }
   const queryTerms=type=>{
@@ -151,7 +153,7 @@
   function paint(){
     const visible=storage.items.slice(0,storage.displayed);
     grid.replaceChildren(...visible.map(card));
-    $('besiSpecStatus').textContent=statusText();
+    $('besiSpecStatus').textContent=storage.error||statusText();
     if(!visible.length&&!storage.loading){
       const msg=el('div','besi-spec-empty','Chưa thấy sản phẩm khớp thông số trong các trang đã kiểm tra. Bạn có thể mở rộng bộ lọc hoặc xem tiếp các kết quả.');
       grid.append(msg);
@@ -195,7 +197,9 @@
         if(storage.items.length>=storage.displayed+TAKE)break;
       }
     }catch(e){
-      if(version===storage.requestId)$('besiSpecStatus').textContent='Không kết nối được danh mục: '+String(e.message).slice(0,110);
+      if(version===storage.requestId){
+        storage.error='Không kết nối được danh mục: '+String(e.message).slice(0,110);
+      }
     }finally{
       if(version===storage.requestId){
         storage.loading=false;apply.disabled=false;
@@ -220,7 +224,7 @@
     storage.active=true;
     storage.filter=selected;
     storage.sources=queryTerms(selected.type).map(term=>({term,page:1,done:false}));
-    storage.seen.clear();storage.items=[];storage.displayed=0;storage.scanned=0;
+    storage.seen.clear();storage.items=[];storage.displayed=0;storage.scanned=0;storage.error='';
     results.hidden=false;
     $('catalog').classList.add('besi-filter-mode');
     $('besiSpecResultsTitle').textContent=typeName(selected.type)
