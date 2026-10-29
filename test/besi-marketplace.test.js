@@ -134,7 +134,7 @@ describe('BESI Supplier Hub durable persistence',()=>{
       const db2=createStore(dbPath);
       assert.equal(db2.read().plans[0].id,plan.id);
       assert.equal(db2.read().offers.length,2);
-      assert.equal(fs.statSync(dbPath).mode&0o777,0o600);
+      if (process.platform !== 'win32') assert.equal(fs.statSync(dbPath).mode&0o777,0o600);
       assert.throws(()=>db2.upsertOffers(a.id,[{sku:'NEW',name:'OK',cost:1000,stock:1},
         {sku:'BAD',name:'Bad',cost:-5,stock:1}]),/Giá/);
       assert.equal(db2.read().offers.length,2,'invalid batch cannot partially write');
