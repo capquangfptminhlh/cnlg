@@ -1852,7 +1852,24 @@ app.get('/api/admin/dropbuy-health', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/healthz', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()), products: storeCatalog.getProducts().length }));
+// A public release fingerprint helps confirm that the running Windows
+// process actually restarted on the newest GitHub commit (no secrets).
+const besiRelease = (() => {
+  const supplied = String(process.env.BESI_DEPLOY_SHA || '').trim();
+  if (/^[0-9a-f]{7,40}$/i.test(supplied)) return supplied.slice(0, 12);
+  try {
+    const { execFileSync } = require('node:child_process');
+    const sha = execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], {
+      cwd: __dirname, timeout: 1200, encoding: 'utf8', windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim();
+    return /^[0-9a-f]{7,12}$/i.test(sha) ? sha : 'unknown';
+  } catch (_) { return 'unknown'; }
+})();
+app.get('/healthz', (req, res) => res.json({
+  ok: true, uptime: Math.round(process.uptime()),
+  products: storeCatalog.getProducts().length, release: besiRelease
+}));
 
 app.get('/api/realtime/status', (req, res) => {
   res.json({ success: true, data: realtimeSync.getPublicSyncStatus() });
