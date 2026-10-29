@@ -165,7 +165,25 @@ body { background:#f7f8fb !important; color:var(--besi-v5-ink); }
   .main-header .search-box input{font-size:16px !important}
   .main-header .search-submit{min-height:35px !important}
   .market-desktop-layout{display:flex !important;flex-direction:column !important;padding-top:0 !important;gap:0 !important}
-  .market-sidebar{display:none !important}
+  .market-discovery{order:1 !important}
+  .market-sidebar{
+    display:block !important;order:2 !important;
+    max-height:47px !important;overflow:visible !important;
+    margin:7px 0 0 !important;border-radius:10px !important;
+    padding:5px !important
+  }
+  .market-sidebar .sidebar-heading{display:none !important}
+  .market-sidebar .cat-nav{width:100% !important;overflow:hidden}
+  .market-sidebar .cat-scroll{
+    display:flex !important;flex-flow:row nowrap !important;
+    max-height:36px !important;overflow-x:auto !important;
+    overflow-y:hidden !important;scrollbar-width:none !important;
+    gap:6px !important;padding:0 4px !important
+  }
+  .market-sidebar .cat-btn{
+    flex:0 0 auto !important;white-space:nowrap !important;min-height:32px !important;
+    font-size:10px !important;padding:6px 10px !important
+  }
   .market-links{display:flex !important;overflow-x:auto;min-height:37px !important;margin-inline:-12px;border:0 !important;
     padding-inline:12px !important;border-radius:0 !important;gap:17px !important}
   .market-links a,.market-links button{font-size:10px !important;min-height:37px !important}
