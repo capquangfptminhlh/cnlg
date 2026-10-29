@@ -171,6 +171,7 @@
     $('besiSpecColor').value='';
   }
   function run(){
+    window.dispatchEvent(new CustomEvent('besi:cable-filters-start'));
     stateUi.seq++;stateUi.active=true;stateUi.page=0;stateUi.total=0;
     stateUi.totalPages=1;stateUi.rows=[];stateUi.error='';stateUi.loading=false;
     stateUi.possibleTotal=0;stateUi.possiblePage=0;stateUi.possiblePages=1;
@@ -201,5 +202,6 @@
   $('searchInput')?.addEventListener('keydown',event=>{
     if(event.key==='Enter'&&stateUi.active)exit();
   },true);
+  window.addEventListener('besi:category-filters-start',()=>{if(stateUi.active)exit();});
   window.addEventListener('popstate',()=>{if(stateUi.active)exit();});
 })();
