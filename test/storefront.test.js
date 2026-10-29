@@ -173,3 +173,43 @@ test('approved BESI design is product-first and responsive',()=>{
   assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
   assert.doesNotMatch(css,/drop\s*buy|source_url|supplier_cost|wholesale_price|api_image/i);
 });
+
+
+test('BESI V5 product-first desktop/mobile design keeps storefront interactions intact',()=>{
+  const html=read('public/index.html');
+  const css=read('public/besi-marketplace-v5.css');
+  assert.match(html,/href="\/besi-marketplace-v5\.css"/);
+  assert.ok(html.indexOf('/besi-marketplace-v5.css')>html.indexOf('/besi-marketplace-2026.css'));
+  assert.ok(html.indexOf('id="catalog"')<html.indexOf('id="flashSaleSection"'));
+  for(const id of ['searchInput','searchBtn','categoriesContainer','productGrid','sortSelect',
+    'btnLoadMore','openCartBtn','checkoutForm','brandPills'])
+    assert.match(html,new RegExp('id="'+id+'"'));
+  assert.match(css,/#productGrid\.product-grid\s*\{\s*grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
+  assert.match(css,/@media\(min-width:1640px\)/);
+  assert.match(css,/repeat\(7,minmax\(0,1fr\)\)/);
+  assert.match(css,/@media\(max-width:700px\)/);
+  assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.market-sidebar\s*\{\s*display:block !important;order:2 !important/);
+  assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
+  assert.doesNotMatch(css,/dropbuy|cnlg|techmall|supplier_cost|source_url|wholesale_price|api_image/i);
+  assert.match(html,/<title>BESI/);
+  assert.doesNotMatch(html,/Rẻ hơn tới 70%|b class="shortcut-pop">-70%/);
+});
+test('BESI host uses correct SEO metadata while legacy host keeps its branding',()=>{
+  const seo=require('../services/seo');
+  const req=host=>({
+    get(name){return name==='host'?host:undefined;},
+    protocol:'https',
+    socket:{remoteAddress:'127.0.0.1'}
+  });
+  const cfg={store:{name:'Hoàng Minh Store',slogan:'Slogan cũ'}};
+  const besi=seo.renderHomePage(req('besi.com.vn'),cfg,25400);
+  assert.match(besi,/<meta property="og:site_name" content="BESI">/);
+  assert.match(besi,/<meta property="og:image" content="https:\/\/besi\.com\.vn\/besi-logo\.svg">/);
+  assert.match(besi,/<meta name="description" content="BESI tập hợp 25\.400 sản phẩm/);
+  assert.doesNotMatch(besi,/<meta property="og:site_name" content="Hoàng Minh Store">/);
+  const www=seo.renderHomePage(req('www.besi.com.vn'),cfg,25400);
+  assert.match(www,/<meta property="og:site_name" content="BESI">/);
+  const legacy=seo.renderHomePage(req('unrelated.example'),cfg,10);
+  assert.match(legacy,/<meta property="og:site_name" content="Hoàng Minh Store">/);
+});
