@@ -106,9 +106,9 @@ function buildIndex(products,reviewedRecords={}){
         && String(override.variantId||'')===String(v?.id||'')
         && !needsVariantDetail;
       const type=isVerified?override.connector:connectorOf(combined);
-      const length=isVerified?(override.length??lengthOf(variantText)??lengthOf(title)):
+      const length=isVerified?(override.length??(lengthOf(variantText)||lengthOf(title))):
         (lengthOf(variantText)||lengthOf(title));
-      const watt=isVerified?(override.power??powerOf(variantText)??powerOf(title)):
+      const watt=isVerified?(override.power??(powerOf(variantText)||powerOf(title))):
         (powerOf(variantText)||powerOf(title));
       const color=isVerified?(override.color||colorOf(variantText)||colorOf(title)):
         (colorOf(variantText)||colorOf(title));
