@@ -36,6 +36,45 @@
       color:$('besiCategoryColor').value
     };
   }
+  const dynamicLoaded=new Set();
+  function modelLabel(value){
+    if(value.startsWith('iphone-'))return 'iPhone '+value.slice(7).replace(/-/g,' ')
+      .replace(/\b(pro|max|plus|mini|air)\b/gi,w=>w[0].toUpperCase()+w.slice(1));
+    return value.replace(/^samsung-/,'Galaxy ').replace(/-/g,' ')
+      .replace(/\b(s|a)(\d+)/,(_,family,num)=>family.toUpperCase()+num)
+      .replace(/\b(ultra|plus)\b/gi,w=>w[0].toUpperCase()+w.slice(1))
+      .replace(/\bfe\b/gi,'FE');
+  }
+  function addOptions(selectId,values,label){
+    const select=$(selectId);if(!select||!Array.isArray(values))return;
+    const known=new Set([...select.options].map(x=>x.value));
+    const fresh=values.filter(v=>!known.has(String(v))).slice(0,500);
+    if(!fresh.length)return;
+    const group=document.createElement('optgroup');
+    group.label='Mẫu có nhắc đến trong danh mục BESI';
+    for(const value of fresh){
+      const option=document.createElement('option');
+      option.value=String(value);option.textContent=label(value);group.append(option);
+    }
+    select.append(group);
+  }
+  async function loadDynamicOptions(category){
+    if(dynamicLoaded.has(category))return;
+    try{
+      const response=await fetch('/api/products/category-facets?'+
+        new URLSearchParams({category}),{credentials:'same-origin'});
+      if(!response.ok)return; // Older servers preserve existing fallback choices.
+      const data=await response.json();
+      if(!data.success||data.category!==category)return;
+      if(category==='case')addOptions('besiCaseModel',data.models,modelLabel);
+      if(category==='charger')addOptions('besiChargerWatt',data.watts,v=>v+'W');
+      if(category==='powerbank'){
+        addOptions('besiPowerbankWatt',data.watts,v=>v+'W');
+        addOptions('besiPowerbankCapacity',data.capacities,v=>Number(v).toLocaleString('vi-VN')+'mAh');
+      }
+      dynamicLoaded.add(category);
+    }catch(_){/* static options remain available when offline */}
+  }
   function switchCategory(category){
     if(!Object.hasOwn(names,category))return;
     if(stateUi.active&&stateUi.category!==category)exit();
@@ -46,6 +85,7 @@
     $('besiChargerWattBox').hidden=category!=='charger';
     $('besiPowerbankCapacityBox').hidden=category!=='powerbank';
     $('besiPowerbankWattBox').hidden=category!=='powerbank';
+    loadDynamicOptions(category);
   }
   async function detail(product,unverified=false){
     const id=Number(product.id);
