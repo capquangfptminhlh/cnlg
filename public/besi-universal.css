@@ -1,0 +1,60 @@
+/* BESI universal search across all categories, first-party catalog only. */
+.besi-universal-finder{background:linear-gradient(125deg,#fff,#fff9f6 75%);
+ border:1px solid #f0d9ce;border-radius:16px;padding:19px;margin-bottom:13px;
+ box-shadow:0 5px 18px rgba(48,51,65,.045)}
+.besi-universal-heading{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:17px}
+.besi-universal-heading h2{margin:3px 0 5px;font-size:21px;letter-spacing:-.055em;color:#23344b;font-weight:850}
+.besi-universal-heading p{margin:0;color:#7c8897;font-size:11px;line-height:1.5}
+.besi-universal-kicker{font-size:9px;font-weight:850;letter-spacing:.13em;color:#e34e29}
+.besi-universal-count{background:#fff0e8;border:1px solid #ffdecf;color:#d64524;border-radius:9px;
+ font-size:11px;font-weight:800;white-space:nowrap;padding:8px 11px}
+.besi-universal-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.besi-universal-form label{display:flex;flex-direction:column;gap:5px;
+ font-size:11px;font-weight:750;color:#36455d;min-width:0}
+.besi-universal-form input,.besi-universal-form select{width:100%;min-width:0;
+ border:1px solid #e0e6ee;background:white;color:#293b55;
+ border-radius:9px;min-height:41px;padding:9px 12px;
+ font:600 11px/1.4 'Be Vietnam Pro',sans-serif;box-sizing:border-box}
+.besi-universal-form input:focus,.besi-universal-form select:focus{outline:2px solid #ffb79b;outline-offset:1px}
+.besi-universal-form select:disabled{opacity:.5;cursor:not-allowed}
+.besi-universal-wide{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}
+.besi-universal-wide>label{font-weight:800;font-size:12px}
+.besi-universal-query{position:relative}
+.besi-universal-query i{position:absolute;top:50%;left:14px;transform:translateY(-50%);font-size:14px;color:#f4512c}
+.besi-universal-query input{padding-left:39px;font-size:13px;min-height:47px;
+ border-color:#ffd3be;box-shadow:0 2px 9px #ec52200d}
+.besi-universal-buttons{grid-column:1/-1;display:flex;gap:8px}
+#besiUniversalApply{background:#f4512c;color:#fff;border:1px solid #e64723;border-radius:9px;
+ min-height:42px;padding:10px 22px;cursor:pointer;font:800 12px/1.3 'Be Vietnam Pro',sans-serif}
+#besiUniversalApply:hover:not(:disabled){background:#da4020}
+#besiUniversalApply:disabled{opacity:.6;cursor:wait}
+#besiUniversalReset{border:1px solid #e1e7ef;background:#fff;color:#63758a;border-radius:9px;
+ min-height:42px;padding:10px 16px;cursor:pointer;font:750 11px/1.3 'Be Vietnam Pro',sans-serif}
+.besi-universal-hint{margin:10px 0 0;font-size:10px;line-height:1.5;color:#8290a2}
+.besi-universal-results{background:#fff;border:1px solid #e8edf4;border-radius:13px;
+ padding:16px;margin-bottom:15px;scroll-margin-top:14px}
+.besi-universal-results[hidden]{display:none!important}
+.besi-universal-results .besi-spec-results-head{align-items:center}
+.besi-universal-price-note{font-size:9px;color:#a36d43;line-height:1.35}
+.besi-universal-results .besi-spec-product-buy{min-height:37px}
+@media(max-width:1050px){.besi-universal-form{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){
+ .besi-universal-finder{padding:13px 11px;border-radius:11px;margin-bottom:9px}
+ .besi-universal-heading{align-items:flex-start;margin-bottom:11px}
+ .besi-universal-heading h2{font-size:16px}
+ .besi-universal-heading p{font-size:10px}
+ .besi-universal-count{font-size:9px;padding:7px;white-space:normal;text-align:center}
+ .besi-universal-form{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .besi-universal-form label{font-size:10px}
+ .besi-universal-form input,.besi-universal-form select{font-size:10px;min-height:40px;padding:8px}
+ .besi-universal-query input{font-size:11px;min-height:44px;padding-left:34px}
+ .besi-universal-query i{left:11px}
+ .besi-universal-buttons button{flex:1}
+ .besi-universal-results{padding:10px}
+}
+@media(max-width:360px){
+ .besi-universal-form{grid-template-columns:1fr}
+ .besi-universal-heading h2{font-size:15px}
+ .besi-universal-buttons{flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:reduce){.besi-universal-finder *{scroll-behavior:auto!important}}
