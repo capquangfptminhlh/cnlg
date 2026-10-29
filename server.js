@@ -178,17 +178,17 @@ app.use((req, res, next) => {
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
-  if (base === 'admin.html') {
+  if (base === 'admin.html' || base === 'admin-besi.html') {
     if (!isAdminRequest(req)) {
       const cfg = readConfig();
       return res.status(200).type('html').send(renderAdminLoginGate(cfg.store?.name || 'Hoàng Minh Store'));
     }
-    return res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+    return res.sendFile(path.join(__dirname, 'public', base));
   }
   if (!isAdminRequest(req)) {
     return res.status(404).type('text/plain').send('Not Found');
   }
-  const allowed = { 'admin.js': 'admin.js', 'admin-portal.css': 'admin-portal.css', 'admin-theme.css': 'admin-theme.css' }[base];
+  const allowed = { 'admin.js': 'admin.js', 'admin-portal.css': 'admin-portal.css', 'admin-theme.css': 'admin-theme.css', 'admin-besi.js': 'admin-besi.js', 'admin-besi.css': 'admin-besi.css' }[base];
   if (!allowed) return res.status(404).type('text/plain').send('Not Found');
   return res.sendFile(path.join(__dirname, 'public', allowed));
 });
