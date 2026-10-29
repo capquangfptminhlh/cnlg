@@ -63,7 +63,9 @@
       if(ok)seen.add(id);
       return ok;
     });
-    const cards=candidates.slice(0,3).map(productCard).filter(Boolean);
+    // Prioritize actual product photographs; blank placeholders decrease trust.
+    const photographed=candidates.filter(p=>safeImage(p.image)!==fallback);
+    const cards=photographed.slice(0,3).map(productCard).filter(Boolean);
     if (cards.length<2) return; // preserve existing quick links if catalog unavailable
     root.replaceChildren(...cards);
     root.hidden=false;
