@@ -34,20 +34,34 @@ function RunNpm {
   $out = & npm.cmd @args 2>&1 | ForEach-Object { "$_" }
   return [pscustomobject]@{ Code = $LASTEXITCODE; Out = $out }
 }
-function Healthy([int]$seconds) {
+function Healthy([int]$seconds, [string]$expectedCommit) {
+  $expectedShort = $expectedCommit.Substring(0, 12)
   for ($i = 0; $i -lt $seconds; $i += 2) {
     Start-Sleep 2
-    try { if ((Invoke-RestMethod http://localhost:3000/healthz -TimeoutSec 3).ok) { return $true } } catch {}
+    try {
+      $health = Invoke-RestMethod http://127.0.0.1:3000/healthz -TimeoutSec 4
+      if (-not $health.ok -or $health.release -ne $expectedShort) { continue }
+      # Release SHA alone is insufficient; verify the product facets API
+      # which caused the long-running "code deployed but UI not live" problem.
+      $facets = Invoke-RestMethod 'http://127.0.0.1:3000/api/products/category-facets?category=case' -TimeoutSec 6
+      if ($facets.success -eq $true -and $facets.category -eq 'case') { return $true }
+    } catch {}
   }
   return $false
 }
-function RestartStore {
-  if ($env:HM_UPDATE_NO_RESTART -eq '1') { return $true }
-  # Tắt node đang giữ cổng 3000; start.bat (tác vụ "HoangMinh Store") tự bật lại sau ~5 giây với mã mới
+function RestartStore([string]$expectedCommit) {
+  if ($env:HM_UPDATE_NO_RESTART -eq '1') { Log "DRY-RUN: bỏ qua restart và smoke test."; return $true }
+  # Only terminate the production Node process when Windows watchdog
+  # is configured to bring it back. Otherwise leave it running and rollback.
+  $task = Get-ScheduledTask -TaskName 'HoangMinh Store' -ErrorAction SilentlyContinue
+  if (-not $task -or $task.State -eq 'Disabled') {
+    Log 'KHÔNG restart: chưa có tác vụ HoangMinh Store bật watchdog. Cần chạy install-server-windows hoặc cấu hình supervisor.'
+    return $false
+  }
   $c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($c) { Stop-Process -Id $c.OwningProcess -Force }
   Start-Sleep 3
-  return (Healthy 90)
+  return (Healthy 90 $expectedCommit)
 }
 # data\products.json do vòng đồng bộ ghi liên tục nhưng vẫn nằm trong git (bản lưu cho bản trưng bày):
 # cất bản đang chạy ra ngoài trước khi đổi mã, xong thì trả lại – không bao giờ mất danh mục đang bán
@@ -107,13 +121,13 @@ try {
     if ($lockChanged) { RunNpm ci --no-audit --no-fund | Out-Null }
     return
   }
-  if (RestartStore) { Log "ĐÃ CẬP NHẬT lên $($new.Substring(0,7)), cửa hàng chạy bình thường."; return }
+  if (RestartStore $new) { Log "ĐÃ CẬP NHẬT lên $($new.Substring(0,7)), health release và API lọc đều đạt."; return }
 
   Log "CỬA HÀNG KHÔNG LÊN với bản $($new.Substring(0,7)) → quay về $($old.Substring(0,7))"
   Set-Content $rejected $new
   WithCatalogKept { RunGit reset --hard --quiet $old | Out-Null }
   if ($lockChanged) { RunNpm ci --no-audit --no-fund | Out-Null }
-  if (RestartStore) { Log 'Đã quay về bản cũ, cửa hàng chạy lại.' } else { Log 'LỖI: cửa hàng vẫn không lên sau khi quay về – xem data\server.log' }
+  if (RestartStore $old) { Log 'Đã quay về bản cũ, health check đạt.' } else { Log 'CẢNH BÁO: chưa xác nhận máy chủ chạy bản cũ. Kiểm tra tác vụ HoangMinh Store và data\server.log.' }
 } catch {
   Log "LỖI: $($_.Exception.Message)"
 } finally {
