@@ -45,8 +45,11 @@ function connectorOf(text){
   if(usbAtoIp.test(s)||/\b(a2l|a2ip|usb2lightning)\b/.test(s))return 'a-lightning';
   if(usbCtoC.test(s)||/\b(c2c|cc cable|2 dau type c)\b/.test(s))return 'c-c';
   if(usbAtoC.test(s)||/\b(a2c|usb2typec)\b/.test(s))return 'a-c';
-  if(l&&c&&!a)return 'c-lightning';
-  if(l&&a&&!c)return 'a-lightning';
+  // A shared title listing both Type-C and Lightning may describe separate
+  // choices (Micro / Type-C / Lightning), NOT a Type-C -> Lightning cable.
+  // Without an explicit connector pair, keep it as an unverified candidate.
+  if(l&&c&&!a)return null;
+  if(l&&a&&!c)return null;
   if(l&&!c&&!a)return 'lightning';
   // Both USB-C and USB-A mentioned without clear direction: never guess.
   if(!l&&c&&a)return null;
@@ -79,7 +82,9 @@ function buildIndex(products){
   for(const p of products||[]){
     if(!p||p.in_stock===false||!Number.isSafeInteger(Number(p.id))||!(Number(p.price)>0))continue;
     const title=norm(p.name);
-    const vars=Array.isArray(p.variants)&&p.variants.length?p.variants:[null];
+    const hasList=Array.isArray(p.variants)&&p.variants.length>0;
+    const needsVariantDetail=!hasList&&Number(p.variant_count||0)>1;
+    const vars=hasList?p.variants:[null];
     // Missing the word "cáp" in a title must not hide a cable whose
     // category, subtype or an explicit connector pair identifies it.
     const category=norm(p.category_name||p.category||'');
@@ -96,14 +101,20 @@ function buildIndex(products){
       const length=lengthOf(variantText)||lengthOf(title);
       const watt=powerOf(variantText)||powerOf(title);
       const color=colorOf(variantText)||colorOf(title);
-      const row={product:p,variant:v||null,length,watt,color,type};
-      if(type){
+      const row={product:p,variant:v||null,length,watt,color,type,
+        unverifiedReason:needsVariantDetail?'Chưa xác minh từng phân loại và giá':null};
+      if(type&&!needsVariantDetail){
         buckets.get(type).push(row);
         if(type==='c-lightning'||type==='a-lightning')buckets.get('lightning').push(row);
         classified=true;indexed++;
       }else{
         incomplete=true;
-        for(const hint of connectorHints(combined))uncertain.get(hint).push(row);
+        // Even a clear title cannot confirm the sellable variation if the
+        // listing says variant_count>1 but does not include those variants.
+        const options=type
+          ? new Set([type,...(type.includes('lightning')?['lightning']:[])])
+          : connectorHints(combined);
+        for(const hint of options)uncertain.get(hint).push(row);
       }
       if(!length||!watt||!color)incomplete=true;
     }
@@ -138,7 +149,7 @@ function searchIndex(index,request={}){
     const id=Number(row.product.id);
     if(!(rowCost(row)>0))return;
     const missing=[];
-    if(unknownConnector)missing.push('Đầu kết nối chưa rõ');
+    if(unknownConnector)missing.push(row.unverifiedReason||'Đầu kết nối chưa rõ');
     if(filter.length&&!row.length)missing.push('Chưa rõ chiều dài');
     if(filter.power&&!row.watt)missing.push('Chưa rõ công suất');
     if(filter.color&&!row.color)missing.push('Chưa rõ màu sắc');

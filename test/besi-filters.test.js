@@ -232,3 +232,19 @@ test('admin audit pagination allows review of every incomplete SKU, not only fir
   assert.match(admin,/spec-coverage\?page=/);
   assert.match(admin,/besiSpecReviewMore/);
 });
+
+test('realistic mixed Micro/Lightning/Type-C product is not falsely confirmed as C-to-Lightning',()=>{
+  const p={id:124062,
+    name:'Cáp Dù 2 mét hãng VVZ đủ chân Micro, Lighting, Type C',
+    category_name:'Củ cáp sạc',price:29000,in_stock:true,variant_count:9};
+  const idx=facets.buildIndex([p]);
+  const result=query(idx,{length:2});
+  assert.equal(result.total,0,'multiple connector choices are not proof of a single C-Lightning cable');
+  assert.equal(result.possibleTotal,1,'buyer can still discover item needing inspection');
+  assert.match(result.possible[0].reasons.join(' '),/Chưa rõ đầu kết nối|Đầu kết nối chưa rõ|phân loại/);
+  const mixedWithPrice={...p,id:124063,name:'Cáp USB-C to Lightning 2m',variant_count:9};
+  const result2=query(facets.buildIndex([mixedWithPrice]),{length:2});
+  assert.equal(result2.total,0,'multiple undownloaded variants must not be claimed a verified sellable SKU');
+  assert.equal(result2.possibleTotal,1);
+  assert.match(result2.possible[0].reasons.join(' '),/phân loại/);
+});
