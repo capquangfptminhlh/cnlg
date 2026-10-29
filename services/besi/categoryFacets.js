@@ -112,7 +112,9 @@ function buildIndex(products){
           parsed.ambiguous?['Có nhiều thông số trong tên']:
             parsed.spec===null?['Chưa rõ thông số']:[]};
       buckets.get(category).push(row);
-      if(verified)options.get(category).add(parsed.spec);
+      // Offer choices from real title/variation mentions even when final SKU
+      // needs verification; never claim these are confirmed availability.
+      if(parsed.spec!==null&&!parsed.ambiguous)options.get(category).add(parsed.spec);
     }
   }
   return {buckets,options,stats};
