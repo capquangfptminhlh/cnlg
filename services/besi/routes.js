@@ -8,7 +8,8 @@ function attach(app,options={}){
   const enabled=()=>process.env.BESI_MARKETPLACE_PUBLIC==='1';
   const handle=fn=>(req,res)=>{
     try{fn(req,res);}catch(error){
-      const status=Number.isInteger(error.status)?error.status:400;
+      const status=Number.isInteger(error.status)&&error.status>=400&&error.status<500?error.status:500;
+      // Never echo parser traces, supplier data, paths or operational details.
       res.status(status).json({success:false,error:status===500?'Lỗi hệ thống':String(error.message).slice(0,180)});
     }
   };
