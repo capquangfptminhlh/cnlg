@@ -58,7 +58,7 @@ function validateOffer(o,supplierIds){
   const stock=Number(o.stock);
   if(!Number.isSafeInteger(stock)||stock<0||stock>1e8)bad('Số lượng tồn không hợp lệ');
   const image=clean(o.image,250);
-  if(image&&!/^\/(?:images|cdn)\/[a-z0-9/_-]+\.(?:png|jpg|jpeg|webp)$/i.test(image))
+  if(image&&!/^\/images\/besi\/[a-z0-9/_-]+\.(?:png|jpg|jpeg|webp)$/i.test(image))
     bad('Chỉ dùng ảnh đã kiểm duyệt trên domain của BESI');
   return {supplierId,sku,name,gtin,brand:clean(o.brand,100),model:clean(o.model,100),
     variant:clean(o.variant,100),category:clean(o.category,120),cost,stock,image,
@@ -103,14 +103,31 @@ function safeName(name,suppliers){
   }
   return result||'Sản phẩm BESI';
 }
+// Stock-aware sourcing: the advertised unit price must cover every unit
+// requested, including units supplied by more expensive backup partners.
+function selectStock(offers,quantity){
+  let remaining=quantity,totalCost=0;
+  const allocations=[];
+  for(const offer of offers){
+    if(!remaining)break;
+    const count=Math.min(remaining,offer.stock);
+    if(count<=0)continue;
+    allocations.push({offer,quantity:count});
+    totalCost+=count*offer.cost;
+    remaining-=count;
+  }
+  if(remaining)bad('Không đủ tồn kho');
+  return {allocations,averageCost:totalCost/quantity};
+}
 function publicCatalog(state,rawPolicy={}){
   const p=policyOf(rawPolicy);
   return groups(state).map(g=>{
-    const cheapest=g.offers[0],cost=cheapest.cost;
+    const cheapest=g.offers[0],stock=g.offers.reduce((n,o)=>n+o.stock,0);
     return {id:g.id,name:safeName(cheapest.name,state.suppliers||[]),
       brand:clean(cheapest.brand,100),category:clean(cheapest.category,120),
-      image:cheapest.image||'',available:true,price:tierPrice(cost,1,p),
-      tiers:p.tiers.map(t=>({minQty:t.minQty,price:tierPrice(cost,t.minQty,p)}))};
+      image:cheapest.image||'',available:true,price:tierPrice(cheapest.cost,1,p),
+      tiers:p.tiers.map(t=>({minQty:t.minQty,
+        price:stock>=t.minQty?tierPrice(selectStock(g.offers,t.minQty).averageCost,t.minQty,p):null}))};
   });
 }
 function quoteInternal(state,lines,policy={}){
@@ -124,8 +141,9 @@ function quoteInternal(state,lines,policy={}){
     if(!group)bad('Sản phẩm không còn bán');
     const stock=group.offers.reduce((n,o)=>n+o.stock,0);
     if(stock<quantity)bad('Không đủ số lượng tồn cho '+id);
-    const unitPrice=tierPrice(group.offers[0].cost,quantity,policy);
-    return {id,quantity,unitPrice,subtotal:quantity*unitPrice,group};
+    const selection=selectStock(group.offers,quantity);
+    const unitPrice=tierPrice(selection.averageCost,quantity,policy);
+    return {id,quantity,unitPrice,subtotal:quantity*unitPrice,group,selection};
   });
 }
 function publicQuote(state,lines,policy={}){
@@ -137,16 +155,8 @@ function publicQuote(state,lines,policy={}){
 function draftAllocation(state,lines,policy={}){
   const quoted=quoteInternal(state,lines,policy),shipments=new Map();
   for(const item of quoted){
-    let missing=item.quantity;
-    const candidates=[...item.group.offers].sort((a,b)=>{
-      const aCost=a.cost*missing+(shipments.has(a.supplierId)?0:a.supplier.shippingFee);
-      const bCost=b.cost*missing+(shipments.has(b.supplierId)?0:b.supplier.shippingFee);
-      return aCost-bCost||a.supplier.leadDays-b.supplier.leadDays;
-    });
-    for(const o of candidates){
-      if(!missing)break;
-      const quantity=Math.min(missing,o.stock);
-      if(!quantity)continue;
+    // Same stock selection as quoting; never swap to a costlier offer after pricing.
+    for(const {offer:o,quantity} of item.selection.allocations){
       if(!shipments.has(o.supplierId))shipments.set(o.supplierId,{
         supplierId:o.supplierId,shippingFee:o.supplier.shippingFee,
         leadDays:o.supplier.leadDays,lines:[]
@@ -154,9 +164,7 @@ function draftAllocation(state,lines,policy={}){
       shipments.get(o.supplierId).lines.push({
         productId:item.id,sku:o.sku,quantity,unitCost:o.cost,unitPrice:item.unitPrice
       });
-      missing-=quantity;
     }
-    if(missing)bad('Không thể chia đủ số lượng sản phẩm');
   }
   const list=[...shipments.values()].map(s=>({
     ...s,cost:s.lines.reduce((n,l)=>n+l.unitCost*l.quantity,0)
