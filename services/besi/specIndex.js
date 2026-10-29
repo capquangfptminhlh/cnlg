@@ -80,7 +80,12 @@ function buildIndex(products){
     if(!p||p.in_stock===false||!Number.isSafeInteger(Number(p.id))||!(Number(p.price)>0))continue;
     const title=norm(p.name);
     const vars=Array.isArray(p.variants)&&p.variants.length?p.variants:[null];
-    const cable=cableName(title)||vars.some(v=>cableName(v?.name));
+    // Missing the word "cáp" in a title must not hide a cable whose
+    // category, subtype or an explicit connector pair identifies it.
+    const category=norm(p.category_name||p.category||'');
+    const otherProduct=/\b(cu sac|bo sac|op lung|tai nghe|adapter|hub|dock|dau chuyen|sac du phong)\b/.test(title);
+    const cable=cableName(title)||vars.some(v=>cableName(v?.name))
+      ||(!otherProduct&&(cableName(category)||connectorOf(title)!==null));
     if(!cable)continue;
     cableProducts++;
     let incomplete=false,classified=false;
