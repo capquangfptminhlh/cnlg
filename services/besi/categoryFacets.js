@@ -62,7 +62,7 @@ function declaredModels(s){
   const pro=/(?:iphone|ip)?\s*(1[1-7])\s*(?:pro\s*max|promax|prm|pm)\b/g;
   let m;
   while((m=pro.exec(t)))result.add('iphone-'+m[1]+'-pro-max');
-  const normal=/(?:iphone|ip)\s*(1[1-7])\b(?!\s*(?:pro|promax|prm|pm))/g;
+  const normal=/(?:iphone|ip)\s*(1[1-7])\b(?!\s*(?:pro|promax|prm|pm|plus|mini|air|e\b))/g;
   while((m=normal.exec(t)))result.add('iphone-'+m[1]);
   const ultra=/(?:samsung|galaxy)?\s*s\s*(2[2-6])\s*ultra\b/g;
   while((m=ultra.exec(t)))result.add('samsung-s'+m[1]+'-ultra');
@@ -141,7 +141,7 @@ function validate(q={}){
   const category=String(q.category||'case');
   const model=String(q.model||''),watt=Number(q.watt||0),
     capacity=Number(q.capacity||0),color=String(q.color||'');
-  const page=Number(q.page||1),possiblePage=Number(q.possiblePage||1),limit=Number(q.limit||24);
+  const page=Number(q.page??1),possiblePage=Number(q.possiblePage??1),limit=Number(q.limit??24);
   if(!CATEGORIES.has(category)||(!MODELS.has(model)&&model!=='')
     ||!WATTS.has(watt)||!CAPACITIES.has(capacity)||!COLORS.has(color)
     ||!Number.isSafeInteger(page)||page<1||page>10000
