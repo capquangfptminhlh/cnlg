@@ -1,0 +1,88 @@
+/* BESI: dimension/connector facets sourced from real catalog and variants. */
+.besi-spec-finder{background:#fff;border:1px solid #e8edf4;border-radius:13px;margin-bottom:12px;box-shadow:0 5px 16px #25344e08;overflow:hidden}
+.besi-spec-summary{display:flex;align-items:center;gap:12px;padding:15px 17px;cursor:pointer;list-style:none;user-select:none}
+.besi-spec-summary::-webkit-details-marker{display:none}
+.besi-spec-summary:hover{background:#fff9f5}
+.besi-spec-icon{width:42px;height:42px;flex:0 0 42px;display:grid;place-items:center;background:#fff0e9;color:#ed4c27;border-radius:12px;font-size:19px}
+.besi-spec-intro{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+.besi-spec-intro strong{font-size:15px;line-height:1.35;font-weight:800;letter-spacing:-.035em;color:#1c2a40}
+.besi-spec-intro small{font-size:11px;color:#7b889b;line-height:1.45}
+.besi-spec-open-text{white-space:nowrap;font-size:11px;color:#e44d2a;font-weight:750}
+.besi-spec-open-text i{font-size:10px;margin-left:6px;transition:transform .2s}
+.besi-spec-finder[open] .besi-spec-open-text i,.besi-spec-finder details[open] .besi-spec-open-text i{transform:rotate(180deg)}
+.besi-spec-body{border-top:1px solid #edf0f5;padding:17px;display:grid;gap:15px}
+.besi-spec-row{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:16px}
+.besi-spec-fieldset{border:0;padding:0;margin:0;min-width:0}
+.besi-spec-fieldset legend{font-size:11px;font-weight:800;margin-bottom:9px;color:#32435b}
+.besi-spec-options{display:flex;flex-wrap:wrap;gap:7px}
+.besi-spec-options label{position:relative;cursor:pointer;font-size:11px;line-height:1.4;flex:0 0 auto}
+.besi-spec-options input{position:absolute;opacity:0;width:1px;height:1px}
+.besi-spec-options span{display:inline-flex;align-items:center;min-height:34px;padding:7px 12px;background:#f8f9fb;border:1px solid #e6ebf2;border-radius:9px;color:#4b5b70;font-weight:700;transition:background .15s,border-color .15s}
+.besi-spec-options label:hover span{background:#fff4ee;border-color:#ffc1aa;color:#dd4323}
+.besi-spec-options input:checked+span{background:#fff0e9;color:#ed4b29;border-color:#f47a57;box-shadow:0 0 0 1px #ffb7a5 inset}
+.besi-spec-options input:focus-visible+span{outline:3px solid #f9b08d;outline-offset:2px}
+.besi-spec-actions{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.besi-spec-colour{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:750;color:#394861}
+.besi-spec-colour select{background:#fff;border:1px solid #dde4ed;border-radius:9px;min-height:39px;padding:8px 34px 8px 10px;font:inherit;color:#35465d}
+.besi-spec-apply{min-height:40px;background:#f4512c;border:1px solid #e94f2b;color:white;border-radius:9px;padding:9px 19px;font-weight:800;font-size:11px;cursor:pointer;box-shadow:0 5px 13px #f4512c20}
+.besi-spec-apply:hover:not(:disabled){background:#d94120}
+.besi-spec-apply:disabled{opacity:.55;cursor:wait}
+.besi-spec-reset{min-height:39px;border:1px solid #e5eaf2;border-radius:9px;background:#fff;color:#5a6980;padding:8px 12px;font-size:11px;font-weight:750;cursor:pointer}
+.besi-spec-reset:hover{color:#e74d2c;border-color:#ffc6b3;background:#fff7f3}
+.besi-spec-hint{margin:0;color:#8793a4;font-size:10px;line-height:1.5}
+.besi-spec-results{margin-bottom:16px;background:#fff;border:1px solid #e9edf3;border-radius:13px;padding:15px;overflow:hidden}
+.besi-spec-results[hidden]{display:none!important}
+.besi-spec-results-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:15px}
+.besi-spec-kicker{font-size:9px;font-weight:800;letter-spacing:.1em;color:#f4512c}
+.besi-spec-results-head h2{margin:3px 0;font-size:20px;font-weight:800;letter-spacing:-.045em;color:#1b2b43}
+#besiSpecStatus{margin:0;font-size:11px;color:#6b788f}
+.besi-spec-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}
+.besi-spec-product{border:1px solid #e9edf3;background:#fff;border-radius:11px;overflow:hidden;min-width:0;display:flex;flex-direction:column}
+.besi-spec-product-image{display:grid;place-items:center;aspect-ratio:1;background:#f7f9fb;border:0;cursor:pointer;padding:7px}
+.besi-spec-product-image img{height:100%;width:100%;object-fit:contain}
+.besi-spec-product-body{padding:10px;display:flex;flex-direction:column;gap:6px;flex:1}
+.besi-spec-product-title{font-size:11.5px;font-weight:600;line-height:1.48;text-align:left;min-height:34px;border:0;background:transparent;padding:0;color:#23334b;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.besi-spec-product-title:hover{color:#ed4b2a}
+.besi-spec-product-variant{display:block;font-size:10px;color:#627189;line-height:1.4;min-height:17px}
+.besi-spec-product-price{font-size:15px;font-weight:800;letter-spacing:-.04em;color:#ec4c29;margin-top:auto}
+.besi-spec-product-buy{background:#fff0e9;color:#e94320;border:1px solid #ffd0be;border-radius:8px;min-height:34px;font-size:10px;font-weight:800;cursor:pointer}
+.besi-spec-product-buy:hover{background:#ee4a25;color:#fff;border-color:#ee4a25}
+.besi-spec-empty{grid-column:1/-1;text-align:center;padding:34px 14px;border:1px dashed #dce4ee;border-radius:12px;font-size:12px;color:#758198}
+.besi-spec-load{text-align:center;padding-top:18px}
+.besi-spec-load button[hidden]{display:none!important}
+.main-layout.besi-filter-mode>.brand-bar,
+.main-layout.besi-filter-mode>.filter-bar,
+.main-layout.besi-filter-mode>#productGrid,
+.main-layout.besi-filter-mode>#pagination,
+.main-layout.besi-filter-mode>.flex-center{display:none!important}
+@media(min-width:1640px){.besi-spec-grid{grid-template-columns:repeat(7,minmax(0,1fr))}}
+@media(max-width:1280px){.besi-spec-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:1000px){.besi-spec-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:700px){
+ .besi-spec-finder{margin-bottom:9px;border-radius:11px}
+ .besi-spec-summary{padding:11px;gap:9px}
+ .besi-spec-icon{width:34px;height:34px;flex-basis:34px;border-radius:10px;font-size:15px}
+ .besi-spec-intro strong{font-size:12px}
+ .besi-spec-intro small{font-size:9px}
+ .besi-spec-open-text{font-size:0}
+ .besi-spec-open-text i{font-size:12px}
+ .besi-spec-body{padding:11px;gap:13px}
+ .besi-spec-row{display:block}
+ .besi-spec-row fieldset+fieldset{margin-top:13px}
+ .besi-spec-options{gap:6px}
+ .besi-spec-options label{font-size:10px}
+ .besi-spec-options span{min-height:32px;padding:6px 9px}
+ .besi-spec-actions{gap:7px}
+ .besi-spec-colour{flex:1 1 130px}
+ .besi-spec-apply{flex:1 1 170px;min-height:39px}
+ .besi-spec-reset{flex:0 1 auto}
+ .besi-spec-results{padding:10px}
+ .besi-spec-results-head h2{font-size:17px}
+ .besi-spec-results-head .besi-spec-reset{max-width:110px}
+ .besi-spec-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .besi-spec-product-body{padding:8px;gap:5px}
+ .besi-spec-product-title{font-size:11px}
+ .besi-spec-product-price{font-size:14px}
+ .besi-spec-product-buy{font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){.besi-spec-options span,.besi-spec-open-text i{transition:none}}
