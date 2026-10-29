@@ -213,3 +213,33 @@ test('BESI host uses correct SEO metadata while legacy host keeps its branding',
   const legacy=seo.renderHomePage(req('unrelated.example'),cfg,10);
   assert.match(legacy,/<meta property="og:site_name" content="Hoàng Minh Store">/);
 });
+
+
+test('BESI conversion-first hero uses real public products, source-safe images and functional buy actions',()=>{
+  const html=read('public/index.html');
+  const js=read('public/besi-conversion.js');
+  const css=read('public/besi-conversion.css');
+  const {Script}=require('node:vm');
+  assert.doesNotThrow(()=>new Script(js,{filename:'public/besi-conversion.js'}));
+  assert.match(html,/id="besiPickList"/);
+  assert.match(html,/id="besiLiveCount"/);
+  assert.match(html,/Giá tốt mỗi ngày/);
+  assert.match(html,/Xem sản phẩm &amp; giá/);
+  assert.match(html,/\/besi-conversion\.js/);
+  assert.match(html,/\/besi-conversion\.css/);
+  assert.ok(html.indexOf('/besi-conversion.css')>html.indexOf('/besi-marketplace-v5.css'));
+  assert.match(js,/addEventListener\('storefront:products'/);
+  assert.match(js,/data.*shopProduct|dataset\.shopProduct/);
+  assert.match(js,/dataset\.shopBuy/);
+  assert.match(js,/safeImage = value/);
+  assert.ok(js.includes('catalog-image'), 'Images must use first-party catalog proxy');
+  assert.match(js,/Number\(item\.price\)/);
+  assert.match(js,/item\.in_stock===false/);
+  assert.match(js,/photographed\.slice\(0,3\)/);
+  assert.doesNotMatch(js,/\bfetch\s*\(|XMLHttpRequest|source_url|dealer_price|wholesale_price/i);
+  assert.doesNotMatch(html,/Rẻ hơn tới 70%/);
+  assert.match(css,/@media\(max-width:700px\)/);
+  assert.match(css,/overflow-x:auto/);
+  assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
+  assert.doesNotMatch(css,/dropbuy|cnlg|techmall|supplier_cost|source_url/i);
+});

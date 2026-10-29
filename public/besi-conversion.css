@@ -1,0 +1,105 @@
+/* BESI conversion-first enhancements.
+   Renders verified public products in the hero side area, never fake urgency. */
+:root {--besi-conversion:#f34f2c}
+.market-main-banner .banner-catalog-count{
+ display:flex !important;align-items:center;gap:4px;
+ margin-top:5px !important;font-size:10px !important;
+ font-weight:500;color:#fff9ef !important;
+ opacity:0;transition:opacity .18s ease;
+}
+.market-main-banner .banner-catalog-count.is-ready{opacity:1}
+.market-main-banner .banner-catalog-count strong{font-size:11px;color:#fff !important;font-weight:800}
+.market-banner-side.has-besi-picks{
+ display:flex !important;flex-direction:column !important;
+ min-width:0;min-height:0;max-height:234px
+}
+.market-banner-side.has-besi-picks > .market-mini-promo{display:none !important}
+.besi-pick-list[hidden]{display:none !important}
+.market-banner-side.has-besi-picks .besi-pick-list{
+ display:grid;grid-template-rows:repeat(3,minmax(0,1fr));
+ gap:7px;min-height:0;min-width:0;flex:1 1 auto
+}
+.besi-pick{
+ background:#fff;border:1px solid #e9edf3;border-radius:10px;
+ display:grid;grid-template-columns:minmax(0,1fr) 58px;align-items:center;
+ min-width:0;overflow:hidden;box-shadow:0 2px 8px rgba(31,50,74,.035);
+ padding:6px;gap:5px
+}
+.besi-pick-preview{
+ display:grid;grid-template-columns:50px minmax(0,1fr);
+ align-items:center;gap:7px;min-width:0;
+ background:none;border:0;cursor:pointer;text-align:left;
+ padding:0;color:#1c2d45;height:100%
+}
+.besi-pick-preview:focus-visible,.besi-pick-buy:focus-visible{
+ outline:2px solid #f4512c;outline-offset:1px
+}
+.besi-pick-image{
+ width:50px;height:50px;object-fit:contain;
+ border-radius:7px;background:#f7f8fb
+}
+.besi-pick-summary{min-width:0;display:flex;flex-direction:column;gap:2px}
+.besi-pick-title{
+ display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+ overflow:hidden;max-width:100%;font-size:10px;line-height:1.35;
+ font-weight:550;color:#26344a
+}
+.besi-pick-price{
+ font-size:11.7px;font-weight:800;color:#f34927;
+ white-space:nowrap;letter-spacing:-.035em
+}
+.besi-pick-buy{
+ background:#fff0e9;border:1px solid #ffcdbb;
+ color:#ea4a25;border-radius:7px;
+ padding:8px 3px;min-height:34px;font:800 9px/1.3 'Be Vietnam Pro',sans-serif;
+ cursor:pointer;white-space:nowrap
+}
+.besi-pick-buy:hover{background:#f4512c;border-color:#f4512c;color:#fff}
+.market-main-banner h1,.market-banner-copy h1{
+ letter-spacing:-.05em !important;
+}
+.market-main-banner .market-banner-copy{max-width:72% !important}
+#catalog{scroll-margin-top:16px}
+#productGrid .btn-buy-instant{transition:background-color .15s,color .15s,border-color .15s}
+#productGrid .btn-buy-instant:hover:not(:disabled){
+ background:#f4512c !important;color:#fff !important;border-color:#f4512c !important
+}
+#productGrid .card-title{color:#1c2a41 !important}
+#productGrid .price-highlight{color:#f04b26 !important}
+@media(max-width:1000px) and (min-width:701px){
+ .market-banner-side.has-besi-picks{display:none !important}
+}
+@media(max-width:700px){
+ .market-banner-side.has-besi-picks{
+  display:block !important;max-height:none !important;
+  margin:8px 0 0 !important;width:100%;overflow:visible
+ }
+ .market-banner-side.has-besi-picks .besi-pick-list{
+  display:flex !important;gap:8px !important;
+  overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;
+  padding:1px 1px 5px;scrollbar-width:thin;overscroll-behavior-x:contain
+ }
+ .market-banner-side.has-besi-picks .besi-pick{
+  flex:0 0 clamp(205px,60vw,245px);width:clamp(205px,60vw,245px);
+  height:73px;scroll-snap-align:start;
+  padding:6px;grid-template-columns:minmax(0,1fr) 57px
+ }
+ .besi-pick-preview{grid-template-columns:51px minmax(0,1fr);gap:7px}
+ .besi-pick-image{width:51px;height:51px}
+ .besi-pick-title{font-size:9.7px}
+ .besi-pick-price{font-size:11.7px}
+ .besi-pick-buy{font-size:9px;padding:7px 3px}
+ .market-main-banner .banner-catalog-count{display:none !important}
+ .market-main-banner .market-banner-copy{max-width:78% !important}
+ .market-main-banner p{line-height:1.35 !important}
+ .market-shortcuts{margin-top:5px !important}
+ .market-links{gap:14px !important}
+}
+@media(max-width:360px){
+ .market-main-banner .market-banner-copy{max-width:86% !important}
+ .market-main-banner h1{font-size:18px !important}
+ .besi-pick-list .besi-pick{flex-basis:203px;width:203px}
+}
+@media(prefers-reduced-motion:reduce){
+ .market-main-banner .banner-catalog-count,#productGrid .btn-buy-instant{transition:none !important}
+}
