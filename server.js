@@ -35,6 +35,7 @@ const catalogImage = require('./services/catalogImage');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
+const besiSpecs = require('./services/besi/specIndex');
 const shipments = require('./services/shipments');
 const deliveryEta = require('./services/deliveryEta');
 
@@ -284,6 +285,8 @@ let cachedBrandsJson = null;
 let cachedCategoriesJson = null;
 let cachedDefaultMixed = null;
 let cachedCategoryIdsMap = new Map();
+let cachedSpecsIndex = null;
+let specsIndexBuiltAt = 0;
 let lastFsSlot = -1;
 let cachedFsData = null;
 
@@ -295,6 +298,7 @@ function ensureCatalogCaches() {
   }
   lastCatalogRef = rawProducts;
   lastCategoriesRef = rawCategories;
+  cachedSpecsIndex = null; // catalog changed: invalidate server-side faceted index
 
   // 1. Phả hệ danh mục con -> cha (tìm nhanh O(1))
   cachedCategoryIdsMap.clear();
@@ -531,6 +535,39 @@ function mixSources(products, every = 4) {
   }
   return out;
 }
+
+/** Public, indexed specification search across the ENTIRE sellable catalog.
+ * No upstream API calls or supplier credentials. Refresh index periodically to
+ * catch in-place stock/price updates, and immediately when catalog refs change.
+ */
+function specificationIndex(){
+  ensureCatalogCaches();
+  if(!cachedSpecsIndex||Date.now()-specsIndexBuiltAt>120000){
+    cachedSpecsIndex=besiSpecs.buildIndex(cachedSellable);
+    specsIndexBuiltAt=Date.now();
+  }
+  return cachedSpecsIndex;
+}
+app.get('/api/products/specs', rateLimit('besi-specs', 60e3, 60), (req,res)=>{
+  try{
+    const found=besiSpecs.searchIndex(specificationIndex(),req.query);
+    const data=found.matched.map(({product,variant})=>{
+      const pub=publicProduct(product);
+      const matched=variant?(pub.variants||[]).find(v=>String(v.id)===String(variant.id)):null;
+      return {...pub,matched_variant:matched?{
+        id:matched.id,name:matched.name,price:matched.price,
+        image:matched.image||null,in_stock:matched.in_stock
+      }:null};
+    });
+    res.set('Cache-Control','public, max-age=20');
+    return res.json({success:true,total:found.total,page:found.page,
+      totalPages:found.totalPages,data});
+  }catch(e){
+    const status=e.status===400?400:500;
+    return res.status(status).json({success:false,
+      error:status===400?'Bộ lọc thông số không hợp lệ':'Không thể tìm kiếm lúc này'});
+  }
+});
 
 app.get('/api/products', (req, res) => {
   try {
