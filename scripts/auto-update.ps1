@@ -5,8 +5,9 @@
 # Test hỏng: giữ nguyên bản đang chạy. Mọi việc ghi vào data\update.log.
 #
 # Repo GitHub public: lấy qua HTTPS không cần token. Nếu có deploy key SSH cũ thì vẫn ưu tiên dùng SSH.
+param([string]$RepoRoot = '')
 $ErrorActionPreference = 'Stop'
-$repo = Split-Path -Parent $PSScriptRoot
+$repo = if ($RepoRoot) { (Resolve-Path -LiteralPath $RepoRoot).Path } else { Split-Path -Parent $PSScriptRoot }
 $dataDir = Join-Path $repo 'data'
 $log = Join-Path $dataDir 'update.log'
 $lock = Join-Path $dataDir 'update.lock'
