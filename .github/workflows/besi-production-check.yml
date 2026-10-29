@@ -1,0 +1,26 @@
+name: BESI live production deployment check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: besi-live-smoke
+  cancel-in-progress: true
+
+jobs:
+  verify-live:
+    name: Check actual BESI running release and category filters
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check health, GitHub release parity, indexed search and UI assets
+        run: node scripts/check-besi-production.js https://besi.com.vn "$(git rev-parse HEAD)"

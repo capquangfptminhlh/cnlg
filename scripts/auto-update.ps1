@@ -4,15 +4,17 @@
 # → test đạt mới khởi động lại cửa hàng (gián đoạn vài giây) → cửa hàng không lên lại thì quay về bản cũ.
 # Test hỏng: giữ nguyên bản đang chạy. Mọi việc ghi vào data\update.log.
 #
-# Lấy mã bằng khoá chỉ-đọc data\deploy\id_ed25519 (tạo bởi scripts\enable-auto-update.ps1), không cần đăng nhập GitHub.
+# Repo GitHub public: lấy qua HTTPS không cần token. Nếu có deploy key SSH cũ thì vẫn ưu tiên dùng SSH.
+param([string]$RepoRoot = '')
 $ErrorActionPreference = 'Stop'
-$repo = Split-Path -Parent $PSScriptRoot
+$repo = if ($RepoRoot) { (Resolve-Path -LiteralPath $RepoRoot).Path } else { Split-Path -Parent $PSScriptRoot }
 $dataDir = Join-Path $repo 'data'
 $log = Join-Path $dataDir 'update.log'
 $lock = Join-Path $dataDir 'update.lock'
 $catalog = Join-Path $dataDir 'products.json'
 $rejected = Join-Path $dataDir 'update.rejected'   # bản đã từ chối: không thử lại mỗi 5 phút
-$remoteUrl = 'git@github.com:capquangfptminhlh/cnlg.git'
+$remoteUrl = 'https://github.com/capquangfptminhlh/cnlg.git'
+$sshRemoteUrl = 'git@github.com:capquangfptminhlh/cnlg.git'
 # Chỉ để thử trên máy khác: HM_UPDATE_REMOTE = nguồn git thay thế (bỏ qua khoá deploy), HM_UPDATE_NO_RESTART=1 = không đụng cửa hàng
 $testRemote = $env:HM_UPDATE_REMOTE
 if ($testRemote) { $remoteUrl = $testRemote }
@@ -33,24 +35,45 @@ function RunNpm {
   $out = & npm.cmd @args 2>&1 | ForEach-Object { "$_" }
   return [pscustomobject]@{ Code = $LASTEXITCODE; Out = $out }
 }
-function Healthy([int]$seconds) {
+function Healthy([int]$seconds, [string]$expectedCommit, [bool]$requireNewApi = $true) {
+  $expectedShort = $expectedCommit.Substring(0, 12)
   for ($i = 0; $i -lt $seconds; $i += 2) {
     Start-Sleep 2
-    try { if ((Invoke-RestMethod http://localhost:3000/healthz -TimeoutSec 3).ok) { return $true } } catch {}
+    try {
+      $health = Invoke-RestMethod http://127.0.0.1:3000/healthz -TimeoutSec 4
+      if (-not $health.ok) { continue }
+      if (-not $requireNewApi) { return $true } # rollback may target a legacy release
+      if ($health.release -ne $expectedShort) { continue }
+      # Verify the new product-facets API, not merely the web server process.
+      $facets = Invoke-RestMethod 'http://127.0.0.1:3000/api/products/category-facets?category=case' -TimeoutSec 6
+      if ($facets.success -eq $true -and $facets.category -eq 'case') { return $true }
+    } catch {}
   }
   return $false
 }
-function RestartStore {
-  if ($env:HM_UPDATE_NO_RESTART -eq '1') { return $true }
-  # Tắt node đang giữ cổng 3000; start.bat (tác vụ "HoangMinh Store") tự bật lại sau ~5 giây với mã mới
+function RestartStore([string]$expectedCommit, [bool]$requireNewApi = $true) {
+  if ($env:HM_UPDATE_NO_RESTART -eq '1') { Log "DRY-RUN: bỏ qua restart và smoke test."; return $true }
+  # Only terminate the production Node process when Windows watchdog
+  # is configured to bring it back. Otherwise leave it running and rollback.
+  $task = Get-ScheduledTask -TaskName 'HoangMinh Store' -ErrorAction SilentlyContinue
+  if (-not $task -or $task.State -ne 'Running') {
+    Log 'KHÔNG restart: tác vụ HoangMinh Store không chạy watchdog. Cần chạy install-server-windows hoặc cấu hình supervisor.'
+    return $false
+  }
   $c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($c) { Stop-Process -Id $c.OwningProcess -Force }
   Start-Sleep 3
-  return (Healthy 90)
+  return (Healthy 90 $expectedCommit $requireNewApi)
 }
 # data\products.json do vòng đồng bộ ghi liên tục nhưng vẫn nằm trong git (bản lưu cho bản trưng bày):
 # cất bản đang chạy ra ngoài trước khi đổi mã, xong thì trả lại – không bao giờ mất danh mục đang bán
 function WithCatalogKept([scriptblock]$body) {
+  # Current BESI catalog data is gitignored, not a tracked source file.
+  # DO NOT "git checkout -- data/products.json" when it is untracked:
+  # doing so fails with pathspec and blocks every production update.
+  $tracked = RunGit ls-files -- data/products.json
+  if (-not $tracked) { & $body; return }
+  # Backward-compatible path for older server clones where file was tracked.
   $tmp = "$catalog.update-keep"
   $had = Test-Path $catalog
   if ($had) { Copy-Item $catalog $tmp -Force; RunGit checkout -- data/products.json | Out-Null }
@@ -63,12 +86,27 @@ Set-Content $lock $PID
 try {
   Set-Location $repo
   $key = Join-Path $dataDir 'deploy\id_ed25519'
-  if (-not $testRemote -and -not (Test-Path $key)) { return }   # chưa bật tự cập nhật
-  $ssh = Join-Path $env:SystemRoot 'System32\OpenSSH\ssh.exe'
-  if (-not (Test-Path $ssh)) { $ssh = 'ssh' }
-  if (-not $testRemote) { $env:GIT_SSH_COMMAND = "`"$($ssh -replace '\\', '/')`" -i `"$($key -replace '\\', '/')`" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=`"$((Join-Path $dataDir 'deploy\known_hosts') -replace '\\', '/')`"" }
+  $env:GIT_TERMINAL_PROMPT = '0' # fail safely instead of waiting on interactive auth in SYSTEM task
+  $env:GCM_INTERACTIVE = 'never'
+  $hasKey = (-not $testRemote -and (Test-Path $key))
+  if ($hasKey) {
+    $ssh = Join-Path $env:SystemRoot 'System32\OpenSSH\ssh.exe'
+    if (-not (Test-Path $ssh)) { $ssh = 'ssh' }
+    $env:GIT_SSH_COMMAND = "`"$($ssh -replace '\\', '/')`" -i `"$($key -replace '\\', '/')`" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=`"$((Join-Path $dataDir 'deploy\known_hosts') -replace '\\', '/')`""
+  } else {
+    Remove-Item Env:\GIT_SSH_COMMAND -ErrorAction SilentlyContinue
+  }
 
-  RunGit fetch --quiet $remoteUrl 'main:refs/remotes/origin/main' | Out-Null
+  # Always prefer the public read-only HTTPS URL. An existing SSH key is
+  # only a fallback for private-repo migration, never a reason to skip HTTPS.
+  try {
+    RunGit fetch --quiet $remoteUrl 'main:refs/remotes/origin/main' | Out-Null
+  } catch {
+    if ($hasKey) {
+      Log 'GitHub HTTPS fetch lỗi, thử khoá SSH cũ.'
+      RunGit fetch --quiet $sshRemoteUrl 'main:refs/remotes/origin/main' | Out-Null
+    } else { throw }
+  }
   $old = RunGit rev-parse HEAD
   $new = RunGit rev-parse origin/main
   if ($old -eq $new) { return }
@@ -87,6 +125,10 @@ try {
   if ($lockChanged) { Log 'package-lock đổi → cài lại thư viện'; if ((RunNpm ci --no-audit --no-fund).Code) { throw 'npm ci lỗi' } }
 
   $test = RunNpm test
+  if (-not $test.Code) {
+    Log 'Backend tests đạt; đang kiểm tra bộ lọc và giao diện (npm run test:ui).'
+    $test = RunNpm run test:ui
+  }
   if ($test.Code) {
     $failed = ($test.Out | Select-String 'fail (\d+)' | ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -Last 1)
     Log "TEST HỎNG ($failed bài) → giữ bản cũ $($old.Substring(0,7)), không thử lại bản $($new.Substring(0,7)) nữa."
@@ -95,13 +137,13 @@ try {
     if ($lockChanged) { RunNpm ci --no-audit --no-fund | Out-Null }
     return
   }
-  if (RestartStore) { Log "ĐÃ CẬP NHẬT lên $($new.Substring(0,7)), cửa hàng chạy bình thường."; return }
+  if (RestartStore $new) { Log "ĐÃ CẬP NHẬT lên $($new.Substring(0,7)), health release và API lọc đều đạt."; return }
 
   Log "CỬA HÀNG KHÔNG LÊN với bản $($new.Substring(0,7)) → quay về $($old.Substring(0,7))"
   Set-Content $rejected $new
   WithCatalogKept { RunGit reset --hard --quiet $old | Out-Null }
   if ($lockChanged) { RunNpm ci --no-audit --no-fund | Out-Null }
-  if (RestartStore) { Log 'Đã quay về bản cũ, cửa hàng chạy lại.' } else { Log 'LỖI: cửa hàng vẫn không lên sau khi quay về – xem data\server.log' }
+  if (RestartStore $old $false) { Log 'Đã quay về bản cũ, health check đạt.' } else { Log 'CẢNH BÁO: chưa xác nhận máy chủ chạy bản cũ. Kiểm tra tác vụ HoangMinh Store và data\server.log.' }
 } catch {
   Log "LỖI: $($_.Exception.Message)"
 } finally {
