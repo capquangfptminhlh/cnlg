@@ -56,6 +56,18 @@ describe('BESI master catalog and price engine',()=>{
     assert.ok(price<=core.tierPrice(80000,1,p));
     assert.throws(()=>core.policyOf({tiers:[{minQty:5,discountPercent:10}]}));
   });
+  test('large basket does not underprice inventory from more expensive backup warehouse',()=>{
+    const s=fixtures(),id=core.publicCatalog(s)[0].id;
+    // Cheap source has 3 units at 80k; remaining 7 must come from 90k.
+    const quoted=core.publicQuote(s,[{id,quantity:10}],s.policy);
+    const plan=core.draftAllocation(s,[{id,quantity:10}],s.policy);
+    const totalSourcing=3*80000+7*90000;
+    assert.equal(plan.shipments.reduce((n,x)=>n+x.lines.reduce((v,l)=>v+l.quantity*l.unitCost,0),0),totalSourcing);
+    assert.ok(quoted.subtotal>totalSourcing,'Quote must cover blended sourcing cost');
+    assert.equal(quoted.subtotal,plan.merchandiseSubtotal);
+    const publicItem=core.publicCatalog(s)[0];
+    assert.equal(publicItem.tiers.find(t=>t.minQty===20).price,null,'Unavailable bulk tiers must not advertise fictitious prices');
+  });
   test('public quotes omit supplier, costs and shipping promises',()=>{
     const s=fixtures(),id=core.publicCatalog(s)[0].id;
     const quote=core.publicQuote(s,[{id,quantity:7}],s.policy);
