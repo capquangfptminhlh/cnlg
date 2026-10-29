@@ -34,6 +34,7 @@ const customerMessage = require('./services/customerMessage');
 const catalogImage = require('./services/catalogImage');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
+const besiMarketplace = require('./services/besi/routes');
 const shipments = require('./services/shipments');
 const deliveryEta = require('./services/deliveryEta');
 
@@ -431,6 +432,10 @@ function paymentOptions(cfg = readConfig()) {
     bank: { enabled: p.bank?.enabled !== false && bankReady(cfg) }
   };
 }
+
+// BESI multi-supplier core: authenticated operations and opt-in public catalog.
+// Existing checkout and supplier adapters remain unchanged until the new flow is approved.
+besiMarketplace.attach(app);
 
 // --- PUBLIC API ---
 
