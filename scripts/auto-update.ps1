@@ -35,22 +35,23 @@ function RunNpm {
   $out = & npm.cmd @args 2>&1 | ForEach-Object { "$_" }
   return [pscustomobject]@{ Code = $LASTEXITCODE; Out = $out }
 }
-function Healthy([int]$seconds, [string]$expectedCommit) {
+function Healthy([int]$seconds, [string]$expectedCommit, [bool]$requireNewApi = $true) {
   $expectedShort = $expectedCommit.Substring(0, 12)
   for ($i = 0; $i -lt $seconds; $i += 2) {
     Start-Sleep 2
     try {
       $health = Invoke-RestMethod http://127.0.0.1:3000/healthz -TimeoutSec 4
-      if (-not $health.ok -or $health.release -ne $expectedShort) { continue }
-      # Release SHA alone is insufficient; verify the product facets API
-      # which caused the long-running "code deployed but UI not live" problem.
+      if (-not $health.ok) { continue }
+      if (-not $requireNewApi) { return $true } # rollback may target a legacy release
+      if ($health.release -ne $expectedShort) { continue }
+      # Verify the new product-facets API, not merely the web server process.
       $facets = Invoke-RestMethod 'http://127.0.0.1:3000/api/products/category-facets?category=case' -TimeoutSec 6
       if ($facets.success -eq $true -and $facets.category -eq 'case') { return $true }
     } catch {}
   }
   return $false
 }
-function RestartStore([string]$expectedCommit) {
+function RestartStore([string]$expectedCommit, [bool]$requireNewApi = $true) {
   if ($env:HM_UPDATE_NO_RESTART -eq '1') { Log "DRY-RUN: bỏ qua restart và smoke test."; return $true }
   # Only terminate the production Node process when Windows watchdog
   # is configured to bring it back. Otherwise leave it running and rollback.
@@ -62,7 +63,7 @@ function RestartStore([string]$expectedCommit) {
   $c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($c) { Stop-Process -Id $c.OwningProcess -Force }
   Start-Sleep 3
-  return (Healthy 90 $expectedCommit)
+  return (Healthy 90 $expectedCommit $requireNewApi)
 }
 # data\products.json do vòng đồng bộ ghi liên tục nhưng vẫn nằm trong git (bản lưu cho bản trưng bày):
 # cất bản đang chạy ra ngoài trước khi đổi mã, xong thì trả lại – không bao giờ mất danh mục đang bán
@@ -142,7 +143,7 @@ try {
   Set-Content $rejected $new
   WithCatalogKept { RunGit reset --hard --quiet $old | Out-Null }
   if ($lockChanged) { RunNpm ci --no-audit --no-fund | Out-Null }
-  if (RestartStore $old) { Log 'Đã quay về bản cũ, health check đạt.' } else { Log 'CẢNH BÁO: chưa xác nhận máy chủ chạy bản cũ. Kiểm tra tác vụ HoangMinh Store và data\server.log.' }
+  if (RestartStore $old $false) { Log 'Đã quay về bản cũ, health check đạt.' } else { Log 'CẢNH BÁO: chưa xác nhận máy chủ chạy bản cũ. Kiểm tra tác vụ HoangMinh Store và data\server.log.' }
 } catch {
   Log "LỖI: $($_.Exception.Message)"
 } finally {
