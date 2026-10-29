@@ -38,6 +38,7 @@
   }
   function switchCategory(category){
     if(!Object.hasOwn(names,category))return;
+    if(stateUi.active&&stateUi.category!==category)exit();
     stateUi.category=category;
     for(const b of root.querySelectorAll('[data-besi-category]'))
       b.setAttribute('aria-pressed',String(b.dataset.besiCategory===category));
