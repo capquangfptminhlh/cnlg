@@ -7,13 +7,16 @@
  * Pure derived data. Do not export supplier, cost, source or logistics data.
  */
 const CATEGORIES=new Set(['case','charger','powerbank']);
-const WATTS=new Set([0,20,25,30,35,45,65,100]);
-const CAPACITIES=new Set([0,5000,10000,20000,30000]);
+const WATTS=new Set([0,10,12,15,18,20,22.5,25,30,33,35,40,45,50,60,65,67,70,80,90,100,120,140,150,200,240]);
+const CAPACITIES=new Set([0,2000,3000,5000,6000,8000,10000,12000,15000,20000,25000,30000,40000,50000]);
 const COLORS=new Set(['','den','trang','xanh']);
 const MODELS=new Set([
-  ...Array.from({length:7},(_,i)=>'iphone-'+(i+11)+'-pro-max'),
-  ...Array.from({length:7},(_,i)=>'iphone-'+(i+11)),
-  ...[22,23,24,25,26].map(i=>'samsung-s'+i+'-ultra')
+  ...Array.from({length:9},(_,i)=>i+11).flatMap(n=>
+    ['', 'pro-max','pro','plus','mini','air','e'].map(v=>'iphone-'+n+(v?'-'+v:''))),
+  ...Array.from({length:16},(_,i)=>i+20).flatMap(n=>
+    ['','ultra','plus','fe'].map(v=>'samsung-s'+n+(v?'-'+v:''))),
+  ...Array.from({length:99},(_,i)=>i+1).flatMap(n=>
+    ['','5g'].map(v=>'samsung-a'+n+(v?'-'+v:'')))
 ]);
 const normalize=s=>String(s||'').normalize('NFKC').toLowerCase()
   .normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d')
@@ -32,14 +35,14 @@ function typeOf(product){
   return null;
 }
 function declaredPower(s){
-  const w=[...normalize(s).matchAll(/(^|[^0-9])(\d{1,3})\s*w(?![a-z])/g)]
-    .map(m=>Number(m[2])).filter(n=>n>=5&&n<=240);
+  const w=[...normalize(s).matchAll(/(^|[^0-9])(\d{1,3}(?:[.,]\d+)?)\s*w(?![a-z])/g)]
+    .map(m=>Number(m[2].replace(',','.'))).filter(n=>n>=5&&n<=240);
   return [...new Set(w)].length===1?w[0]:0;
 }
 function declaredCapacity(s){
-  const matches=[...normalize(s).matchAll(/(^|[^0-9])(\d{1,2}[.,]\d{3}|\d{4,5}|\d{1,2}\s*k)\s*m\s*a\s*h\b/g)]
+  const matches=[...normalize(s).matchAll(/(^|[^0-9])(\d{1,2}[., ]\d{3}|\d{4,5}|\d{1,2}\s*k)\s*m\s*a\s*h\b/g)]
     .map(m=>m[2].includes('k')?Number(m[2].replace('k','').trim())*1000:
-      Number(m[2].replace(/[.,]/g,'')))
+      Number(m[2].replace(/[., ]/g,'')))
     .filter(n=>n>=1000&&n<=50000);
   return [...new Set(matches)].length===1?matches[0]:0;
 }
@@ -63,6 +66,20 @@ function declaredModels(s){
   while((m=normal.exec(t)))result.add('iphone-'+m[1]);
   const ultra=/(?:samsung|galaxy)?\s*s\s*(2[2-6])\s*ultra\b/g;
   while((m=ultra.exec(t)))result.add('samsung-s'+m[1]+'-ultra');
+  // Include actual product generations not covered by legacy fixed filter
+  // options. Never infer a model from "Samsung" or "iPhone" without digits.
+  const ip=/\b(?:iphone|ip)\s*(1[1-9])\s*(pro\s*max|promax|pro|plus|mini|air|e)?\b/g;
+  while((m=ip.exec(t))){
+    const suffix=(m[2]||'').replace(/\s+/g,'-');
+    result.add('iphone-'+m[1]+(suffix?'-'+suffix:''));
+  }
+  const sam=/\b(?:samsung|galaxy)\s*(?:galaxy\s*)?([sa])\s*(\d{1,2})\s*(ultra|plus|fe|5g)?\b/g;
+  while((m=sam.exec(t))){
+    const n=Number(m[2]);
+    if(m[1]==='s'&&(n<20||n>35))continue;
+    if(m[1]==='a'&&(n<1||n>99))continue;
+    result.add('samsung-'+m[1]+n+(m[3]?'-'+m[3]:''));
+  }
   return [...result];
 }
 function modelPotential(text,model,found){
@@ -105,7 +122,20 @@ function buildIndex(products){
       });
     }
   }
-  return {buckets,productCount:products?.length||0};
+  const options={};
+  for(const [category,rows] of buckets){
+    const models=new Set(),watts=new Set(),capacities=new Set();
+    const productIds=new Set();
+    for(const row of rows){
+      productIds.add(row.product.id);
+      for(const model of row.models)if(MODELS.has(model))models.add(model);
+      if(row.watt&&WATTS.has(row.watt))watts.add(row.watt);
+      if(row.capacity&&CAPACITIES.has(row.capacity))capacities.add(row.capacity);
+    }
+    options[category]={models:[...models].sort(),watts:[...watts].sort((a,b)=>a-b),
+      capacities:[...capacities].sort((a,b)=>a-b),productCount:productIds.size};
+  }
+  return {buckets,productCount:products?.length||0,options};
 }
 function validate(q={}){
   const category=String(q.category||'case');
@@ -154,5 +184,10 @@ function searchIndex(index,q={}){
     matched:confirmedRows.slice((f.page-1)*f.limit,f.page*f.limit).map(x=>x.row),
     possible:possibleRows.slice((f.possiblePage-1)*8,f.possiblePage*8),filter:f};
 }
+function availableOptions(index,category){
+  if(!CATEGORIES.has(category))throw error('Nhóm ngành hàng không hợp lệ');
+  return {category,...(index.options?.[category]||
+    {models:[],watts:[],capacities:[],productCount:0})};
+}
 module.exports={typeOf,declaredPower,declaredCapacity,declaredColor,
-  declaredModels,modelPotential,buildIndex,searchIndex,validate};
+  declaredModels,modelPotential,buildIndex,searchIndex,validate,availableOptions};
