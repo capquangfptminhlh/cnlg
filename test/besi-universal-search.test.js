@@ -40,7 +40,7 @@ test('universal index covers unrelated industries, nested categories and actual 
  assert.ok(out.categories.some(x=>x.id===21&&x.count===3));
  assert.ok(out.categories.some(x=>x.id===31&&x.name==='Dụng cụ nhà bếp'));
  assert.ok(out.brands.some(x=>x.value==='Nike'));
- assert.equal(discover.search(idx,{category:20}).total,4);
+ assert.equal(discover.search(idx,{category:20}).total,5);
  assert.equal(discover.search(idx,{category:21}).total,3);
  assert.equal(discover.search(idx,{category:31}).total,1);
 });
@@ -60,7 +60,8 @@ test('full industry product name and category search is accent-insensitive, pagi
 test('real source-derived size, material, model, price and brand facets',()=>{
  const idx=index();
  assert.equal(discover.search(idx,{category:21,attr:'size',value:'XL'}).total,2);
- assert.equal(discover.search(idx,{category:21,attr:'size',value:'XXL'}).total,0);
+ assert.throws(()=>discover.search(idx,{category:21,attr:'size',value:'XXL'}),e=>e.status===400,
+   'Out-of-stock-only size must never become a selectable option');
  assert.equal(discover.search(idx,{category:21,attr:'material',value:'cotton'}).total,3);
  assert.equal(discover.search(idx,{category:22,attr:'size',value:'42'}).total,1);
  assert.equal(discover.search(idx,{attr:'model',value:'iphone-16-pro-max'}).total,1);
