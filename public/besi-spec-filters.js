@@ -203,5 +203,6 @@
     if(event.key==='Enter'&&stateUi.active)exit();
   },true);
   window.addEventListener('besi:category-filters-start',()=>{if(stateUi.active)exit();});
+  window.addEventListener('besi:universal-filters-start',()=>{if(stateUi.active)exit();});
   window.addEventListener('popstate',()=>{if(stateUi.active)exit();});
 })();
