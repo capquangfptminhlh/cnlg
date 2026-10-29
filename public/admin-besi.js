@@ -76,8 +76,8 @@
     for(const product of catalog.data){
       const tr=document.createElement('tr');cell(tr,product.id);
       cell(tr,product.name,true);cell(tr,money(product.price));
-      cell(tr,money(product.tiers.find(t=>t.minQty===5)?.price??product.price));
-      cell(tr,money(product.tiers.find(t=>t.minQty===20)?.price??product.price));
+      cell(tr,(product.tiers.find(t=>t.minQty===5)?.price==null?'Chưa đủ tồn':money(product.tiers.find(t=>t.minQty===5).price)));
+      cell(tr,(product.tiers.find(t=>t.minQty===20)?.price==null?'Chưa đủ tồn':money(product.tiers.find(t=>t.minQty===20).price)));
       catalogRows.append(tr);
     }
   }
