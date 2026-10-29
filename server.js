@@ -570,6 +570,17 @@ function categoryFacetIndex(){
   }
   return cachedCategoryFacetsIndex;
 }
+// Values shown in accessory dropdowns are discovered from the current
+// sellable catalog, not a frozen selection of old phone generations.
+app.get('/api/products/category-facets',rateLimit('besi-category-options',60e3,80),(req,res)=>{
+  try{
+    const options=besiCategoryFacets.availableOptions(categoryFacetIndex(),String(req.query.category||''));
+    res.set('Cache-Control','public, max-age=30').json({success:true,...options});
+  }catch(e){
+    const status=e.status===400?400:500;
+    res.status(status).json({success:false,error:status===400?'Nhóm hàng không hợp lệ':'Không thể tải thông số'});
+  }
+});
 app.get('/api/products/category-specs',rateLimit('besi-category-specs',60e3,60),(req,res)=>{
   try{
     const result=besiCategoryFacets.searchIndex(categoryFacetIndex(),req.query);
