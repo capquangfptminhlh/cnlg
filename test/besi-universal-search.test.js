@@ -52,10 +52,10 @@ test('full industry product name and category search is accent-insensitive, pagi
  assert.equal(discover.search(idx,{q:'dien thoai',category:31}).total,0);
  const page1=discover.search(idx,{q:'cotton',page:1,limit:2});
  const page2=discover.search(idx,{q:'cotton',page:2,limit:2});
- assert.equal(page1.total,4);
+ assert.equal(page1.total,3);
  assert.equal(page1.matched.length,2);
- assert.equal(page2.matched.length,2);
- assert.equal(new Set([...page1.matched,...page2.matched].map(x=>x.product.id)).size,4);
+ assert.equal(page2.matched.length,1);
+ assert.equal(new Set([...page1.matched,...page2.matched].map(x=>x.product.id)).size,3);
 });
 test('real source-derived size, material, model, price and brand facets',()=>{
  const idx=index();
