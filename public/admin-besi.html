@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="vi"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>BESI Supplier Hub | Quản trị đa tổng kho</title>
+<link rel="icon" href="/besi-logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="/admin-besi.css" rel="stylesheet">
+<script src="/admin-besi.js" defer></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <a href="/admin.html" class="brand"><span class="logo">b.</span><span>BESI<small>SUPPLIER HUB</small></span></a>
+    <div class="menu-label">VẬN HÀNH NỘI BỘ</div>
+    <a href="#overview"><span>▦</span> Tổng quan</a>
+    <a href="#suppliers"><span>▣</span> Tổng kho đối tác</a>
+    <a href="#feed"><span>⇣</span> Nhập bảng hàng</a>
+    <a href="#catalog"><span>▤</span> Danh mục hợp nhất</a>
+    <a href="#pricing"><span>％</span> Chính sách giá</a>
+    <a href="#allocation"><span>↗</span> Phân đơn đa kho</a>
+    <div class="aside-bottom"><a href="/admin.html">← Quay về quản trị</a><small>Chỉ quản trị viên truy cập · Không tự gửi đơn</small></div>
+  </aside>
+  <main class="workspace">
+    <header class="top">
+      <div><span class="eyebrow">BESI INTERNAL OPERATIONS</span><h1>Trung tâm điều phối tổng kho</h1><p>Quản lý đối tác, bảng hàng, giá bán và phương án phân đơn tại một nơi.</p></div>
+      <span class="mode">● Chế độ nháp an toàn</span>
+    </header>
+    <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+    <section id="overview" class="stats" aria-label="Tổng quan">
+      <div class="stat"><small>Đối tác đăng ký</small><strong id="statSuppliers">–</strong><span>Chờ xác minh hoặc đã duyệt</span></div>
+      <div class="stat"><small>Đối tác đang hoạt động</small><strong id="statActive">–</strong><span>Đã xác minh và kích hoạt</span></div>
+      <div class="stat"><small>Đề nghị hàng hóa</small><strong id="statOffers">–</strong><span>SKU từ các đối tác</span></div>
+      <div class="stat"><small>Mặt hàng hợp nhất</small><strong id="statCatalog">–</strong><span>Không trùng mã định danh chuẩn</span></div>
+    </section>
+    <div class="content-grid">
+      <section class="panel span2" id="suppliers">
+        <div class="section-head"><div><small>01 / SUPPLIER HUB</small><h2>Tổng kho & nhà phân phối</h2></div><span class="tag">Xác minh trước khi bán</span></div>
+        <form id="supplierForm" class="fields">
+          <label>Tên pháp lý <input name="legalName" required maxlength="180" placeholder="Tên công ty hoặc hộ kinh doanh"></label>
+          <label>Tên hiển thị nội bộ <input name="displayName" maxlength="180" placeholder="Ví dụ: Đối tác khu vực 01"></label>
+          <label>Liên hệ <input name="contact" maxlength="150" placeholder="Email hoặc điện thoại quản trị"></label>
+          <label>Tỉnh/thành <input name="region" maxlength="100" placeholder="Thành phố Hồ Chí Minh"></label>
+          <label>Ước tính phí gửi/kiện <input name="shippingFee" type="number" min="0" step="1000" value="0"></label>
+          <label>Số ngày chuẩn bị <input name="leadDays" type="number" min="0" max="365" value="2"></label>
+          <button class="primary" type="submit">+ Thêm đối tác để xác minh</button>
+        </form>
+        <div class="table-wrap"><table><thead><tr><th>Đối tác</th><th>Khu vực</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="suppliersRows"><tr><td colspan="4">Đang tải…</td></tr></tbody></table></div>
+      </section>
+      <section class="panel" id="feed">
+        <div class="section-head"><div><small>02 / INVENTORY FEED</small><h2>Nhập bảng hàng</h2></div></div>
+        <p class="hint">Dữ liệu từ tổng kho chỉ lưu trên server. Tối đa 200 SKU/lần; mọi thay đổi được xác thực trước khi lưu.</p>
+        <form id="feedForm" class="form-stack">
+          <label>Chọn đối tác <select id="supplierSelect" required></select></label>
+          <label>JSON các sản phẩm <textarea id="offerJson" rows="7" spellcheck="false" required placeholder='[{"sku":"ABC01","name":"Sản phẩm A","gtin":"8931234567890","cost":50000,"stock":30}]'></textarea></label>
+          <button type="submit" class="primary">Nhập và cập nhật SKU</button>
+        </form>
+      </section>
+      <section class="panel" id="pricing">
+        <div class="section-head"><div><small>03 / PRICE ENGINE</small><h2>Chính sách giá</h2></div></div>
+        <p class="hint">Giá vốn, phí giao dịch, dự phòng hoàn trả và biên tối thiểu được xử lý tại máy chủ. Không hiển thị giá vốn ra bên ngoài.</p>
+        <form id="pricingForm" class="form-stack">
+          <label>Tỷ lệ cộng giá (%) <input id="markupPercent" type="number" step=".1" min="0" max="75"></label>
+          <label>Phí giao dịch (%) <input id="feePercent" type="number" step=".1" min="0" max="75"></label>
+          <label>Dự phòng hoàn trả (%) <input id="reservePercent" type="number" step=".1" min="0" max="75"></label>
+          <label>Biên lợi nhuận tối thiểu (%) <input id="marginFloorPercent" type="number" step=".1" min="0" max="75"></label>
+          <button type="submit" class="primary">Lưu chính sách giá</button>
+        </form>
+      </section>
+      <section class="panel span2" id="catalog">
+        <div class="section-head"><div><small>04 / MASTER CATALOG</small><h2>Danh mục sản phẩm BESI</h2></div><span class="tag">Không lộ nguồn</span></div>
+        <p class="hint">Một sản phẩm chung có thể lấy từ nhiều tổng kho. Mã BESI được tạo riêng, không hiển thị mã nguồn hay giá mua.</p>
+        <div class="table-wrap"><table><thead><tr><th>Mã BESI</th><th>Sản phẩm</th><th>Giá lẻ</th><th>Từ 5</th><th>Từ 20</th></tr></thead><tbody id="catalogRows"><tr><td colspan="5">Đang tải…</td></tr></tbody></table></div>
+      </section>
+      <section class="panel span2" id="allocation">
+        <div class="section-head"><div><small>05 / SMART SOURCING</small><h2>Lập phương án chia đơn đa tổng kho</h2></div><span class="tag warning">DRAFT · Chưa đặt hàng thật</span></div>
+        <p class="hint">Nhập mã BESI cùng số lượng, hệ thống tính phân bổ theo tồn và chi phí. Không tự giao đơn, chuyển tiền hay thông báo khách.</p>
+        <form id="allocationForm" class="allocation-form">
+          <label>Danh sách hàng cần phân bổ (JSON) <textarea id="allocationJson" rows="3" required spellcheck="false" placeholder='[{"id":"B0123456789abcdef","quantity":5}]'></textarea></label>
+          <button class="primary" type="submit">Tạo bản nháp phân đơn</button>
+        </form>
+        <pre id="allocationResult" class="output" hidden></pre>
+      </section>
+    </div>
+    <footer>BESI Supplier Hub · Dành riêng cho quản trị · Chưa kích hoạt thanh toán hoặc điều phối tự động</footer>
+  </main>
+</div>
+</body></html>
