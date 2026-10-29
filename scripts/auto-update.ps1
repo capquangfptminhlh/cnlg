@@ -87,17 +87,25 @@ try {
   $key = Join-Path $dataDir 'deploy\id_ed25519'
   $env:GIT_TERMINAL_PROMPT = '0' # fail safely instead of waiting on interactive auth in SYSTEM task
   $env:GCM_INTERACTIVE = 'never'
-  if (-not $testRemote -and (Test-Path $key)) {
-    $remoteUrl = $sshRemoteUrl
+  $hasKey = (-not $testRemote -and (Test-Path $key))
+  if ($hasKey) {
     $ssh = Join-Path $env:SystemRoot 'System32\OpenSSH\ssh.exe'
     if (-not (Test-Path $ssh)) { $ssh = 'ssh' }
     $env:GIT_SSH_COMMAND = "`"$($ssh -replace '\\', '/')`" -i `"$($key -replace '\\', '/')`" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=`"$((Join-Path $dataDir 'deploy\known_hosts') -replace '\\', '/')`""
-  } elseif (-not $testRemote) {
+  } else {
     Remove-Item Env:\GIT_SSH_COMMAND -ErrorAction SilentlyContinue
-    Log 'Không có deploy key SSH; sử dụng GitHub HTTPS public (read-only).'
   }
 
-  RunGit fetch --quiet $remoteUrl 'main:refs/remotes/origin/main' | Out-Null
+  # Always prefer the public read-only HTTPS URL. An existing SSH key is
+  # only a fallback for private-repo migration, never a reason to skip HTTPS.
+  try {
+    RunGit fetch --quiet $remoteUrl 'main:refs/remotes/origin/main' | Out-Null
+  } catch {
+    if ($hasKey) {
+      Log 'GitHub HTTPS fetch lỗi, thử khoá SSH cũ.'
+      RunGit fetch --quiet $sshRemoteUrl 'main:refs/remotes/origin/main' | Out-Null
+    } else { throw }
+  }
   $old = RunGit rev-parse HEAD
   $new = RunGit rev-parse origin/main
   if ($old -eq $new) { return }
