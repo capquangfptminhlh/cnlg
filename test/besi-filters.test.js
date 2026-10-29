@@ -212,3 +212,23 @@ test('missing keyword in title is rescued by cable category or explicit connecto
   assert.deepEqual(new Set(res.matched.map(r=>r.product.id)),new Set([601,602]));
   assert.ok(!res.matched.some(r=>r.product.id===603));
 });
+
+test('admin audit pagination allows review of every incomplete SKU, not only first 50',()=>{
+  const products=Array.from({length:123},(_,i)=>({
+    id:5000+i,name:'Cáp USB-C to Lightning mẫu '+i,price:22000,in_stock:true
+  }));
+  const index=facets.buildIndex(products);
+  const all=[];
+  for(let page=1;page<=3;page++){
+    const view=facets.coverage(index,{page,limit:50});
+    assert.equal(view.reviewCount,123);
+    assert.equal(view.totalPages,3);
+    all.push(...view.review.map(x=>x.product.id));
+  }
+  assert.equal(all.length,123);
+  assert.equal(new Set(all).size,123);
+  assert.throws(()=>facets.coverage(index,{page:0}),err=>err.status===400);
+  const admin=fs.readFileSync(path.join(ROOT,'public/admin-besi.js'),'utf8');
+  assert.match(admin,/spec-coverage\?page=/);
+  assert.match(admin,/besiSpecReviewMore/);
+});
