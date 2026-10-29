@@ -9,7 +9,7 @@
     "sync": "node -e \"require('./services/dropbuyScraper').syncCatalog()\"",
     "test": "node --test test/unit.test.js test/fulfillment.test.js test/autoOrder.test.js test/catalogImage.test.js test/relogin.test.js test/catalogSync.test.js test/stockMap.test.js test/bundleCrypt.test.js test/sources.test.js test/antiLeak.test.js test/shipments.test.js test/variantGrouper.test.js test/besi-marketplace.test.js",
     "test:dropbuy": "node scripts/test-dropbuy-api.js",
-    "test:ui": "node --test test/storefront.test.js test/besi-filters.test.js test/besi-spec-review.test.js test/besi-category-facets.test.js test/besi-facet-options.test.js test/besi-deployment.test.js"
+    "test:ui": "node --test test/storefront.test.js test/besi-filters.test.js test/besi-spec-review.test.js test/besi-category-facets.test.js test/besi-facet-options.test.js test/besi-deployment.test.js test/besi-universal-search.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
