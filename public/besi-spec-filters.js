@@ -10,6 +10,12 @@
   const root=$('besiSpecFinder'),results=$('besiSpecResults'),grid=$('besiSpecGrid');
   if(!root||!results||!grid)return;
   const apply=$('besiApplySpecs'),loadMore=$('besiSpecLoadMore');
+  // Mobile shoppers should see real products immediately; the summary remains
+  // visible and expands the full attribute filters on demand.
+  if(window.matchMedia&&window.matchMedia('(max-width: 700px)').matches){
+    const details=$('besiSpecDetails');
+    if(details)details.open=false;
+  }
   const storage={active:false,requestId:0,sources:[],seen:new Set(),items:[],displayed:0,scanned:0,loading:false,filter:null};
   const TAKE=24, PAGE_SIZE=100, MAX_FIRST_REQUESTS=9, MAX_NEXT_REQUESTS=6;
   const accentless=s=>String(s||'').normalize('NFKC').toLowerCase()
