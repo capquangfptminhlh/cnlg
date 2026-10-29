@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="/besi-marketplace-v5.css">
   <link rel="stylesheet" href="/besi-conversion.css">
   <link rel="stylesheet" href="/besi-spec-filters.css">
+  <link rel="stylesheet" href="/besi-category-facets.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -159,6 +160,96 @@
   <!-- Products Main Content -->
   <main class="container main-layout" id="catalog">
     
+
+    <!-- BESI multi-category specification discovery -->
+    <section class="besi-category-finder" id="besiCategoryFinder" aria-label="Lọc sản phẩm theo ngành hàng">
+      <div class="besi-category-head">
+        <div><strong>Lọc đúng món cần mua</strong><small>Chọn dòng máy, công suất hoặc dung lượng — không cần xem từng sản phẩm.</small></div>
+        <span>THÔNG SỐ CHUYÊN SÂU</span>
+      </div>
+      <div class="besi-category-tabs" role="group" aria-label="Nhóm sản phẩm">
+        <button type="button" data-besi-category="case" aria-pressed="true">Ốp lưng điện thoại</button>
+        <button type="button" data-besi-category="charger" aria-pressed="false">Củ sạc nhanh</button>
+        <button type="button" data-besi-category="powerbank" aria-pressed="false">Pin dự phòng</button>
+      </div>
+      <div class="besi-category-controls">
+        <label id="besiCaseModelBox">Dòng điện thoại
+          <select id="besiCaseModel">
+            <option value="">Tất cả dòng máy</option>
+            <optgroup label="iPhone">
+              <option value="iphone-17-pro-max">iPhone 17 Pro Max</option>
+              <option value="iphone-16-pro-max">iPhone 16 Pro Max</option>
+              <option value="iphone-15-pro-max">iPhone 15 Pro Max</option>
+              <option value="iphone-14-pro-max">iPhone 14 Pro Max</option>
+              <option value="iphone-13-pro-max">iPhone 13 Pro Max</option>
+              <option value="iphone-12-pro-max">iPhone 12 Pro Max</option>
+              <option value="iphone-11-pro-max">iPhone 11 Pro Max</option>
+              <option value="iphone-17">iPhone 17</option>
+              <option value="iphone-16">iPhone 16</option>
+              <option value="iphone-15">iPhone 15</option>
+              <option value="iphone-14">iPhone 14</option>
+              <option value="iphone-13">iPhone 13</option>
+            </optgroup>
+            <optgroup label="Samsung Galaxy">
+              <option value="samsung-s26-ultra">Galaxy S26 Ultra</option>
+              <option value="samsung-s25-ultra">Galaxy S25 Ultra</option>
+              <option value="samsung-s24-ultra">Galaxy S24 Ultra</option>
+              <option value="samsung-s23-ultra">Galaxy S23 Ultra</option>
+              <option value="samsung-s22-ultra">Galaxy S22 Ultra</option>
+            </optgroup>
+          </select>
+        </label>
+        <label id="besiChargerWattBox" hidden>Công suất củ sạc
+          <select id="besiChargerWatt">
+            <option value="">Mọi công suất</option><option value="20">20W</option>
+            <option value="25">25W</option><option value="30">30W</option>
+            <option value="35">35W</option><option value="45">45W</option>
+            <option value="65">65W</option><option value="100">100W</option>
+          </select>
+        </label>
+        <label id="besiPowerbankCapacityBox" hidden>Dung lượng pin
+          <select id="besiPowerbankCapacity">
+            <option value="">Mọi dung lượng</option><option value="5000">5.000mAh</option>
+            <option value="10000">10.000mAh</option><option value="20000">20.000mAh</option>
+            <option value="30000">30.000mAh</option>
+          </select>
+        </label>
+        <label id="besiPowerbankWattBox" hidden>Công suất sạc
+          <select id="besiPowerbankWatt">
+            <option value="">Mọi công suất</option><option value="20">20W</option>
+            <option value="25">25W</option><option value="30">30W</option>
+            <option value="35">35W</option><option value="45">45W</option>
+            <option value="65">65W</option><option value="100">100W</option>
+          </select>
+        </label>
+        <label>Màu sắc
+          <select id="besiCategoryColor">
+            <option value="">Mọi màu</option><option value="den">Đen</option>
+            <option value="trang">Trắng</option><option value="xanh">Xanh</option>
+          </select>
+        </label>
+        <button type="button" class="besi-category-apply" id="besiCategoryApply">
+          <i class="fa-solid fa-magnifying-glass"></i> Tìm sản phẩm
+        </button>
+      </div>
+      <p class="besi-category-note">BESI chỉ khẳng định thông số ghi rõ trên sản phẩm hoặc đúng phân loại. Hàng thiếu thông tin nằm riêng ở mục “Có thể phù hợp”.</p>
+    </section>
+    <section class="besi-spec-results besi-category-results" id="besiCategoryResults" hidden>
+      <div class="besi-spec-results-head">
+        <div><span class="besi-spec-kicker">LỌC THEO NGÀNH HÀNG</span>
+          <h2 id="besiCategoryResultsTitle">Sản phẩm phù hợp</h2>
+          <p id="besiCategoryStatus" role="status" aria-live="polite"></p></div>
+        <button type="button" id="besiCategoryExit" class="besi-spec-reset">Xem toàn bộ</button>
+      </div>
+      <div class="product-grid besi-spec-grid" id="besiCategoryGrid"></div>
+      <div class="besi-spec-load"><button type="button" id="besiCategoryMore" class="btn-load-more" hidden>Xem thêm sản phẩm</button></div>
+      <aside class="besi-spec-possible" id="besiCategoryPossible" hidden>
+        <div class="besi-spec-possible-heading"><strong>Có thể phù hợp — cần kiểm tra thông số</strong>
+          <p id="besiCategoryPossibleStatus"></p></div>
+        <div class="product-grid besi-spec-grid" id="besiCategoryPossibleGrid"></div>
+        <div class="besi-spec-load"><button type="button" id="besiCategoryPossibleMore" class="besi-spec-reset" hidden>Xem thêm hàng chưa rõ thông số</button></div>
+      </aside>
+    </section>
 
     <!-- BESI smart specification finder: uses existing /api/products and variant data. -->
     <section class="besi-spec-finder" id="besiSpecFinder" aria-label="Lọc sản phẩm theo thông số">
@@ -662,5 +753,6 @@
   <script src="/flash-sale.js"></script>
   <script src="/besi-conversion.js"></script>
   <script src="/besi-spec-filters.js"></script>
+  <script src="/besi-category-facets.js"></script>
 </body>
 </html>

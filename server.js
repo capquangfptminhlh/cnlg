@@ -36,6 +36,7 @@ const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn 
 const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
 const besiSpecs = require('./services/besi/specIndex');
+const besiCategoryFacets = require('./services/besi/categoryFacets');
 const { createStore: createSpecReviewStore } = require('./services/besi/specReviewStore');
 const besiSpecLocalAI = require('./services/besi/specLocalAI');
 const specReviewStore = createSpecReviewStore();
@@ -289,6 +290,8 @@ let cachedCategoriesJson = null;
 let cachedDefaultMixed = null;
 let cachedCategoryIdsMap = new Map();
 let cachedSpecsIndex = null;
+let cachedCategoryFacetsIndex = null;
+let categoryFacetsBuiltAt = 0;
 let specsIndexBuiltAt = 0;
 let specsIndexReviewedRev = -1;
 let lastFsSlot = -1;
@@ -303,6 +306,7 @@ function ensureCatalogCaches() {
   lastCatalogRef = rawProducts;
   lastCategoriesRef = rawCategories;
   cachedSpecsIndex = null; // catalog changed: invalidate server-side faceted index
+  cachedCategoryFacetsIndex = null;
 
   // 1. Phả hệ danh mục con -> cha (tìm nhanh O(1))
   cachedCategoryIdsMap.clear();
@@ -555,6 +559,41 @@ function specificationIndex(){
   }
   return cachedSpecsIndex;
 }
+/** Category-specific full catalog facets: cases, chargers, power banks.
+ * Prices / product identities always projected from the public catalog DTO.
+ */
+function categoryFacetIndex(){
+  ensureCatalogCaches();
+  if(!cachedCategoryFacetsIndex||Date.now()-categoryFacetsBuiltAt>120000){
+    cachedCategoryFacetsIndex=besiCategoryFacets.buildIndex(cachedSellable);
+    categoryFacetsBuiltAt=Date.now();
+  }
+  return cachedCategoryFacetsIndex;
+}
+app.get('/api/products/category-specs',rateLimit('besi-category-specs',60e3,60),(req,res)=>{
+  try{
+    const result=besiCategoryFacets.searchIndex(categoryFacetIndex(),req.query);
+    const project=(row,reasons=[])=>{
+      const {product,variant}=row;
+      const pub=publicProduct(product);
+      const match=variant?(pub.variants||[]).find(v=>String(v.id)===String(variant.id)):null;
+      return {...pub,matched_variant:match?{
+        id:match.id,name:match.name,price:match.price,
+        image:match.image||null,in_stock:match.in_stock
+      }:null,verified_spec:reasons.length===0,missing_specs:reasons};
+    };
+    res.set('Cache-Control','public, max-age=20');
+    res.json({success:true,total:result.total,page:result.page,
+      totalPages:result.totalPages,data:result.matched.map(row=>project(row)),
+      possibleTotal:result.possibleTotal,possiblePage:result.possiblePage,
+      possiblePages:result.possiblePages,
+      possible:result.possible.map(({row,reasons})=>project(row,reasons))});
+  }catch(e){
+    res.status(e.status===400?400:500).json({success:false,
+      error:e.status===400?'Bộ lọc ngành hàng không hợp lệ':'Không thể tìm kiếm lúc này'});
+  }
+});
+
 app.get('/api/products/specs', rateLimit('besi-specs', 60e3, 60), (req,res)=>{
   try{
     const found=besiSpecs.searchIndex(specificationIndex(),req.query);

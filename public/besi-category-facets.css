@@ -1,0 +1,42 @@
+/* BESI V6 — concise category-specific attribute discovery */
+.besi-category-finder{border:1px solid #e9edf3;background:#fff;border-radius:13px;margin:0 0 12px;
+ padding:15px 17px 12px;box-shadow:0 4px 16px #1c325208}
+.besi-category-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.besi-category-head>div{display:grid;gap:2px}
+.besi-category-head strong{font-size:16px;letter-spacing:-.04em;color:#22334b;font-weight:800}
+.besi-category-head small{font-size:11px;color:#7b879a}
+.besi-category-head>span{font-size:9px;letter-spacing:.11em;font-weight:800;color:#ef512c;white-space:nowrap}
+.besi-category-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:13px 0 11px}
+.besi-category-tabs button{border-radius:9px;border:1px solid #e3e8ef;background:#f8f9fb;
+ color:#536277;min-height:35px;padding:7px 13px;font:700 11px 'Be Vietnam Pro',sans-serif;cursor:pointer}
+.besi-category-tabs button[aria-pressed=true]{background:#fff0e9;border-color:#ffb699;color:#dd4825;
+ box-shadow:0 0 0 1px #ffd7c4 inset}
+.besi-category-tabs button:focus-visible{outline:3px solid #f8ac90;outline-offset:2px}
+.besi-category-controls{display:flex;flex-wrap:wrap;align-items:end;gap:9px}
+.besi-category-controls label{display:flex;flex-direction:column;gap:5px;font-weight:750;font-size:10.5px;color:#45546a;
+ min-width:140px;flex:1 1 158px;max-width:260px}
+.besi-category-controls label[hidden]{display:none!important}
+.besi-category-controls select{width:100%;height:39px;border:1px solid #dfe5ee;border-radius:9px;
+ background:#fff;color:#263a54;font:600 11px 'Be Vietnam Pro',sans-serif;padding:7px 12px;
+ box-sizing:border-box;max-width:100%}
+.besi-category-apply{border:0;border-radius:9px;min-height:39px;padding:9px 18px;
+ background:#f4512c;color:#fff;font:800 11px 'Be Vietnam Pro',sans-serif;cursor:pointer}
+.besi-category-apply:hover:not(:disabled){background:#d94320}
+.besi-category-apply:disabled{opacity:.55}
+.besi-category-note{margin:10px 0 0;color:#8792a1;font-size:9.7px;line-height:1.5}
+.besi-category-results[hidden]{display:none!important}
+.besi-category-results{margin-bottom:12px}
+.besi-category-results .besi-spec-product-price{color:#f24c27}
+@media(max-width:700px){
+ .besi-category-finder{padding:11px;margin-bottom:10px}
+ .besi-category-head strong{font-size:13px}
+ .besi-category-head small{font-size:9px}
+ .besi-category-head>span{display:none}
+ .besi-category-tabs{gap:5px;margin:10px 0}
+ .besi-category-tabs button{flex:1 1 auto;font-size:9.5px;padding:7px 8px}
+ .besi-category-controls{gap:8px}
+ .besi-category-controls label{max-width:none;flex:1 1 130px;min-width:120px}
+ .besi-category-apply{flex:1 1 100%}
+ .besi-category-note{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){.besi-category-finder *{scroll-behavior:auto!important}}
