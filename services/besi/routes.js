@@ -21,6 +21,13 @@ function attach(app,options={}){
       policy:s.policy
     }});
   }));
+  app.get('/api/admin/besi/catalog',requireAdmin,handle((req,res)=>{
+    const s=store.read(),items=core.publicCatalog(s,s.policy).map(p=>({
+      ...p,name:stripSupplierText(p.name),brand:stripSupplierText(p.brand),
+      category:stripSupplierText(p.category)
+    }));
+    res.set('Cache-Control','no-store').json({success:true,total:items.length,data:items.slice(0,100)});
+  }));
   app.get('/api/admin/besi/offers',requireAdmin,handle((req,res)=>{
     const s=store.read(),limit=Math.min(100,Math.max(1,Number(req.query.limit)||30));
     const page=Math.max(1,Number(req.query.page)||1);
