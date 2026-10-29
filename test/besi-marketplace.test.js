@@ -116,3 +116,71 @@ describe('BESI Supplier Hub durable persistence',()=>{
     }finally{fs.rmSync(dir,{recursive:true,force:true});}
   });
 });
+
+
+test('HTTP Supplier Hub is admin-only and public DTO never exposes supplier information',async()=>{
+  const express=require('express');
+  const {attach}=require('../services/besi/routes');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'besi-routes-'));
+  const store=createStore(path.join(dir,'hub.json'));
+  const app=express();app.use(express.json({limit:'100kb'}));attach(app,{store});
+  const server=await new Promise(resolve=>{
+    const s=app.listen(0,'127.0.0.1',()=>resolve(s));
+  });
+  const base='http://127.0.0.1:'+server.address().port;
+  const call=async(p,method='GET',body,auth=false)=>{
+    const res=await fetch(base+p,{method,headers:{
+      ...(body?{'Content-Type':'application/json'}:{}),
+      ...(auth?{'x-admin-key':process.env.ADMIN_PASSWORD}:{})
+    },body:body?JSON.stringify(body):undefined});
+    return {status:res.status,data:await res.json()};
+  };
+  try{
+    assert.equal((await call('/api/admin/besi/overview')).status,401);
+    assert.equal((await call('/api/besi/products')).status,404);
+    const created=await call('/api/admin/besi/suppliers','POST',{
+      legalName:'Công ty nguồn thí nghiệm',displayName:'Tổng kho nội bộ A',
+      shippingFee:5000
+    },true);
+    assert.equal(created.status,201);
+    assert.equal(created.data.data.verified,false);
+    const id=created.data.data.id;
+    const upsert=await call('/api/admin/besi/feeds/'+id,'POST',{items:[{
+      sku:'INTERNAL-SKU-007',name:'Tai nghe mẫu thử',brand:'BESI',model:'S1',
+      cost:80000,stock:12,gtin:'8930000012345'
+    }]},true);
+    assert.equal(upsert.status,200);
+    const denied=await call('/api/admin/besi/suppliers/'+id,'PATCH',{verified:true,active:true});
+    assert.equal(denied.status,401);
+    assert.equal((await call('/api/admin/besi/suppliers/'+id,'PATCH',
+      {verified:true,active:true},true)).status,200);
+    process.env.BESI_MARKETPLACE_PUBLIC='1';
+    const listing=await call('/api/besi/products');
+    assert.equal(listing.status,200);
+    assert.equal(listing.data.data.length,1);
+    const publicData=JSON.stringify(listing.data);
+    for(const leak of ['Tổng kho nội bộ A','Công ty nguồn thí nghiệm','INTERNAL-SKU-007',
+      'supplierId','shippingFee','cost','80000'])
+      assert.ok(!publicData.includes(leak),'Public API leaked: '+leak);
+    const pubId=listing.data.data[0].id;
+    const quotation=await call('/api/besi/quote','POST',{items:[{id:pubId,quantity:5}]});
+    assert.equal(quotation.status,200);
+    assert.equal(quotation.data.data.orderEnabled,false);
+    const privateDraft=await call('/api/admin/besi/allocate','POST',
+      {items:[{id:pubId,quantity:5}]},true);
+    assert.equal(privateDraft.status,201);
+    assert.equal(privateDraft.data.data.readyForDispatch,false);
+    assert.equal((await call('/api/admin/besi/plans')).status,401);
+  }finally{
+    delete process.env.BESI_MARKETPLACE_PUBLIC;
+    await new Promise(resolve=>server.close(resolve));
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
+});
+test('admin-only Supplier Hub assets stay behind server login gate',()=>{
+  const server=fs.readFileSync(path.join(__dirname,'../server.js'),'utf8');
+  assert.match(server,/base === 'admin-besi\.html'/);
+  assert.match(server,/'admin-besi\.js': 'admin-besi\.js'/);
+  assert.match(server,/'admin-besi\.css': 'admin-besi\.css'/);
+  assert.match(server,/besiMarketplace\.attach\(app\)/);
+});
