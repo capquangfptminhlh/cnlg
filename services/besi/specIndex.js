@@ -1,8 +1,9 @@
 'use strict';
 /**
- * BESI indexed specification search: ephemeral, server-side derived data only.
- * Never stores or serializes upstream source identifiers, URLs or purchase costs.
- * The caller must project matched products through the normal publicProduct DTO.
+ * BESI specifications index over existing sellable catalog.
+ * Confident hits and incomplete/ambiguous suggestions are NEVER mixed.
+ * This remains a derived, in-memory search index; upstream data is unchanged.
+ * Caller must project all returned products through publicProduct().
  */
 const CONNECTORS=new Set(['c-lightning','a-lightning','lightning','c-c','a-c']);
 const COLORS=new Set(['','den','trang','xanh']);
@@ -30,86 +31,139 @@ function colorOf(text){
   if(/\b(blue|green|xanh)\b/.test(s))return 'xanh';
   return '';
 }
+const isLightning=s=>/\b(lightning|lighting|lightnig|lightining|8 ?pin)\b/.test(s);
+const isUSBc=s=>/\b(type ?c|usb ?c|usbc|typec|usb ?type ?c)\b/.test(s);
+const isUSBa=s=>/\b(usb ?a|type ?a|usba)\b/.test(s);
+const usbCtoIp=/\b(?:type ?c|usb ?c|usbc|typec|tc|c)\s*(?:to|sang|2)\s*(?:ip|iphone|lightning|lighting|8 ?pin)\b/;
+const usbAtoIp=/\b(?:usb ?a|type ?a|usba|a)\s*(?:to|sang|2)\s*(?:ip|iphone|lightning|lighting|8 ?pin)\b/;
+const usbCtoC=/\b(?:type ?c|usb ?c|usbc|typec|c)\s*(?:to|sang|2 dau|2)\s*(?:type ?c|usb ?c|usbc|typec|c)\b/;
+const usbAtoC=/\b(?:usb ?a|type ?a|usba|a)\s*(?:to|sang|2)\s*(?:type ?c|usb ?c|usbc|typec|c)\b/;
 function connectorOf(text){
   const s=' '+norm(text)+' ';
-  const lightning=/\b(lightning|lighting|lightnig|8 ?pin)\b/.test(s);
-  const c=/\b(type ?c|usb ?c|usbc|typec)\b/.test(s)
-    || /\bc (?:to|sang) (?:lightning|lighting|lightnig)\b/.test(s);
-  const a=/\b(usb ?a|type ?a|usba)\b/.test(s);
-  const cc=/\b(?:type c|usb c|typec|usbc|c)\s*(?:to|sang|2 dau|2)\s*(?:type c|usb c|typec|usbc|c)\b/.test(s)
-    || (s.match(/\b(type c|usb c|typec|usbc)\b/g)||[]).length>=2;
-  if(lightning&&c&&!a)return 'c-lightning';
-  if(lightning&&a&&!c)return 'a-lightning';
-  if(lightning&&!c&&!a)return 'lightning';
-  if(!lightning&&cc)return 'c-c';
-  if(!lightning&&c&&a)return 'a-c';
+  const l=isLightning(s),c=isUSBc(s),a=isUSBa(s);
+  if(usbCtoIp.test(s)||/\b(c2l|c2ip|tc2ip|typec2lightning)\b/.test(s))return 'c-lightning';
+  if(usbAtoIp.test(s)||/\b(a2l|a2ip|usb2lightning)\b/.test(s))return 'a-lightning';
+  if(usbCtoC.test(s)||/\b(c2c|cc cable|2 dau type c)\b/.test(s))return 'c-c';
+  if(usbAtoC.test(s)||/\b(a2c|usb2typec)\b/.test(s))return 'a-c';
+  if(l&&c&&!a)return 'c-lightning';
+  if(l&&a&&!c)return 'a-lightning';
+  if(l&&!c&&!a)return 'lightning';
+  // Both USB-C and USB-A mentioned without clear direction: never guess.
+  if(!l&&c&&a)return null;
   return null;
 }
-function cableName(s){
-  return /\b(cap|cable|charging cable|day sac|day cap|wire)\b/.test(s);
+function cableName(text){
+  const s=norm(text);
+  if(/\b(cu sac|bo sac|sac du phong|op lung|tai nghe|dau chuyen|adapter|hub|dock)\b/.test(s)
+    &&!/\b(cap|cable|day sac|day cap|cord|wire)\b/.test(s))return false;
+  return /\b(cap|cable|day sac|day cap|charging cord|charging wire|cord|wire|day data)\b/.test(s);
+}
+function connectorHints(text){
+  const s=norm(text), found=new Set();
+  if(/\b(ip|iphone|ipad|lightning|lighting|lightnig|8 ?pin|c2l|a2l)\b/.test(s)){
+    for(const type of ['c-lightning','a-lightning','lightning'])found.add(type);
+  }
+  if(isUSBc(s)||/\b(c2c|c2l|c2ip)\b/.test(s)){
+    for(const type of ['c-c','a-c','c-lightning'])found.add(type);
+  }
+  if(isUSBa(s)){for(const type of ['a-c','a-lightning'])found.add(type);}
+  // Completely unspecified cable: retain as an explicitly unverified suggestion.
+  if(!found.size)for(const type of CONNECTORS)found.add(type);
+  return found;
 }
 function buildIndex(products){
   const buckets=new Map([...CONNECTORS].map(type=>[type,[]]));
-  let indexed=0;
+  const uncertain=new Map([...CONNECTORS].map(type=>[type,[]]));
+  const review=[];
+  let indexed=0,cableProducts=0;
   for(const p of products||[]){
-    if(!p||p.in_stock===false||!Number.isSafeInteger(Number(p.id))||Number(p.price)<=0)continue;
+    if(!p||p.in_stock===false||!Number.isSafeInteger(Number(p.id))||!(Number(p.price)>0))continue;
     const title=norm(p.name);
-    if(!cableName(title))continue;
-    const variations=Array.isArray(p.variants)&&p.variants.length?p.variants:[null];
-    for(const v of variations){
+    const vars=Array.isArray(p.variants)&&p.variants.length?p.variants:[null];
+    const cable=cableName(title)||vars.some(v=>cableName(v?.name));
+    if(!cable)continue;
+    cableProducts++;
+    let incomplete=false,classified=false;
+    for(const v of vars){
       if(v&&(v.in_stock===false||!(Number(v.price)>0)))continue;
-      const variantText=norm(v?.name);
-      const combined=title+' '+variantText;
+      const variantText=norm(v?.name),combined=title+' '+variantText;
       const type=connectorOf(combined);
-      if(!type)continue;
-      // Variation-specific specs must take priority over parent display names.
       const length=lengthOf(variantText)||lengthOf(title);
       const watt=powerOf(variantText)||powerOf(title);
       const color=colorOf(variantText)||colorOf(title);
-      const row={product:p,variant:v||null,length,watt,color};
-      buckets.get(type).push(row);
-      if(type==='c-lightning'||type==='a-lightning'||type==='lightning'){
-        // "All Lightning" combines both connector types, but never duplicates
-        // a product when its connector is already generic Lightning.
-        if(type!=='lightning')buckets.get('lightning').push(row);
+      const row={product:p,variant:v||null,length,watt,color,type};
+      if(type){
+        buckets.get(type).push(row);
+        if(type==='c-lightning'||type==='a-lightning')buckets.get('lightning').push(row);
+        classified=true;indexed++;
+      }else{
+        incomplete=true;
+        for(const hint of connectorHints(combined))uncertain.get(hint).push(row);
       }
-      indexed++;
+      if(!length||!watt||!color)incomplete=true;
+    }
+    if(incomplete||!classified){
+      // Safe for admin diagnostics when mapped through publicProduct().
+      review.push({product:p,reason:!classified?'unknown_connector':'missing_spec'});
     }
   }
-  return {buckets,indexed,productCount:products?.length||0};
+  return {buckets,uncertain,review,indexed,cableProducts,productCount:products?.length||0};
 }
 function validate(query={}){
   const type=String(query.type??'c-lightning');
-  const length=Number(query.length||0);
-  const power=Number(query.power||0);
-  const color=String(query.color||'');
+  const length=Number(query.length||0),power=Number(query.power||0),color=String(query.color||'');
   const page=Number(query.page||1),limit=Number(query.limit||24);
+  const possiblePage=Number(query.possiblePage||1);
   if(!CONNECTORS.has(type)||!LENGTHS.has(length)||!POWERS.has(power)||!COLORS.has(color)
      ||!Number.isSafeInteger(page)||page<1||page>10000
+     ||!Number.isSafeInteger(possiblePage)||possiblePage<1||possiblePage>10000
      ||!Number.isSafeInteger(limit)||limit<1||limit>48){
     const e=new Error('Bộ lọc thông số không hợp lệ');e.status=400;throw e;
   }
-  return {type,length,power,color,page,limit};
+  return {type,length,power,color,page,limit,possiblePage};
 }
+function rowCost(row){return Number(row.variant?.price??row.product.price);}
 function searchIndex(index,request={}){
   const filter=validate(request);
-  const matched=new Map();
-  const rows=index.buckets.get(filter.type)||[];
-  for(const row of rows){
-    if(filter.length&&Math.abs(row.length-filter.length)>.001)continue;
-    if(filter.power&&row.watt!==filter.power)continue;
-    if(filter.color&&row.color!==filter.color)continue;
+  const certain=new Map(),potential=new Map();
+  function consider(row,unknownConnector=false){
+    if(filter.length&&row.length&&Math.abs(row.length-filter.length)>.001)return;
+    if(filter.power&&row.watt&&row.watt!==filter.power)return;
+    if(filter.color&&row.color&&row.color!==filter.color)return;
     const id=Number(row.product.id);
-    const price=Number(row.variant?.price||row.product.price);
-    if(!(price>0))continue;
-    const previous=matched.get(id);
-    if(!previous||price<Number(previous.variant?.price||previous.product.price))matched.set(id,row);
+    if(!(rowCost(row)>0))return;
+    const missing=[];
+    if(unknownConnector)missing.push('Đầu kết nối chưa rõ');
+    if(filter.length&&!row.length)missing.push('Chưa rõ chiều dài');
+    if(filter.power&&!row.watt)missing.push('Chưa rõ công suất');
+    if(filter.color&&!row.color)missing.push('Chưa rõ màu sắc');
+    const target=missing.length?potential:certain;
+    const prev=target.get(id);
+    if(!prev||missing.length<prev.reasons.length
+      ||(missing.length===prev.reasons.length&&rowCost(row)<rowCost(prev.row)))
+      target.set(id,{row,reasons:missing});
   }
-  const ordered=[...matched.values()].sort((a,b)=>
-    Number(a.variant?.price||a.product.price)-Number(b.variant?.price||b.product.price)
-    ||Number(a.product.id)-Number(b.product.id));
-  const total=ordered.length,start=(filter.page-1)*filter.limit;
-  return {total,page:filter.page,totalPages:Math.ceil(total/filter.limit)||1,
-    matched:ordered.slice(start,start+filter.limit),filter};
+  for(const row of index.buckets.get(filter.type)||[])consider(row);
+  for(const row of index.uncertain?.get(filter.type)||[])consider(row,true);
+  for(const id of certain.keys())potential.delete(id);
+  const sort=(a,b)=>rowCost(a.row)-rowCost(b.row)||Number(a.row.product.id)-Number(b.row.product.id);
+  const certainList=[...certain.values()].sort(sort),potentialList=[...potential.values()].sort((a,b)=>
+    a.reasons.length-b.reasons.length||sort(a,b));
+  const total=certainList.length,possibleTotal=potentialList.length;
+  return {
+    total,possibleTotal,page:filter.page,
+    totalPages:Math.ceil(total/filter.limit)||1,
+    possiblePage:filter.possiblePage,
+    possiblePages:Math.ceil(possibleTotal/8)||1,
+    matched:certainList.slice((filter.page-1)*filter.limit,filter.page*filter.limit)
+      .map(x=>x.row),
+    possible:potentialList.slice((filter.possiblePage-1)*8,filter.possiblePage*8),
+    filter
+  };
 }
-module.exports={buildIndex,searchIndex,validate,norm,lengthOf,powerOf,colorOf,connectorOf};
+function coverage(index){
+  return {cableProducts:index.cableProducts,indexedVariations:index.indexed,
+    reviewCount:index.review.length,
+    review:index.review.slice(0,50)};
+}
+module.exports={buildIndex,searchIndex,coverage,validate,norm,lengthOf,powerOf,colorOf,connectorOf,connectorHints};
