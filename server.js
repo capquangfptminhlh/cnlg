@@ -36,6 +36,8 @@ const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn 
 const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
 const besiSpecs = require('./services/besi/specIndex');
+const { createStore: createSpecReviewStore } = require('./services/besi/specReviewStore');
+const specReviewStore = createSpecReviewStore();
 const shipments = require('./services/shipments');
 const deliveryEta = require('./services/deliveryEta');
 
@@ -287,6 +289,7 @@ let cachedDefaultMixed = null;
 let cachedCategoryIdsMap = new Map();
 let cachedSpecsIndex = null;
 let specsIndexBuiltAt = 0;
+let specsIndexReviewedRev = -1;
 let lastFsSlot = -1;
 let cachedFsData = null;
 
@@ -542,8 +545,11 @@ function mixSources(products, every = 4) {
  */
 function specificationIndex(){
   ensureCatalogCaches();
-  if(!cachedSpecsIndex||Date.now()-specsIndexBuiltAt>120000){
-    cachedSpecsIndex=besiSpecs.buildIndex(cachedSellable);
+  const reviewed=specReviewStore.snapshot();
+  if(!cachedSpecsIndex||Date.now()-specsIndexBuiltAt>120000
+    ||specsIndexReviewedRev!==reviewed.revision){
+    cachedSpecsIndex=besiSpecs.buildIndex(cachedSellable,reviewed.records);
+    specsIndexReviewedRev=reviewed.revision;
     specsIndexBuiltAt=Date.now();
   }
   return cachedSpecsIndex;
@@ -583,7 +589,8 @@ app.get('/api/admin/besi/spec-coverage', requireAdmin, (req,res)=>{
     const summary=besiSpecs.coverage(specificationIndex(),{page:req.query.page||1,limit:50});
     res.set('Cache-Control','no-store').json({success:true,
       cableProducts:summary.cableProducts,indexedVariations:summary.indexedVariations,
-      needsReview:summary.reviewCount,page:summary.page,totalPages:summary.totalPages,
+      needsReview:summary.reviewCount,reviewedVariations:summary.reviewedVariations,
+      page:summary.page,totalPages:summary.totalPages,
       review:summary.review.map(({product,reason})=>{
         const pub=publicProduct(product);
         return {id:pub.id,name:pub.name,reason};
@@ -591,6 +598,53 @@ app.get('/api/admin/besi/spec-coverage', requireAdmin, (req,res)=>{
   }catch(_){
     res.status(500).json({success:false,error:'Không thể tạo báo cáo thông số'});
   }
+});
+
+// All attribute corrections are private and require the existing admin gate.
+// Product and variation IDs are resolved against the current catalog before
+// saving; never accept a source URL, price or supplier name from the editor.
+app.get('/api/admin/besi/spec-review/:id', requireAdmin, (req,res)=>{
+  try{
+    const id=Number(req.params.id);
+    if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({success:false,error:'Mã sản phẩm không hợp lệ'});
+    const item=storeCatalog.findProduct(id);
+    if(!item)return res.status(404).json({success:false,error:'Sản phẩm không tồn tại'});
+    const pub=publicProduct(item);
+    const rows=(Array.isArray(pub.variants)&&pub.variants.length?
+      pub.variants:[{id:'',name:'Thông số sản phẩm'}]).map(v=>{
+      const key=String(id)+':'+String(v.id||'');
+      const existing=specReviewStore.snapshot().records[key]||null;
+      const combined=String(pub.name||'')+' '+String(v.name||'');
+      return {id:v.id||'',name:v.name||'Sản phẩm',
+        in_stock:v.in_stock!==false,proposed:{
+          connector:besiSpecs.connectorOf(combined),
+          length:besiSpecs.lengthOf(combined)||null,
+          power:besiSpecs.powerOf(combined)||null,
+          color:besiSpecs.colorOf(combined)||null,
+          status:'gợi ý từ tên, chưa xác minh'
+        },verified:existing};
+    });
+    res.set('Cache-Control','no-store').json({success:true,
+      product:{id:pub.id,name:pub.name,variant_count:pub.variant_count||rows.length},
+      variations:rows});
+  }catch(_){res.status(500).json({success:false,error:'Không thể đọc thông số sản phẩm'});}
+});
+app.put('/api/admin/besi/spec-review/:id', requireAdmin, rateLimit('spec-review-write',60e3,45),(req,res)=>{
+  try{
+    if(String(req.body?.productId)!==String(req.params.id))
+      return res.status(400).json({success:false,error:'Mã sản phẩm không khớp'});
+    const result=specReviewStore.save(req.body,id=>storeCatalog.findProduct(id));
+    cachedSpecsIndex=null;
+    res.set('Cache-Control','no-store').json({success:true,record:result.record});
+  }catch(e){res.status(e.status||500).json({success:false,
+    error:e.status?e.message:'Không thể lưu thông số'});}
+});
+app.delete('/api/admin/besi/spec-review/:id', requireAdmin,rateLimit('spec-review-delete',60e3,45),(req,res)=>{
+  try{
+    const result=specReviewStore.remove(req.params.id,req.query.variantId||'');
+    cachedSpecsIndex=null;
+    res.set('Cache-Control','no-store').json({success:true,...result});
+  }catch(e){res.status(e.status||500).json({success:false,error:e.status?e.message:'Không thể hủy xác minh'});}
 });
 
 app.get('/api/products', (req, res) => {
