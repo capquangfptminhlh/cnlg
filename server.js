@@ -37,6 +37,7 @@ const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
 const besiSpecs = require('./services/besi/specIndex');
 const besiCategoryFacets = require('./services/besi/categoryFacets');
+const besiUniversal = require('./services/besi/universalDiscovery');
 const { createStore: createSpecReviewStore } = require('./services/besi/specReviewStore');
 const besiSpecLocalAI = require('./services/besi/specLocalAI');
 const specReviewStore = createSpecReviewStore();
@@ -292,6 +293,8 @@ let cachedCategoryIdsMap = new Map();
 let cachedSpecsIndex = null;
 let cachedCategoryFacetsIndex = null;
 let categoryFacetsBuiltAt = 0;
+let cachedUniversalDiscovery=null;
+let universalDiscoveryAt=0;
 let specsIndexBuiltAt = 0;
 let specsIndexReviewedRev = -1;
 let lastFsSlot = -1;
@@ -307,6 +310,7 @@ function ensureCatalogCaches() {
   lastCategoriesRef = rawCategories;
   cachedSpecsIndex = null; // catalog changed: invalidate server-side faceted index
   cachedCategoryFacetsIndex = null;
+  cachedUniversalDiscovery = null;
 
   // 1. Phả hệ danh mục con -> cha (tìm nhanh O(1))
   cachedCategoryIdsMap.clear();
@@ -717,6 +721,50 @@ app.delete('/api/admin/besi/spec-review/:id', requireAdmin,rateLimit('spec-revie
     cachedSpecsIndex=null;
     res.set('Cache-Control','no-store').json({success:true,...result});
   }catch(e){res.status(e.status||500).json({success:false,error:e.status?e.message:'Không thể hủy xác minh'});}
+});
+
+// Full-industry buyer discovery: all sellable categories, brands and
+// source-declared variation attributes, with unverified candidates separated.
+function universalDiscoveryIndex(){
+  ensureCatalogCaches();
+  if(!cachedUniversalDiscovery||Date.now()-universalDiscoveryAt>120000){
+    cachedUniversalDiscovery=besiUniversal.compile(cachedSellable,storeCatalog.getCategories());
+    universalDiscoveryAt=Date.now();
+  }
+  return cachedUniversalDiscovery;
+}
+app.get('/api/products/discover/options',rateLimit('besi-discover-options',60e3,70),(req,res)=>{
+  try{
+    const data=besiUniversal.facetOptions(universalDiscoveryIndex(),req.query);
+    res.set('Cache-Control','public, max-age=30').json({success:true,...data});
+  }catch(e){
+    const status=e.status===400?400:500;
+    res.status(status).json({success:false,
+      error:status===400?'Bộ lọc không hợp lệ':'Chưa thể tải danh mục lúc này'});
+  }
+});
+app.get('/api/products/discover',rateLimit('besi-discover-search',60e3,70),(req,res)=>{
+  try{
+    const data=besiUniversal.search(universalDiscoveryIndex(),req.query);
+    const project=(row,unverified=false,missing=[])=>{
+      const pub=publicProduct(row.product);
+      const selected=row.variant?(pub.variants||[]).find(v=>String(v.id)===String(row.variant.id)):null;
+      return {...pub,matched_variant:selected?{
+        id:selected.id,name:selected.name,price:selected.price,
+        image:selected.image||null,in_stock:selected.in_stock
+      }:null,verified_spec:!unverified,missing_specs:missing};
+    };
+    const exact=data.matched.map(row=>project(row));
+    const possible=data.possible.map(({row,reasons})=>project(row,true,reasons));
+    res.set('Cache-Control','public, max-age=15').json({success:true,
+      total:data.total,page:data.page,totalPages:data.totalPages,data:exact,
+      possibleTotal:data.possibleTotal,possiblePage:data.possiblePage,
+      possiblePages:data.possiblePages,possible});
+  }catch(e){
+    const status=e.status===400?400:500;
+    res.status(status).json({success:false,
+      error:status===400?'Điều kiện tìm kiếm không hợp lệ':'Không thể tìm sản phẩm lúc này'});
+  }
 });
 
 app.get('/api/products', (req, res) => {

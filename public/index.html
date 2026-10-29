@@ -25,6 +25,7 @@
   <link rel="stylesheet" href="/besi-conversion.css">
   <link rel="stylesheet" href="/besi-spec-filters.css">
   <link rel="stylesheet" href="/besi-category-facets.css">
+  <link rel="stylesheet" href="/besi-universal.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -160,6 +161,72 @@
   <!-- Products Main Content -->
   <main class="container main-layout" id="catalog">
     
+
+    <!-- Universal discovery: works for EVERY populated catalog category. -->
+    <section class="besi-universal-finder" id="besiUniversalFinder" aria-label="Tìm kiếm và lọc mọi ngành hàng">
+      <div class="besi-universal-heading">
+        <div><span class="besi-universal-kicker"><i class="fa-solid fa-compass"></i> TÌM KIẾM TOÀN SÀN</span>
+          <h2>Muốn mua gì? Lọc đúng món đó.</h2>
+          <p>Tìm trong toàn bộ danh mục BESI, từ đồ công nghệ đến gia dụng, thời trang và các ngành hàng đang bán.</p></div>
+        <div class="besi-universal-count" id="besiUniversalScope">Đang đọc ngành hàng…</div>
+      </div>
+      <form id="besiUniversalForm" class="besi-universal-form">
+        <div class="besi-universal-wide">
+          <label for="besiUniversalQuery">Tên hàng, mã, dòng máy hoặc nhu cầu</label>
+          <div class="besi-universal-query">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="besiUniversalQuery" type="search" maxlength="120" placeholder="Ví dụ: ốp iPhone 16, áo cotton, giày size 42, cáp 2m…" autocomplete="off">
+          </div>
+        </div>
+        <label>Ngành hàng
+          <select id="besiUniversalCategory"><option value="">Tất cả ngành hàng</option></select>
+        </label>
+        <label>Thương hiệu
+          <select id="besiUniversalBrand"><option value="">Tất cả thương hiệu</option></select>
+        </label>
+        <label>Thông số cần lọc
+          <select id="besiUniversalAttribute"><option value="">Chọn thông số (nếu có)</option></select>
+        </label>
+        <label>Giá trị thông số
+          <select id="besiUniversalValue" disabled><option value="">Tất cả</option></select>
+        </label>
+        <label>Giá từ (đ)
+          <input id="besiUniversalMin" type="number" min="0" max="1000000000" step="1000" placeholder="Từ">
+        </label>
+        <label>Giá đến (đ)
+          <input id="besiUniversalMax" type="number" min="0" max="1000000000" step="1000" placeholder="Đến">
+        </label>
+        <label>Sắp xếp
+          <select id="besiUniversalSort">
+            <option value="relevance">Phù hợp nhất</option>
+            <option value="price-asc">Giá thấp trước</option>
+            <option value="price-desc">Giá cao trước</option>
+            <option value="name-asc">Tên A → Z</option>
+          </select>
+        </label>
+        <div class="besi-universal-buttons">
+          <button type="submit" id="besiUniversalApply"><i class="fa-solid fa-filter"></i> Tìm sản phẩm phù hợp</button>
+          <button type="button" id="besiUniversalReset">Xóa bộ lọc</button>
+        </div>
+      </form>
+      <p class="besi-universal-hint" id="besiUniversalHint">Danh mục và thông số lấy từ sản phẩm có sẵn. Không có dữ liệu sẽ không tự tạo bộ lọc giả.</p>
+    </section>
+    <section class="besi-universal-results" id="besiUniversalResults" hidden aria-label="Kết quả tìm kiếm toàn ngành hàng">
+      <div class="besi-spec-results-head">
+        <div><span class="besi-spec-kicker">KẾT QUẢ TRONG TOÀN BỘ BESI</span>
+          <h2 id="besiUniversalTitle">Sản phẩm phù hợp</h2>
+          <p id="besiUniversalStatus" role="status" aria-live="polite">Đang tìm kiếm…</p></div>
+        <button type="button" class="besi-spec-reset" id="besiUniversalExit">Trở về danh mục</button>
+      </div>
+      <div class="product-grid besi-spec-grid" id="besiUniversalGrid"></div>
+      <div class="besi-spec-load"><button type="button" id="besiUniversalMore" class="btn-load-more" hidden>Xem thêm sản phẩm</button></div>
+      <aside class="besi-spec-possible" id="besiUniversalPossible" hidden>
+        <div class="besi-spec-possible-heading"><strong><i class="fa-solid fa-circle-question"></i> Có thể phù hợp — cần xác minh thông số</strong>
+          <p id="besiUniversalPossibleStatus"></p></div>
+        <div class="product-grid besi-spec-grid" id="besiUniversalPossibleGrid"></div>
+        <div class="besi-spec-load"><button type="button" class="besi-spec-reset" id="besiUniversalPossibleMore" hidden>Xem thêm sản phẩm cần kiểm tra</button></div>
+      </aside>
+    </section>
 
     <!-- BESI multi-category specification discovery -->
     <section class="besi-category-finder" id="besiCategoryFinder" aria-label="Lọc sản phẩm theo ngành hàng">
@@ -754,5 +821,6 @@
   <script src="/besi-conversion.js"></script>
   <script src="/besi-spec-filters.js"></script>
   <script src="/besi-category-facets.js"></script>
+  <script src="/besi-universal.js"></script>
 </body>
 </html>

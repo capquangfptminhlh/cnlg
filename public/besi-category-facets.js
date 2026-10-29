@@ -235,6 +235,7 @@
   $('searchInput')?.addEventListener('keydown',event=>{
     if(event.key==='Enter'&&stateUi.active)exit();
   },true);
+  window.addEventListener('besi:universal-filters-start',()=>{if(stateUi.active)exit();});
   window.addEventListener('popstate',()=>{if(stateUi.active)exit();});
   switchCategory('case');
 })();
