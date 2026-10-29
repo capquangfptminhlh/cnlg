@@ -64,18 +64,30 @@ function capacityValues(text){
 function uniqueOrNull(values){const arr=[...new Set(values)];return arr.length===1?arr[0]:null;}
 function parseSpec(category,productTitle,variantTitle=''){
   const t=norm(productTitle),v=norm(variantTitle);
-  if(category==='cases')return {
-    spec:phoneModel(v)||phoneModel(t),
-    ambiguous:modelMatches(v).length>1||(!modelMatches(v).length&&modelMatches(t).length>1)
-  };
-  if(category==='chargers')return {
-    spec:uniqueOrNull(watts(v))??uniqueOrNull(watts(t)),
-    ambiguous:watts(v).length>1||(!watts(v).length&&watts(t).length>1)
-  };
-  if(category==='powerbanks')return {
-    spec:uniqueOrNull(capacityValues(v))??uniqueOrNull(capacityValues(t)),
-    ambiguous:capacityValues(v).length>1||(!capacityValues(v).length&&capacityValues(t).length>1)
-  };
+  const original=String(productTitle||'').toLowerCase();
+  // Some supplier titles write "iPhone 14/15", "20/35W" or "5000/10000mAh".
+  // A lone trailing measurement is NOT proof of the only sellable option.
+  const multiPhone=/\biphone\s*1[1-9]\s*(?:\/|,|&|va|and)\s*1[1-9]\b/i.test(original);
+  const multiWatt=/\b\d{1,3}\s*(?:\/|,)\s*\d{1,3}\s*w\b/i.test(original);
+  const multiCapacity=/\b\d{4,5}\s*(?:\/|,)\s*\d{4,5}\s*mah\b/i.test(original);
+  if(category==='cases'){
+    const variantModels=modelMatches(v),parentModels=modelMatches(t);
+    const specific=variantModels.length===1;
+    return {spec:specific?variantModels[0]:(multiPhone?null:phoneModel(t)),
+      ambiguous:variantModels.length>1||(!specific&&(multiPhone||parentModels.length>1))};
+  }
+  if(category==='chargers'){
+    const variantWatts=watts(v),parentWatts=watts(t);
+    const specific=variantWatts.length===1;
+    return {spec:specific?variantWatts[0]:(multiWatt?null:uniqueOrNull(parentWatts)),
+      ambiguous:variantWatts.length>1||(!specific&&(multiWatt||parentWatts.length>1))};
+  }
+  if(category==='powerbanks'){
+    const variantCapacities=capacityValues(v),parentCapacities=capacityValues(t);
+    const specific=variantCapacities.length===1;
+    return {spec:specific?variantCapacities[0]:(multiCapacity?null:uniqueOrNull(parentCapacities)),
+      ambiguous:variantCapacities.length>1||(!specific&&(multiCapacity||parentCapacities.length>1))};
+  }
   return {spec:null,ambiguous:false};
 }
 function buildIndex(products){
