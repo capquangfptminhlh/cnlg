@@ -4,7 +4,7 @@
 # → test đạt mới khởi động lại cửa hàng (gián đoạn vài giây) → cửa hàng không lên lại thì quay về bản cũ.
 # Test hỏng: giữ nguyên bản đang chạy. Mọi việc ghi vào data\update.log.
 #
-# Lấy mã bằng khoá chỉ-đọc data\deploy\id_ed25519 (tạo bởi scripts\enable-auto-update.ps1), không cần đăng nhập GitHub.
+# Repo GitHub public: lấy qua HTTPS không cần token. Nếu có deploy key SSH cũ thì vẫn ưu tiên dùng SSH.
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $dataDir = Join-Path $repo 'data'
@@ -12,7 +12,8 @@ $log = Join-Path $dataDir 'update.log'
 $lock = Join-Path $dataDir 'update.lock'
 $catalog = Join-Path $dataDir 'products.json'
 $rejected = Join-Path $dataDir 'update.rejected'   # bản đã từ chối: không thử lại mỗi 5 phút
-$remoteUrl = 'git@github.com:capquangfptminhlh/cnlg.git'
+$remoteUrl = 'https://github.com/capquangfptminhlh/cnlg.git'
+$sshRemoteUrl = 'git@github.com:capquangfptminhlh/cnlg.git'
 # Chỉ để thử trên máy khác: HM_UPDATE_REMOTE = nguồn git thay thế (bỏ qua khoá deploy), HM_UPDATE_NO_RESTART=1 = không đụng cửa hàng
 $testRemote = $env:HM_UPDATE_REMOTE
 if ($testRemote) { $remoteUrl = $testRemote }
@@ -63,10 +64,17 @@ Set-Content $lock $PID
 try {
   Set-Location $repo
   $key = Join-Path $dataDir 'deploy\id_ed25519'
-  if (-not $testRemote -and -not (Test-Path $key)) { return }   # chưa bật tự cập nhật
-  $ssh = Join-Path $env:SystemRoot 'System32\OpenSSH\ssh.exe'
-  if (-not (Test-Path $ssh)) { $ssh = 'ssh' }
-  if (-not $testRemote) { $env:GIT_SSH_COMMAND = "`"$($ssh -replace '\\', '/')`" -i `"$($key -replace '\\', '/')`" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=`"$((Join-Path $dataDir 'deploy\known_hosts') -replace '\\', '/')`"" }
+  $env:GIT_TERMINAL_PROMPT = '0' # fail safely instead of waiting on interactive auth in SYSTEM task
+  $env:GCM_INTERACTIVE = 'never'
+  if (-not $testRemote -and (Test-Path $key)) {
+    $remoteUrl = $sshRemoteUrl
+    $ssh = Join-Path $env:SystemRoot 'System32\OpenSSH\ssh.exe'
+    if (-not (Test-Path $ssh)) { $ssh = 'ssh' }
+    $env:GIT_SSH_COMMAND = "`"$($ssh -replace '\\', '/')`" -i `"$($key -replace '\\', '/')`" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=`"$((Join-Path $dataDir 'deploy\known_hosts') -replace '\\', '/')`""
+  } elseif (-not $testRemote) {
+    Remove-Item Env:\GIT_SSH_COMMAND -ErrorAction SilentlyContinue
+    Log 'Không có deploy key SSH; sử dụng GitHub HTTPS public (read-only).'
+  }
 
   RunGit fetch --quiet $remoteUrl 'main:refs/remotes/origin/main' | Out-Null
   $old = RunGit rev-parse HEAD
@@ -87,6 +95,10 @@ try {
   if ($lockChanged) { Log 'package-lock đổi → cài lại thư viện'; if ((RunNpm ci --no-audit --no-fund).Code) { throw 'npm ci lỗi' } }
 
   $test = RunNpm test
+  if (-not $test.Code) {
+    Log 'Backend tests đạt; đang kiểm tra bộ lọc và giao diện (npm run test:ui).'
+    $test = RunNpm run test:ui
+  }
   if ($test.Code) {
     $failed = ($test.Out | Select-String 'fail (\d+)' | ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -Last 1)
     Log "TEST HỎNG ($failed bài) → giữ bản cũ $($old.Substring(0,7)), không thử lại bản $($new.Substring(0,7)) nữa."
