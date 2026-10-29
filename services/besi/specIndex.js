@@ -166,9 +166,14 @@ function searchIndex(index,request={}){
     filter
   };
 }
-function coverage(index){
+function coverage(index,{page=1,limit=50}={}){
+  const p=Number(page),l=Number(limit);
+  if(!Number.isSafeInteger(p)||p<1||p>10000
+    ||!Number.isSafeInteger(l)||l<1||l>100)throw Object.assign(
+      new Error('Trang báo cáo không hợp lệ'),{status:400});
   return {cableProducts:index.cableProducts,indexedVariations:index.indexed,
-    reviewCount:index.review.length,
-    review:index.review.slice(0,50)};
+    reviewCount:index.review.length,page:p,
+    totalPages:Math.ceil(index.review.length/l)||1,
+    review:index.review.slice((p-1)*l,p*l)};
 }
 module.exports={buildIndex,searchIndex,coverage,validate,norm,lengthOf,powerOf,colorOf,connectorOf,connectorHints};
