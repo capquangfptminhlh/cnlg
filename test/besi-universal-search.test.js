@@ -143,7 +143,8 @@ test('standalone size variants and RAM/ROM fields stay separate',()=>{
  ],cats);
  assert.equal(discover.search(idx,{attr:'size',value:'XL'}).total,1);
  assert.equal(discover.search(idx,{attr:'size',value:'42'}).total,1);
- assert.equal(discover.search(idx,{attr:'size',value:'43'}).total,0);
+ assert.throws(()=>discover.search(idx,{attr:'size',value:'43'}),e=>e.status===400,
+   'A size available only in sold-out variants must not appear as a selectable facet');
  assert.deepEqual(discover.memory('RAM 8GB ROM 256GB','ram'),['8gb']);
  assert.deepEqual(discover.memory('RAM 8GB ROM 256GB','storage'),['256gb']);
 });
