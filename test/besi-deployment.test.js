@@ -7,7 +7,8 @@ const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 test('public repo Windows update no longer requires SSH deploy key',()=>{
   const script=read('scripts/auto-update.ps1');
   assert.match(script,/\$remoteUrl = 'https:\/\/github\.com\/capquangfptminhlh\/cnlg\.git'/);
-  assert.match(script,/if \(-not \$testRemote -and \(Test-Path \$key\)\)/);
+  assert.match(script,/\$hasKey = \(-not \$testRemote -and \(Test-Path \$key\)\)/);
+  assert.match(script,/RunGit fetch --quiet \$sshRemoteUrl/);
   assert.doesNotMatch(script,/if \(-not \$testRemote -and -not \(Test-Path \$key\)\) \{ return \}/);
   assert.match(script,/\$env:GIT_TERMINAL_PROMPT = '0'/);
   assert.match(script,/RunGit fetch --quiet \$remoteUrl/);
