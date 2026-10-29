@@ -25,7 +25,7 @@ or request quantity-based tier pricing.
 | --- | --- | --- |
 | Admin supplier registry / verification | `services/besi/store.js` | Works; local single-instance persistence |
 | Partner SKU JSON intake (200 per import) | `/api/admin/besi/feeds/:supplierId` | Works; authenticated admin |
-| Master catalog / deduplication | `services/besi/core.js` | Works; precise product identifiers only |
+| Master catalog / deduplication | `services/besi/core.js` | Works; GTIN+variant, curated mappingKey or complete brand+model+variant; never title-only |
 | Quantity price engine | `core.tierPrice` | Works; fee, reserve and margin floor |
 | Supplier allocation | `core.draftAllocation` | Works; draft only, no upstream send |
 | Admin Supplier Hub | `/admin-besi.html` | Works behind existing admin session |
