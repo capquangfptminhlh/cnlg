@@ -66,7 +66,7 @@ describe('BESI master catalog and price engine',()=>{
     assert.equal(quote.orderEnabled,false);
     assert.doesNotMatch(JSON.stringify(quote),/supplier|cost|stock|sku|dispatch/i);
     assert.throws(()=>core.publicQuote(s,[{id,quantity:14}]),/tồn/);
-    assert.throws(()=>core.publicQuote(s,[{id,quantity:1},{id,quantity:2}]),/Trùng/);
+    assert.throws(()=>core.publicQuote(s,[{id,quantity:1},{id,quantity:2}]),/trùng/i);
   });
   test('allocation splits stock across partners but remains a DRAFT not an actual order',()=>{
     const s=fixtures(),id=core.publicCatalog(s)[0].id;
@@ -81,7 +81,7 @@ describe('BESI master catalog and price engine',()=>{
   test('image URLs to upstream servers and invalid supplier references rejected',()=>{
     const ids=new Set(['supplier001']);
     assert.throws(()=>core.validateOffer({supplierId:'supplier001',sku:'A1',
-      name:'SP',stock:1,cost:1000,image:'https://vendor.example/p.jpg'},ids),/Ảnh/);
+      name:'SP',stock:1,cost:1000,image:'https://vendor.example/p.jpg'},ids),/ảnh/i);
     assert.throws(()=>core.validateOffer({supplierId:'unknown',sku:'A1',
       name:'SP',stock:1,cost:1000},ids),/đối tác/);
   });
