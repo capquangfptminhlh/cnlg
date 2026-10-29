@@ -67,6 +67,12 @@ function RestartStore([string]$expectedCommit) {
 # data\products.json do vòng đồng bộ ghi liên tục nhưng vẫn nằm trong git (bản lưu cho bản trưng bày):
 # cất bản đang chạy ra ngoài trước khi đổi mã, xong thì trả lại – không bao giờ mất danh mục đang bán
 function WithCatalogKept([scriptblock]$body) {
+  # Current BESI catalog data is gitignored, not a tracked source file.
+  # DO NOT "git checkout -- data/products.json" when it is untracked:
+  # doing so fails with pathspec and blocks every production update.
+  $tracked = RunGit ls-files -- data/products.json
+  if (-not $tracked) { & $body; return }
+  # Backward-compatible path for older server clones where file was tracked.
   $tmp = "$catalog.update-keep"
   $had = Test-Path $catalog
   if ($had) { Copy-Item $catalog $tmp -Force; RunGit checkout -- data/products.json | Out-Null }
