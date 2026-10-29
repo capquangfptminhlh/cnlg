@@ -40,6 +40,19 @@ describe('BESI master catalog and price engine',()=>{
       name:'Tai nghe Bluetooth Pro',cost:52000,stock:1},ids));
     assert.equal(core.publicCatalog(s).length,3);
   });
+  test('manual SKU mapping combines verified matching offers without relying on product titles',()=>{
+    const s=fixtures(),ids=new Set(s.suppliers.map(v=>v.id));
+    // No GTIN and no full model/variant: admin-curated key is required.
+    s.offers=[
+      core.validateOffer({supplierId:'supplier001',sku:'SKU-A',
+        name:'Máy ép chậm 500W',mappingKey:'juicer-model-500w',cost:120000,stock:3},ids),
+      core.validateOffer({supplierId:'supplier002',sku:'SKU-B',
+        name:'Máy ép chậm 500W',mappingKey:'juicer-model-500w',cost:125000,stock:5},ids)
+    ];
+    assert.equal(core.publicCatalog(s).length,1);
+    delete s.offers[1].mappingKey;
+    assert.equal(core.publicCatalog(s).length,2,'uncurated SKU must not merge by similar name');
+  });
   test('no unverified, inactive or zero-stock offer enters a public catalog',()=>{
     const s=fixtures();
     s.suppliers[0].verified=false;
