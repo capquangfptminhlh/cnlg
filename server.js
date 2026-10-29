@@ -580,10 +580,10 @@ app.get('/api/products/specs', rateLimit('besi-specs', 60e3, 60), (req,res)=>{
  */
 app.get('/api/admin/besi/spec-coverage', requireAdmin, (req,res)=>{
   try{
-    const summary=besiSpecs.coverage(specificationIndex());
+    const summary=besiSpecs.coverage(specificationIndex(),{page:req.query.page||1,limit:50});
     res.set('Cache-Control','no-store').json({success:true,
       cableProducts:summary.cableProducts,indexedVariations:summary.indexedVariations,
-      needsReview:summary.reviewCount,
+      needsReview:summary.reviewCount,page:summary.page,totalPages:summary.totalPages,
       review:summary.review.map(({product,reason})=>{
         const pub=publicProduct(product);
         return {id:pub.id,name:pub.name,reason};
