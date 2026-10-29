@@ -37,6 +37,7 @@ const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
 const besiSpecs = require('./services/besi/specIndex');
 const { createStore: createSpecReviewStore } = require('./services/besi/specReviewStore');
+const besiSpecLocalAI = require('./services/besi/specLocalAI');
 const specReviewStore = createSpecReviewStore();
 const shipments = require('./services/shipments');
 const deliveryEta = require('./services/deliveryEta');
@@ -628,6 +629,27 @@ app.get('/api/admin/besi/spec-review/:id', requireAdmin, (req,res)=>{
       product:{id:pub.id,name:pub.name,variant_count:pub.variant_count||rows.length},
       variations:rows});
   }catch(_){res.status(500).json({success:false,error:'Không thể đọc thông số sản phẩm'});}
+});
+// Opt-in AI runs ONLY on local loopback. Suggestions never enter the
+// verified index without the separate human-confirmed PUT action.
+app.post('/api/admin/besi/spec-ai-suggest/:id',requireAdmin,rateLimit('spec-local-ai',60e3,6),async(req,res)=>{
+  try{
+    const id=Number(req.params.id);
+    if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({success:false,error:'Mã sản phẩm không hợp lệ'});
+    const product=storeCatalog.findProduct(id);
+    if(!product)return res.status(404).json({success:false,error:'Không có sản phẩm'});
+    const pub=publicProduct(product),variantId=String(req.body?.variantId||'');
+    const variations=Array.isArray(pub.variants)?pub.variants:[];
+    const variant=variantId?variations.find(x=>String(x.id)===variantId):null;
+    if(variantId&&!variant)return res.status(404).json({success:false,error:'Không có phân loại'});
+    if(!variantId&&(variations.length>1||Number(pub.variant_count||0)>1))
+      return res.status(400).json({success:false,error:'Phải chọn đúng phân loại trước khi hỏi AI'});
+    const suggestion=await besiSpecLocalAI.suggest({name:pub.name,variantName:variant?.name||''});
+    res.set('Cache-Control','no-store').json({success:true,data:suggestion});
+  }catch(e){
+    const status=e.status===503?503:500;
+    res.status(status).json({success:false,error:status===503?'AI nội bộ chưa được cấu hình':'Không lấy được gợi ý AI'});
+  }
 });
 app.put('/api/admin/besi/spec-review/:id', requireAdmin, rateLimit('spec-review-write',60e3,45),(req,res)=>{
   try{
