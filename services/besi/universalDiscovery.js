@@ -52,17 +52,28 @@ function sizes(text,context=''){
     const shoes=/(?<!\d)(3[5-9]|4[0-9]|50)(?!\d)/g;
     while((m=shoes.exec(t)))result.push(m[1]);
   }
-  // Plain isolated letters are not accepted without an explicit size label.
+  // A single standalone variant label ("XL", "42") is an explicit
+  // sellable variation in a clothing/shoe category. Parent titles are still
+  // required to carry an explicit size label.
+  const single=t.trim().toUpperCase();
+  if(sizeLabels.includes(single))result.push(single);
+  if(/^(3[5-9]|4[0-9]|50)$/.test(single)&&/\b(giay|dep|shoe|sneaker)\b/.test(category))
+    result.push(single);
   return [...new Set(result)];
 }
 function memory(text,kind){
-  const t=norm(text);const result=[];
+  const t=norm(text),result=[];
   const re=/\b(\d{1,4})\s*(gb|tb)\b/g;let m;
   while((m=re.exec(t))){
-    const mb=Number(m[1])*(m[2]==='tb'?1024:1);
+    const gb=Number(m[1])*(m[2]==='tb'?1024:1);
+    // Interpret labels closest to EACH capacity, never a blanket RAM flag
+    // that accidentally marks the storage portion as RAM ("8GB/256GB").
+    const prefix=t.slice(Math.max(0,m.index-18),m.index);
+    const ramHere=/\b(?:ram|bo nho ram)\s*[:=-]?\s*$/.test(prefix);
+    const storageHere=/\b(?:rom|ssd|hdd|storage|bo nho trong)\s*[:=-]?\s*$/.test(prefix);
     if(kind==='ram'){
-      if(mb<=256&&/\bram\s*[:=-]?\s*\d/.test(t))result.push(mb+'gb');
-    }else if(mb>=8&&mb<=8192&&!/\bram\s*[:=-]?\s*\d/.test(t))result.push(mb+'gb');
+      if(gb<=256&&ramHere)result.push(gb+'gb');
+    }else if(gb>=8&&gb<=8192&&(storageHere||!ramHere))result.push(gb+'gb');
   }
   return [...new Set(result)];
 }
