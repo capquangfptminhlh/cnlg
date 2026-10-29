@@ -11,7 +11,7 @@ const capacities=[2000,3000,5000,6000,8000,10000,12000,15000,20000,25000,30000,4
 function detectCategory(p){
   const text=norm(p?.name),category=norm(p?.category_name||p?.category||'');
   if(/\b(pin du phong|sac du phong|power ?bank|portable charger)\b/.test(text))return 'powerbanks';
-  if(/\b(op lung|op dien thoai|bao da dien thoai|phone case|protective case|back cover)\b/.test(text))return 'cases';
+  if(/\b(op lung|op dien thoai|bao da dien thoai|phone case|protective case|back cover|op (?:iphone|samsung|galaxy))\b/.test(text))return 'cases';
   if(/\b(cu sac|bo sac|adapter sac|wall charger|gan charger|sac nhanh)\b/.test(text)
     &&!/\b(cap sac|day sac|pin du phong|sac du phong|power ?bank)\b/.test(text))return 'chargers';
   if(/\b(op lung|mieng dan|phone case)\b/.test(category)&&!/\b(mieng dan|kinh cuong luc|film)\b/.test(text))return 'cases';
@@ -124,8 +124,8 @@ function validate(q={}){
   if(!CATEGORIES.has(category))throw Object.assign(new Error('Nhóm hàng không hợp lệ'),{status:400});
   const raw=String(q.value??'');
   const value=raw.trim()||null;
-  const page=Number(q.page||1),limit=Number(q.limit||24);
-  const possiblePage=Number(q.possiblePage||1);
+  const page=Number(q.page??1),limit=Number(q.limit??24);
+  const possiblePage=Number(q.possiblePage??1);
   if(!Number.isSafeInteger(page)||page<1||page>10000||
      !Number.isSafeInteger(possiblePage)||possiblePage<1||possiblePage>10000||
      !Number.isSafeInteger(limit)||limit<1||limit>48)
