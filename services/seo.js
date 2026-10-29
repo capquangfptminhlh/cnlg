@@ -58,15 +58,20 @@ function productPath(p) {
   return `/sp/${p.id}-${String(p.slug || '').slice(0, 80)}`;
 }
 
-function storeName(config) {
-  return config.store?.name || 'Hoàng Minh Store';
+// BESI storefront metadata must be correct even if legacy store configuration
+// still contains the old retail name. Do not change any other host.
+function isBesiHost(req) {
+  return /(^|\.)besi\.com\.vn(?::\d+)?$/i.test(String(req.get('host') || ''));
+}
+function storeName(config, req) {
+  return isBesiHost(req) ? 'BESI' : (config.store?.name || 'Hoàng Minh Store');
 }
 
 /** HTML trang sản phẩm (index.html + thẻ SEO) */
 function renderProductPage(req, product, detail, config) {
   const base = baseUrl(req);
   const url = base + productPath(product);
-  const name = storeName(config);
+  const name = storeName(config, req);
   const priceText = `${Number(product.price).toLocaleString('vi-VN')} đ`;
   const desc = stripSupplierText(stripHtml(detail?.description).slice(0, 155) || `${product.name} – ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, thanh toán khi nhận hàng.'}`);
   const maskedImg = maskMediaUrl(product.image_hd || product.image);
@@ -111,8 +116,10 @@ function renderProductPage(req, product, detail, config) {
 
 /** HTML trang chủ kèm meta mô tả cửa hàng */
 function renderHomePage(req, config, total) {
-  const name = storeName(config);
-  const desc = `${config.store?.slogan || 'Tổng kho phân phối sỉ & lẻ chính hãng'} – Hơn ${total.toLocaleString('vi-VN')} sản phẩm công nghệ & gia dụng chính hãng, giao toàn quốc, kiểm tra hàng – trả tiền khi nhận.`;
+  const name = storeName(config, req);
+  const desc = isBesiHost(req)
+    ? `BESI tập hợp ${total.toLocaleString('vi-VN')} sản phẩm từ nhiều tổng kho và nhà phân phối. Mua lẻ giá tốt, nhập sỉ số lượng lớn và khám phá nhiều ngành hàng trong một nơi.`
+    : `${config.store?.slogan || 'Tổng kho phân phối sỉ & lẻ chính hãng'} – Hơn ${total.toLocaleString('vi-VN')} sản phẩm công nghệ & gia dụng chính hãng, giao toàn quốc, kiểm tra hàng – trả tiền khi nhận.`;
   const head = `
   <meta name="description" content="${escAttr(desc)}">
   <link rel="canonical" href="${escAttr(baseUrl(req) + '/')}">
@@ -120,7 +127,7 @@ function renderHomePage(req, config, total) {
   <meta property="og:site_name" content="${escAttr(name)}">
   <meta property="og:title" content="${escAttr(name)}">
   <meta property="og:description" content="${escAttr(desc)}">
-  <meta property="og:image" content="${escAttr(baseUrl(req) + '/logo.svg')}">
+  <meta property="og:image" content="${escAttr(baseUrl(req) + (isBesiHost(req) ? '/besi-logo.svg' : '/logo.svg'))}">
   <meta property="og:url" content="${escAttr(baseUrl(req) + '/')}">`;
   return getTemplate().replace('</head>', `${head}\n</head>`);
 }
