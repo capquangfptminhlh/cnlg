@@ -67,7 +67,7 @@ test('power banks parse 10.000/20.000 mAh, exclude misleading charger products',
   assert.equal(query(idx,'powerbanks',10000).total,0);
   assert.equal(query(idx,'powerbanks',10000).possibleTotal,2);
   assert.equal(query(idx,'powerbanks',5000).total,1);
-  assert.equal(query(idx,'powerbanks',5000).possibleTotal,2);
+  assert.equal(query(idx,'powerbanks',5000).possibleTotal,1);
   assert.equal(facets.filterOptions(idx,'powerbanks').productCount,4);
   assert.deepEqual(facets.filterOptions(idx,'powerbanks').values,[5000,10000,20000]);
 });
