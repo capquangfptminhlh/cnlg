@@ -149,7 +149,7 @@
   // --- Cuộn vô hạn ---
   let autoLoad = null;
   function maybeLoadMore() {
-    if (!loadMore || state.loadingMore) return;
+    if (!loadMore || state.loadingMore || catalog.classList.contains('besi-filter-mode')) return;
     if (getComputedStyle(loadMore).display === 'none' || !loadMore.isConnected) return;
     if ((state.products.length || 0) >= (state.totalProducts ?? Infinity)) return;
     const r = loadMore.getBoundingClientRect();

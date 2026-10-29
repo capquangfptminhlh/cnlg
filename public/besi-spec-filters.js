@@ -195,7 +195,7 @@
     exit();$('productGrid')?.scrollIntoView({behavior:'smooth',block:'start'});
   });
   document.addEventListener('click',event=>{
-    if(!stateUi.active)return;
+    if(!stateUi.active||event.isTrusted===false)return;
     if(event.target.closest('#searchBtn,.cat-btn,.brand-pill,.price-pill,[data-store-action],.market-links a,#btnLoadMore'))exit();
   },true);
   $('searchInput')?.addEventListener('keydown',event=>{
