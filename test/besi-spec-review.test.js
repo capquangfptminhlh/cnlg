@@ -107,3 +107,33 @@ test('large catalog reindex uses compact reviewed mappings without upstream writ
   assert.equal(facets.searchIndex(idx,{type:'c-lightning',length:2}).total,1);
   assert.equal(facets.searchIndex(idx,{type:'c-lightning',length:1}).total,9999);
 });
+
+test('local AI suggestions are opt-in, schema-validated, do not auto-verify or contact external hosts',async()=>{
+  const ai=require('../services/besi/specLocalAI');
+  await assert.rejects(()=>ai.suggest({name:'Cáp sạc C to IP 2m',model:''}),/Chưa cấu hình/);
+  let target='',sent=null;
+  const candidate=await ai.suggest({
+    name:'Cáp C2L 2m 20W',variantName:'Đen',model:'qwen3:4b',
+    fetchFn:async(url,request)=>{
+      target=url;sent=JSON.parse(request.body);
+      return {ok:true,json:async()=>({response:JSON.stringify({
+        connector:'c-lightning',length:2,power:20,color:'den'
+      })})};
+    }
+  });
+  assert.equal(target,'http://127.0.0.1:11434/api/generate');
+  assert.equal(candidate.verified,false);
+  assert.match(candidate.status,/chưa/);
+  assert.equal(candidate.length,2);
+  assert.ok(!JSON.stringify(sent).includes('supplier_cost'));
+  await assert.rejects(()=>ai.suggest({
+    name:'test',model:'qwen3:4b',
+    fetchFn:async()=>({ok:true,json:async()=>({response:'{"connector":"invalid"}'})})
+  }),/danh sách/);
+  const server=fs.readFileSync(path.join(repo,'server.js'),'utf8');
+  assert.match(server,/app\.post\('\/api\/admin\/besi\/spec-ai-suggest\/:id',requireAdmin/);
+  assert.match(server,/besiSpecLocalAI\.suggest\(\{name:pub\.name,variantName:variant\?\.name\|\|''\}\)/);
+  const adminJs=fs.readFileSync(path.join(repo,'public/admin-besi.js'),'utf8');
+  assert.match(adminJs,/besiReviewAskAI/);
+  assert.match(adminJs,/besiReviewConfirm'\)\.checked=false/);
+});
