@@ -60,13 +60,17 @@ function validateOffer(o,supplierIds){
   const image=clean(o.image,250);
   if(image&&!/^\/images\/besi\/[a-z0-9/_-]+\.(?:png|jpg|jpeg|webp)$/i.test(image))
     bad('Chỉ dùng ảnh đã kiểm duyệt trên domain của BESI');
-  return {supplierId,sku,name,gtin,brand:clean(o.brand,100),model:clean(o.model,100),
+  const mappingKey=clean(o.mappingKey,80);
+  if(mappingKey&&!/^[a-zA-Z0-9_-]{6,80}$/.test(mappingKey))bad('Mã gộp sản phẩm không hợp lệ');
+  return {supplierId,sku,name,gtin,mappingKey,brand:clean(o.brand,100),model:clean(o.model,100),
     variant:clean(o.variant,100),category:clean(o.category,120),cost,stock,image,
     active:o.active!==false,updatedAt:new Date().toISOString()};
 }
 function canonicalKey(o){
   if(o.gtin)return 'gtin:'+o.gtin+':'+normalized(o.variant);
-  if(normalized(o.brand)&&normalized(o.model))
+  if(o.mappingKey)return 'curated:'+o.mappingKey;
+  // Without a precise variant, brand+model may falsely merge storage/colors.
+  if(normalized(o.brand)&&normalized(o.model)&&normalized(o.variant))
     return 'model:'+normalized(o.brand)+':'+normalized(o.model)+':'+normalized(o.variant);
   // Never merge two unrelated goods because their titles sound similar.
   return 'unique:'+o.supplierId+':'+o.sku;
