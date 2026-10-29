@@ -35,6 +35,7 @@ const catalogImage = require('./services/catalogImage');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
 const shipments = require('./services/shipments');
+const deliveryEta = require('./services/deliveryEta');
 
 const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
 /**
@@ -58,19 +59,19 @@ async function quoteShipping({ province, wardId, lines, cfg = readConfig() }) {
   const dropGroups = groups.filter(g => g.kind === 'dropbuy');
   if (dropGroups.length) parts.push(...await quoteDropbuyShipments({ province, wardId, groups: dropGroups, cfg }));
   for (const g of groups.filter(x => x.kind === 'source')) {
-    parts.push({ ...g.source.shippingQuote({ province, subtotal: g.subtotal }), source: 'partner', key: g.key, items: g.lines.length, subtotal: g.subtotal, refs: g.lines.map(shipments.refOf) });
+    parts.push({ ...g.source.shippingQuote({ province, subtotal: g.subtotal }), source: 'partner', key: g.key, items: g.lines.length, subtotal: g.subtotal, refs: g.lines.map(shipments.refOf), eta: deliveryEta.estimate({ fromProvince: g.source.def.originProvince, toProvince: province }) });
   }
   return shipments.combineQuotes(parts);
 }
 
 /** Phần khách xem: chỉ số kiện, phí, số món – không mã kho, không tên nguồn. */
-const publicShipments = q => (q.shipments || []).map(x => ({ no: x.no, fee: x.fee, free_ship: x.free_ship, items: x.items, subtotal: x.subtotal }));
+const publicShipments = q => (q.shipments || []).map(x => ({ no: x.no, fee: x.fee, free_ship: x.free_ship, items: x.items, subtotal: x.subtotal, eta: x.eta?.text || null }));
 
 async function quoteDropbuyShipments({ province, wardId, groups, cfg }) {
   const rules = shipping.normalizeShipping(cfg.shipping);
   const flat = note => groups.map(g => {
     const q = shipping.quote({ province, subtotal: g.subtotal, lines: g.lines }, cfg.shipping);
-    return { ...q, source: 'flat', key: g.key, items: g.lines.length, subtotal: g.subtotal, refs: g.lines.map(shipments.refOf), detail: note && !q.free_ship ? `${q.detail} (ước tính)` : q.detail, live_error: note || null };
+    return { ...q, source: 'flat', key: g.key, items: g.lines.length, subtotal: g.subtotal, refs: g.lines.map(shipments.refOf), eta: deliveryEta.estimate({ toProvince: province }), detail: note && !q.free_ship ? `${q.detail} (ước tính)` : q.detail, live_error: note || null };
   });
   if (rules.mode !== 'live' || !rules.enabled) return flat();
   if (!wardId) return flat('chọn phường/xã để tính phí thật');
@@ -86,13 +87,15 @@ async function quoteDropbuyShipments({ province, wardId, groups, cfg }) {
       method: dropbuyOrderFulfillment.normalizeAutoOrder(cfg.autoOrder).shippingMethod,
       config: cfg
     });
-    // Kho DropBuy trả về là căn cứ chia kiện (chuẩn hơn mã kho lưu trong catalog)
-    const parts = live.depots.map(d => {
+    // Kho DropBuy trả về là căn cứ chia kiện (chuẩn hơn mã kho lưu trong catalog); tỉnh kho → ngày giao dự kiến
+    const origins = await Promise.all(live.depots.map(d => (d.sender_province_id ? vnAddress.provinceById(d.sender_province_id).catch(() => null) : null)));
+    const parts = live.depots.map((d, di) => {
       const mine = lines.filter(l => (d.variation_ids || []).includes(l.variation_id));
       const subtotal = shipments.sum(mine);
       const free = rules.freeShipThreshold > 0 && subtotal >= rules.freeShipThreshold;
       return {
         source: 'dropbuy', key: `db:${d.code}`, items: mine.length, subtotal, live_fee: d.fee, refs: mine.map(shipments.refOf),
+        eta: deliveryEta.estimate({ fromProvince: origins[di], toProvince: province }),
         region: shipping.regionOf(province),
         fee: free ? 0 : d.fee + rules.liveExtra, free_ship: free,
         detail: free ? `Miễn phí ship cho kiện từ ${rules.freeShipThreshold.toLocaleString('vi-VN')} đ` : (CARRIER[d.method] || d.method)
@@ -104,7 +107,7 @@ async function quoteDropbuyShipments({ province, wardId, groups, cfg }) {
     }
     // Bản báo phí cũ không kèm danh sách món từng kho → chia theo tỉ lệ không được, coi cả phần DropBuy là các kho đã báo
     const subtotal = shipments.sum(lines);
-    return live.depots.map((d, i) => ({ source: 'dropbuy', key: `db:${d.code}`, items: i ? 0 : lines.length, subtotal: i ? 0 : subtotal, refs: i ? [] : lines.map(shipments.refOf), live_fee: d.fee, region: shipping.regionOf(province), fee: d.fee + rules.liveExtra, free_ship: false, detail: CARRIER[d.method] || d.method }));
+    return live.depots.map((d, i) => ({ source: 'dropbuy', key: `db:${d.code}`, items: i ? 0 : lines.length, subtotal: i ? 0 : subtotal, refs: i ? [] : lines.map(shipments.refOf), eta: deliveryEta.estimate({ fromProvince: origins[i], toProvince: province }), live_fee: d.fee, region: shipping.regionOf(province), fee: d.fee + rules.liveExtra, free_ship: false, detail: CARRIER[d.method] || d.method }));
   } catch (e) {
     console.warn('[Ship] Không lấy được phí ship DropBuy:', e.message);
     return flat(e.code === 401 ? 'chưa kết nối kho' : 'kho chưa phản hồi');
@@ -380,6 +383,9 @@ function categoryIdsFor(catId) {
 const customerSafe = t => (t ? stripSupplierText(String(t)).replace(/\badmin\b/gi, 'Cửa hàng').replace(/\s{2,}/g, ' ').trim() || 'Đã huỷ' : t);
 
 /** Dữ liệu đơn trả cho khách: che bớt thông tin cá nhân, không lộ thông tin nội bộ. */
+const cleanText = t => (t ? stripSupplierText(String(t)).trim() || null : null);
+const publicTracking = t => (t ? { status: cleanText(t.status), location: cleanText(t.location), updated_at: t.updated_at || null, expected_delivery: cleanText(t.expected_delivery) } : null);
+
 function publicOrder(o) {
   return {
     id: o.id,
@@ -396,6 +402,9 @@ function publicOrder(o) {
     payment_method: o.payment_method || 'BANK',
     shipping_ref_code: o.dropbuy_sync?.shipping_ref_code || null,
     shipping_carrier: o.dropbuy_sync?.carrier || null,
+    // Trước khi ĐVVC nhận hàng: ước tính lúc đặt; sau đó: ngày giao dự kiến + vị trí thật từ hành trình vận đơn
+    delivery_eta: o.delivery_eta?.text || null,
+    tracking: publicTracking(o.dropbuy_sync?.tracking),
     paid_at: o.paid_at || null
   };
 }
@@ -886,7 +895,7 @@ app.post('/api/shipping/quote', rateLimit('quote', 10 * 60e3, 60), async (req, r
     const lines = await priceCartLines(items.slice(0, 30));
     const subtotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
     const q = await quoteShipping({ province, wardId: Number(ward_id) || null, subtotal, lines });
-    res.json({ success: true, data: { subtotal, fee: q.fee, shipping_fee: q.fee, total: subtotal + q.fee, free_ship: !!q.free_ship, region: q.region, weight_gram: q.weight_gram || 0, source: q.source === 'dropbuy' ? 'live' : 'flat', detail: stripSupplierText(q.detail || ''), shipments: publicShipments(q) } });
+    res.json({ success: true, data: { subtotal, fee: q.fee, shipping_fee: q.fee, total: subtotal + q.fee, free_ship: !!q.free_ship, region: q.region, weight_gram: q.weight_gram || 0, source: q.source === 'dropbuy' ? 'live' : 'flat', detail: stripSupplierText(q.detail || ''), shipments: publicShipments(q), eta: q.eta || null } });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
@@ -986,7 +995,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       total_amount,
       payment_method: paymentMethod
     });
-    orderStore.updateOrder(order.id, { subtotal, shipping_fee: ship.fee, shipping_detail: ship.detail, shipping_source: ship.source, shipping_live: ship.live || null, shipments: (ship.shipments || []).map(({ refs, ...x }) => x), weight_gram: ship.weight_gram, live_verified: orderItems.every(i => i.live_verified) });
+    orderStore.updateOrder(order.id, { subtotal, shipping_fee: ship.fee, shipping_detail: ship.detail, shipping_source: ship.source, shipping_live: ship.live || null, shipments: (ship.shipments || []).map(({ refs, ...x }) => x), delivery_eta: ship.eta || null, weight_gram: ship.weight_gram, live_verified: orderItems.every(i => i.live_verified) });
     order.subtotal = subtotal;
     order.shipping_fee = ship.fee;
     console.log(`[Order] Đã tiếp nhận đơn hàng #${order.id}: ${subtotal.toLocaleString('vi-VN')} đ + ship ${ship.fee.toLocaleString('vi-VN')} đ`);
@@ -1004,6 +1013,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
         subtotal,
         shipping_fee: ship.fee,
         shipping_detail: ship.detail,
+        delivery_eta: ship.eta?.text || null,
         total_amount,
         items: orderItems.map(i => ({ id: i.id, variation_id: i.variation_id, variant_name: i.variant_name, name: i.name, price: i.price, quantity: i.quantity })),
         message: `Đặt hàng thành công! Bạn thanh toán ${total_amount.toLocaleString('vi-VN')} đ khi nhận hàng.`
@@ -1025,6 +1035,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       subtotal,
       shipping_fee: ship.fee,
       shipping_detail: ship.detail,
+      delivery_eta: ship.eta?.text || null,
       total_amount,
       payment_method: 'BANK',
       payment_timeout_minutes: timeout,

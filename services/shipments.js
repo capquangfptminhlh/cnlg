@@ -6,6 +6,8 @@
  *    nên phí ship và mức miễn ship phải xét theo TỪNG kiện, không gộp cả đơn (gộp thì lỗ ship).
  */
 
+const deliveryEta = require('./deliveryEta');
+
 const sum = lines => lines.reduce((t, l) => t + Number(l.price || 0) * Number(l.quantity || 0), 0);
 /** Mã nhận diện 1 dòng hàng trong kiện (SP + phân loại). */
 const refOf = l => `${l.id}:${l.variation_id ?? ''}`;
@@ -32,7 +34,7 @@ function groupShipments(lines, { sourceOf, depotOf }) {
 function combineQuotes(parts) {
   const shipments = parts.map((q, i) => ({
     no: i + 1, key: q.key, fee: q.fee, free_ship: !!q.free_ship, detail: q.detail,
-    items: q.items || 0, subtotal: q.subtotal || 0, live: !!q.live_fee, refs: q.refs || []
+    items: q.items || 0, subtotal: q.subtotal || 0, live: !!q.live_fee, refs: q.refs || [], eta: q.eta || null
   }));
   if (parts.length === 1) return { ...parts[0], shipments };
   const fee = parts.reduce((t, q) => t + q.fee, 0);
@@ -44,6 +46,7 @@ function combineQuotes(parts) {
     region: parts.find(q => q.region)?.region,
     weight_gram: parts.reduce((t, q) => t + (q.weight_gram || 0), 0),
     shipments,
+    eta: deliveryEta.combine(parts.map(q => q.eta)),
     detail: `Giao thành ${parts.length} kiện: ` + parts.map((q, i) => `kiện ${i + 1} ${q.fee ? q.fee.toLocaleString('vi-VN') + ' đ' : 'miễn phí'}`).join(' + ')
   };
 }

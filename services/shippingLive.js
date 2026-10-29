@@ -37,7 +37,7 @@ async function liveQuote({ lines, provinceId, wardId, codAmount = 0, method = 'c
       let weight = 0;
       for (const d of depots) {
         const ship = await dropbuyCart.shippingFor(d, receiver, codAmount, method, config);
-        out.push({ code: d.code, method: ship.method, fee: ship.fee, variation_ids: d.lines.map(l => l.variation_id) });
+        out.push({ code: d.code, method: ship.method, fee: ship.fee, variation_ids: d.lines.map(l => l.variation_id), sender_province_id: d.lines[0]?.province_id ?? null });
         weight += ship.weight || 0;
       }
       return { fee: out.reduce((s, d) => s + d.fee, 0), weight_gram: weight || null, depots: out };

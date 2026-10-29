@@ -19,6 +19,7 @@ module.exports = createWooSource({
   // Nhãn nội bộ của TechMall, không phải danh mục cho khách
   ignoreCategories: /^(order\b|trading|ngưng sản xuất|sản phẩm bán chạy|hot selling)/i,
   intervalMinutes: 10,
+  originProvince: 'TP. Hồ Chí Minh', // kho gửi – tính ngày giao dự kiến
   pricingDefaults: { markupPercent: 25, minProfit: 10000, roundTo: 1000, capAtPublic: true, surchargePercent: 10 },
   shippingDefaults: { hcmFreeFrom: 200000, hcmFee: 20000, otherFreeFrom: 400000, otherFee: 30000 }
 });

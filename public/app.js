@@ -1069,6 +1069,16 @@ const provinceSelect = document.getElementById('custProvince');
 const summarySubtotal = document.getElementById('summarySubtotal');
 const summaryShipping = document.getElementById('summaryShipping');
 const summaryShippingNote = document.getElementById('summaryShippingNote');
+const summaryEta = document.getElementById('summaryEta');
+/** Ngày giao dự kiến (theo kho thật của từng kiện); nhiều kiện thì ghi từng kiện. */
+function showEta(q) {
+  if (!summaryEta) return;
+  const parts = (q && q.shipments || []).filter(s => s.eta);
+  const main = q && q.eta && q.eta.text;
+  summaryEta.hidden = !main;
+  summaryEta.innerHTML = main ? `<i class="fa-solid fa-truck-fast"></i> ${esc(main)}` +
+    (parts.length > 1 ? `<small>${parts.map(s => `Kiện ${s.no}: ${esc(s.eta.replace(/^Dự kiến giao /, ''))}`).join(' · ')}</small>` : '') : '';
+}
 const PROVINCE_KEY = 'hm_province';
 const wardSelect = document.getElementById('custWard');
 const submitOrderBtn = document.getElementById('submitOrderBtn');
@@ -1150,12 +1160,14 @@ async function updateCheckoutSummary() {
   if (state.cart.length === 0) {
     summaryShipping.innerText = '0 đ';
     summaryShippingNote.innerText = '';
+    showEta(null);
     summaryTotal.innerText = '0 đ';
     return;
   }
   if (!province) {
     summaryShipping.innerText = 'Chọn tỉnh/thành để tính';
     summaryShippingNote.innerText = '';
+    showEta(null);
     summaryTotal.innerText = formatPrice(subtotal);
     return;
   }
@@ -1172,10 +1184,12 @@ async function updateCheckoutSummary() {
     summaryShipping.innerText = q.fee === 0 ? 'Miễn phí' : formatPrice(q.fee);
     summaryShippingNote.innerText = q.source === 'live' ? `Phí vận chuyển tiêu chuẩn: ${q.detail}` : q.detail;
     summaryTotal.innerText = formatPrice(subtotal + q.fee);
+    showEta(q);
   } catch (e) {
     if (seq !== quoteSeq) return;
     summaryShipping.innerText = 'Không tính được';
     summaryShippingNote.innerText = e.message;
+    showEta(null);
     summaryTotal.innerText = formatPrice(subtotal);
   }
 }
@@ -1674,6 +1688,7 @@ async function trackOrder(id, phone) {
         <div class="flex-between" style="font-size:16px;"><strong>Tổng</strong><strong class="price-highlight">${formatPrice(o.total_amount)}</strong></div>
         <div style="font-size:12px; color:#94a3b8; margin-top:6px;">Giao tới: ${esc(o.address || '')}${o.customer?.ward_name ? `, ${esc(o.customer.ward_name)}` : ''}${o.customer?.province ? `, ${esc(o.customer.province)}` : ''}</div>
         <div style="font-size:12px; color:#94a3b8;">Thanh toán: ${o.payment_method === 'COD' ? 'khi nhận hàng (COD)' : 'chuyển khoản'}</div>
+        ${deliveryBlock(o)}
         ${o.shipping_ref_code ? shipmentBlock(o) : ''}
         <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(148,163,184,0.2); display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;"><span style="font-size:12px; color:#94a3b8;">Nhận mã vận đơn & hành trình tự động qua Zalo:</span><button type="button" class="btn-ghost" style="font-size:12px; padding:6px 10px; color:#38bdf8; border-color:rgba(56,189,248,0.35);" onclick="openZaloBotForOrder('${esc(o.id)}')"><i class="fa-solid fa-bell"></i> Kết nối Zalo Bot (#${esc(o.id)})</button></div>
         ${o.status === 'PENDING_PAYMENT' && o.payment ? `<button type="button" class="btn-primary-block" style="margin-top:12px;" onclick="resumePayment('${esc(o.id)}')"><i class="fa-solid fa-qrcode"></i> Mở Mã QR Để Thanh Toán</button>` : ''}
@@ -1689,6 +1704,19 @@ const CARRIERS = {
   S: { name: 'SPX Express', url: 'https://spx.vn/' },
   V: { name: 'Viettel Post', url: 'https://viettelpost.com.vn/tra-cuu-hanh-trinh-don/' }
 };
+/** Ngày giao: số thật của hãng vận chuyển khi đã có hành trình, trước đó là ước tính lúc đặt. */
+function deliveryBlock(o) {
+  if (o.status === 'COMPLETED' || o.status === 'CANCELLED') return '';
+  const t = o.tracking;
+  if (t && (t.expected_delivery || t.status)) {
+    return `<div class="delivery-eta-box">
+      ${t.expected_delivery ? `<div><i class="fa-solid fa-calendar-check"></i> Hãng vận chuyển dự kiến giao: <strong>${esc(t.expected_delivery)}</strong></div>` : ''}
+      ${t.status ? `<div><i class="fa-solid fa-location-dot"></i> ${esc(t.status)}${t.location ? ` – ${esc(t.location)}` : ''}${t.updated_at ? ` <small>(${new Date(t.updated_at).toLocaleString('vi-VN')})</small>` : ''}</div>` : ''}
+    </div>`;
+  }
+  return o.delivery_eta ? `<div class="delivery-eta-box"><div><i class="fa-solid fa-truck-fast"></i> ${esc(o.delivery_eta)}</div></div>` : '';
+}
+
 function shipmentBlock(o) {
   const c = CARRIERS[o.shipping_carrier] || (/^SPX/i.test(o.shipping_ref_code) ? CARRIERS.S : null);
   const code = String(o.shipping_ref_code).split(',')[0].trim();

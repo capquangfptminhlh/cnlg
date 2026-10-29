@@ -1692,3 +1692,11 @@ input, textarea, select { font-family: var(--font); }
 .shipment-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .shipment-actions .btn-ghost { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; text-decoration: none; }
 .shipment-box small { color: #667383; }
+
+/* Ngày giao dự kiến: giỏ hàng + tra cứu đơn */
+.summary-eta { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: #16794a; font-weight: 600; }
+.summary-eta i { margin-right: 4px; }
+.summary-eta small { font-weight: 400; color: #667383; }
+.delivery-eta-box { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: #f0fbf5; border: 1px solid #c9ecd8; font-size: 13px; color: #273141; display: flex; flex-direction: column; gap: 6px; }
+.delivery-eta-box i { color: #16794a; margin-right: 4px; }
+.delivery-eta-box small { color: #667383; }

@@ -77,6 +77,12 @@ async function provinceByName(name) {
   return d.provinces.find(p => normName(p.name) === key) || null;
 }
 
+/** Tên tỉnh theo mã DropBuy (vd tỉnh của kho gửi). */
+async function provinceById(id) {
+  const d = await load();
+  return d.provinces.find(p => p.id === Number(id))?.name || null;
+}
+
 async function wardsOfProvince(name) {
   const p = await provinceByName(name);
   if (!p) return null;
@@ -94,4 +100,4 @@ async function resolve(provinceName, wardId) {
   return { province: p, ward: w };
 }
 
-module.exports = { load, provinceByName, wardsOfProvince, resolve, normName };
+module.exports = { load, provinceByName, provinceById, wardsOfProvince, resolve, normName };

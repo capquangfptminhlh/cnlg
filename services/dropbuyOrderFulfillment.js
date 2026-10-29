@@ -5,6 +5,7 @@ const { bff, ensureSession, DropbuyError } = require('./dropbuySession');
 const { notify } = require('./notify');
 const { vnDate } = require('./backup');
 const { emitAdmin } = require('./security');
+const deliveryEta = require('./deliveryEta');
 
 /**
  * VÒNG ĐỜI ĐƠN TRÊN DROPBUY
@@ -310,6 +311,13 @@ async function cancelOnDropbuy(orderId, io) {
   return updated;
 }
 
+/** Đơn tách nhiều kho → mỗi kho 1 vận đơn; báo khách theo kiện tới muộn nhất. */
+function slowestTracking(found) {
+  const list = found.map(d => deliveryEta.fromJourneys(d.journeys)).filter(Boolean);
+  if (!list.length) return null;
+  return list.reduce((a, b) => (String(b.expected_at || '') > String(a.expected_at || '') ? b : a));
+}
+
 async function fetchHistory(config, orderCode) {
   const data = await bff('/orders/history', { method: 'POST', config, body: { order_code: orderCode, page_num: 1, page_size: 5 } });
   return data?.orders || data?.items || [];
@@ -345,6 +353,8 @@ async function syncDropbuyOrdersStatus(io) {
       carrier: found.map(d => d.shipping_method).find(Boolean) || order.dropbuy_sync.carrier || null,
       dropbuy_total: found.reduce((s, d) => s + (d.total_amount || 0), 0),
       dropbuy_profit: found.reduce((s, d) => s + (d.profit_amount || 0), 0),
+      // Hành trình ĐVVC (VTP): trạng thái, vị trí, ngày giao dự kiến thật – kiện chậm nhất quyết định
+      tracking: slowestTracking(found) || order.dropbuy_sync.tracking || null,
       checked_at: now
     };
     sync.current_label = STATUS_LABEL[sync.current_status] || sync.current_status;
@@ -363,7 +373,7 @@ async function syncDropbuyOrdersStatus(io) {
         orderStore.updateOrder(order.id, { needs_attention: true, dropbuy_sync: { ...sync, problem: FAILED[failed] } });
         emit(io, order, order.status);
       }
-    } else if (sync.current_status !== order.dropbuy_sync.current_status || sync.shipping_ref_code !== order.dropbuy_sync.shipping_ref_code) {
+    } else if (sync.current_status !== order.dropbuy_sync.current_status || sync.shipping_ref_code !== order.dropbuy_sync.shipping_ref_code || JSON.stringify(sync.tracking) !== JSON.stringify(order.dropbuy_sync.tracking || null)) {
       orderStore.updateOrder(order.id, { dropbuy_sync: sync });
       emit(io, order, order.status);
     }
