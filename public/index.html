@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="/besi-marketplace-v5.css">
   <link rel="stylesheet" href="/besi-conversion.css">
   <link rel="stylesheet" href="/besi-spec-filters.css">
+  <link rel="stylesheet" href="/besi-category-facets.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -160,6 +161,45 @@
   <main class="container main-layout" id="catalog">
     
 
+    <!-- Category-aware filter navigation; keeps original cable filter intact. -->
+    <section class="besi-facet-switcher" aria-label="Lọc thông số theo ngành hàng">
+      <div class="besi-facet-switcher-title">Tìm đúng sản phẩm theo nhu cầu</div>
+      <div class="besi-facet-tabs" id="besiFacetTabs" role="group" aria-label="Chọn nhóm hàng">
+        <button type="button" class="is-current" data-besi-facet-category="cables" aria-pressed="true">Cáp sạc</button>
+        <button type="button" data-besi-facet-category="cases" aria-pressed="false">Ốp lưng</button>
+        <button type="button" data-besi-facet-category="chargers" aria-pressed="false">Củ sạc</button>
+        <button type="button" data-besi-facet-category="powerbanks" aria-pressed="false">Pin dự phòng</button>
+      </div>
+    </section>
+    <section class="besi-category-facet" id="besiCategoryFacet" hidden aria-label="Lọc thông số ngành hàng">
+      <div class="besi-category-facet-header">
+        <div><strong id="besiCategoryFacetTitle">Bộ lọc ngành hàng</strong>
+          <small>Chọn đúng thông số từ danh mục BESI đang bán</small></div>
+        <span class="besi-category-facet-count" id="besiFacetScope">Đang tải…</span>
+      </div>
+      <div class="besi-category-facet-controls">
+        <label id="besiFacetValueLabel" for="besiFacetValue">Thông số sản phẩm</label>
+        <select id="besiFacetValue"><option value="">Tất cả</option></select>
+        <button type="button" class="besi-spec-apply" id="besiFacetApply"><i class="fa-solid fa-magnifying-glass"></i> Tìm sản phẩm</button>
+        <button type="button" class="besi-spec-reset" id="besiFacetReset">Xem tất cả sản phẩm</button>
+      </div>
+      <p class="besi-spec-hint">Bộ lọc dựa trên từng mã phân loại. Hàng thiếu thông số hoặc chưa có dữ liệu biến thể sẽ xuất hiện ở mục cần xác minh, không tự nhận là khớp chính xác.</p>
+    </section>
+    <section class="besi-spec-results" id="besiCategoryFacetResults" hidden aria-label="Kết quả lọc ngành hàng">
+      <div class="besi-spec-results-head">
+        <div><span class="besi-spec-kicker">BỘ LỌC SẢN PHẨM BESI</span>
+          <h2 id="besiCategoryResultTitle">Sản phẩm phù hợp</h2>
+          <p id="besiCategoryResultStatus" role="status" aria-live="polite">Đang tìm sản phẩm…</p></div>
+      </div>
+      <div class="product-grid besi-spec-grid" id="besiCategoryResultGrid"></div>
+      <div class="besi-spec-load"><button type="button" id="besiCategoryResultMore" class="btn-load-more" hidden>Xem thêm sản phẩm</button></div>
+      <aside id="besiCategoryPossible" class="besi-spec-possible" hidden>
+        <div class="besi-spec-possible-heading"><strong><i class="fa-solid fa-circle-question"></i> Có thể phù hợp — cần kiểm tra phân loại</strong>
+          <p id="besiCategoryPossibleStatus">Sản phẩm chưa đủ thông số hoặc biến thể chưa được xác minh.</p></div>
+        <div class="product-grid besi-spec-grid" id="besiCategoryPossibleGrid"></div>
+        <div class="besi-spec-load"><button type="button" class="besi-spec-reset" id="besiCategoryPossibleMore" hidden>Xem thêm hàng chưa rõ thông số</button></div>
+      </aside>
+    </section>
     <!-- BESI smart specification finder: uses existing /api/products and variant data. -->
     <section class="besi-spec-finder" id="besiSpecFinder" aria-label="Lọc sản phẩm theo thông số">
       <details id="besiSpecDetails" open>
@@ -662,5 +702,6 @@
   <script src="/flash-sale.js"></script>
   <script src="/besi-conversion.js"></script>
   <script src="/besi-spec-filters.js"></script>
+  <script src="/besi-category-facets.js"></script>
 </body>
 </html>
