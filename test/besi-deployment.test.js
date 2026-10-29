@@ -24,11 +24,11 @@ test('Windows updater runs both backend and UI checks, verifies running revision
   const script=read('scripts/auto-update.ps1');
   assert.match(script,/RunNpm test/);
   assert.match(script,/RunNpm run test:ui/);
-  assert.match(script,/function Healthy\(\[int\]\$seconds, \[string\]\$expectedCommit\)/);
+  assert.match(script,/function Healthy\(\[int\]\$seconds, \[string\]\$expectedCommit, \[bool\]\$requireNewApi/);
   assert.match(script,/health\.release -ne \$expectedShort/);
   assert.match(script,/api\/products\/category-facets\?category=case/);
   assert.match(script,/if \(RestartStore \$new\)/);
-  assert.match(script,/if \(RestartStore \$old\)/);
+  assert.match(script,/if \(RestartStore \$old \$false\)/);
   assert.match(script,/HoangMinh Store/);
 });
 test('setup works without deploy keys, diagnostic is read-only and release fingerprint is safe',()=>{
