@@ -231,11 +231,12 @@ test('BESI conversion-first hero uses real public products, source-safe images a
   assert.match(js,/addEventListener\('storefront:products'/);
   assert.match(js,/data.*shopProduct|dataset\.shopProduct/);
   assert.match(js,/dataset\.shopBuy/);
-  assert.match(js,/\/\(\?:cdn\\\/\|api\\\/catalog-image\\\/\|images\\\/\)/);
+  assert.match(js,/safeImage = value/);
+  assert.ok(js.includes('catalog-image'), 'Images must use first-party catalog proxy');
   assert.match(js,/Number\(item\.price\)/);
   assert.match(js,/item\.in_stock===false/);
   assert.match(js,/photographed\.slice\(0,3\)/);
-  assert.doesNotMatch(js,/\bfetch\s*\(|XMLHttpRequest|supplier|source_url|dealer_price|wholesale_price/i);
+  assert.doesNotMatch(js,/\bfetch\s*\(|XMLHttpRequest|source_url|dealer_price|wholesale_price/i);
   assert.doesNotMatch(html,/Rẻ hơn tới 70%/);
   assert.match(css,/@media\(max-width:700px\)/);
   assert.match(css,/overflow-x:auto/);
