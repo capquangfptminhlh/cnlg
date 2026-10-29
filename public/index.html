@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="/besi-marketplace-2026.css">
   <link rel="stylesheet" href="/besi-marketplace-v5.css">
   <link rel="stylesheet" href="/besi-conversion.css">
+  <link rel="stylesheet" href="/besi-spec-filters.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -158,6 +159,68 @@
   <!-- Products Main Content -->
   <main class="container main-layout" id="catalog">
     
+
+    <!-- BESI smart specification finder: uses existing /api/products and variant data. -->
+    <section class="besi-spec-finder" id="besiSpecFinder" aria-label="Lọc sản phẩm theo thông số">
+      <details id="besiSpecDetails" open>
+        <summary class="besi-spec-summary">
+          <span class="besi-spec-icon"><i class="fa-solid fa-sliders"></i></span>
+          <span class="besi-spec-intro"><strong>Tìm đúng cáp sạc bạn cần</strong><small>Chọn đầu cáp, chiều dài 1m / 2m, công suất và màu sắc</small></span>
+          <span class="besi-spec-open-text">Bộ lọc thông minh <i class="fa-solid fa-chevron-down"></i></span>
+        </summary>
+        <div class="besi-spec-body">
+          <fieldset class="besi-spec-fieldset" id="besiConnectorChoices">
+            <legend>Loại đầu cáp</legend>
+            <div class="besi-spec-options">
+              <label><input type="radio" name="besiConnector" value="c-lightning" checked><span>USB-C → Lightning</span></label>
+              <label><input type="radio" name="besiConnector" value="c-c"><span>USB-C → USB-C</span></label>
+              <label><input type="radio" name="besiConnector" value="a-lightning"><span>USB-A → Lightning</span></label>
+              <label><input type="radio" name="besiConnector" value="a-c"><span>USB-A → USB-C</span></label>
+              <label><input type="radio" name="besiConnector" value="lightning"><span>Mọi cáp Lightning</span></label>
+            </div>
+          </fieldset>
+          <div class="besi-spec-row">
+            <fieldset class="besi-spec-fieldset" id="besiLengthChoices">
+              <legend>Chiều dài dây</legend>
+              <div class="besi-spec-options">
+                <label><input type="radio" name="besiLength" value="" checked><span>Tất cả</span></label>
+                <label><input type="radio" name="besiLength" value="0.5"><span>0,5m</span></label>
+                <label><input type="radio" name="besiLength" value="1"><span>1m</span></label>
+                <label><input type="radio" name="besiLength" value="1.2"><span>1,2m</span></label>
+                <label><input type="radio" name="besiLength" value="1.5"><span>1,5m</span></label>
+                <label><input type="radio" name="besiLength" value="2"><span>2m</span></label>
+                <label><input type="radio" name="besiLength" value="3"><span>3m</span></label>
+              </div>
+            </fieldset>
+            <fieldset class="besi-spec-fieldset" id="besiWattChoices">
+              <legend>Công suất ghi trên sản phẩm</legend>
+              <div class="besi-spec-options">
+                <label><input type="radio" name="besiWatt" value="" checked><span>Tất cả</span></label>
+                <label><input type="radio" name="besiWatt" value="20"><span>20W</span></label>
+                <label><input type="radio" name="besiWatt" value="30"><span>30W</span></label>
+                <label><input type="radio" name="besiWatt" value="60"><span>60W</span></label>
+                <label><input type="radio" name="besiWatt" value="100"><span>100W</span></label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="besi-spec-actions">
+            <label class="besi-spec-colour">Màu sắc <select id="besiSpecColor"><option value="">Tất cả màu</option><option value="den">Đen</option><option value="trang">Trắng</option><option value="xanh">Xanh</option></select></label>
+            <button type="button" id="besiApplySpecs" class="besi-spec-apply"><i class="fa-solid fa-magnifying-glass"></i> Tìm sản phẩm phù hợp</button>
+            <button type="button" id="besiResetSpecs" class="besi-spec-reset"><i class="fa-solid fa-rotate-left"></i> Bỏ lọc</button>
+          </div>
+          <p class="besi-spec-hint">Chỉ hiển thị thông số có trong tên hoặc phân loại hàng thực tế. Giá và tồn kho được lấy từ danh mục BESI, không tự tạo sản phẩm.</p>
+        </div>
+      </details>
+    </section>
+    <section class="besi-spec-results" id="besiSpecResults" aria-label="Kết quả lọc theo thông số" hidden>
+      <div class="besi-spec-results-head">
+        <div><span class="besi-spec-kicker">KẾT QUẢ THEO THÔNG SỐ</span><h2 id="besiSpecResultsTitle">Cáp sạc phù hợp</h2><p id="besiSpecStatus" role="status" aria-live="polite">Đang tìm sản phẩm…</p></div>
+        <button type="button" class="besi-spec-reset" id="besiExitSpecs">Xem toàn bộ sản phẩm</button>
+      </div>
+      <div class="product-grid besi-spec-grid" id="besiSpecGrid"></div>
+      <div class="besi-spec-load"><button type="button" id="besiSpecLoadMore" class="btn-load-more" hidden>Xem thêm kết quả</button></div>
+    </section>
+
     <!-- Brand Filter Bar -->
     <div class="brand-bar" id="brandBar" aria-label="Lọc theo thương hiệu">
       <div class="brand-bar-header">
@@ -590,5 +653,6 @@
   <script src="/storefront-premium.js"></script>
   <script src="/flash-sale.js"></script>
   <script src="/besi-conversion.js"></script>
+  <script src="/besi-spec-filters.js"></script>
 </body>
 </html>
