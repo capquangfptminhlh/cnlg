@@ -122,7 +122,9 @@ test('alias dictionary handles C-to-iP, C2L, TC2IP, C2C, A2C and lightning missp
   assert.equal(facets.connectorOf('Cáp C2C 100W'), 'c-c');
   assert.equal(facets.connectorOf('Cáp A2C 2m'), 'a-c');
   assert.equal(facets.connectorOf('Cáp USB A to Lightning 1m'), 'a-lightning');
-  assert.equal(facets.connectorOf('Dây sạc iPhone PD 2m'), 'lightning');
+  assert.equal(facets.connectorOf('Dây sạc iPhone PD 2m'), null, 'iPhone alone does not prove Lightning');
+  assert.ok(facets.connectorHints('Dây sạc iPhone PD 2m').has('c-lightning'));
+  assert.ok(facets.connectorHints('Dây sạc iPhone PD 2m').has('a-lightning'));
 });
 test('unknown length appears as possible, not confirmed or permanently lost',()=>{
   const items=[
