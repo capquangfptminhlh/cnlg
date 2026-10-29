@@ -123,7 +123,7 @@ test('local AI suggestions are opt-in, schema-validated, do not auto-verify or c
   });
   assert.equal(target,'http://127.0.0.1:11434/api/generate');
   assert.equal(candidate.verified,false);
-  assert.match(candidate.status,/chưa/);
+  assert.match(candidate.status,/phải kiểm tra thực tế/);
   assert.equal(candidate.length,2);
   assert.ok(!JSON.stringify(sent).includes('supplier_cost'));
   await assert.rejects(()=>ai.suggest({
