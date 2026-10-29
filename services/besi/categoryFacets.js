@@ -25,7 +25,7 @@ function typeOf(product){
   if(/\b(pin du phong|sac du phong|power ?bank|external battery)\b/.test(title)
     || /\bpin sac du phong\b/.test(category))return 'powerbank';
   if(/\b(op lung|op dien thoai|phone case|protective case|silicone case)\b/.test(title)
-    || /\bvo op lung\b/.test(category))return 'case';
+    || (/\bvo op lung\b/.test(category)&&!(/\b(mieng dan|kinh cuong luc|screen protector)\b/.test(title))))return 'case';
   if(/\b(cap|cable|day sac|day cap)\b/.test(title))return null;
   if(/\b(cu sac|bo sac|adapter sac|wall charger|gan charger|charging adapter)\b/.test(title))
     return 'charger';
@@ -72,7 +72,7 @@ function modelPotential(text,model,found){
   const m=/^iphone-(1[1-7])-pro-max$/.exec(model);
   if(m&&found.length>=2&&found.every(x=>x.endsWith('-pro-max'))){
     const ns=found.map(x=>Number(x.split('-')[1]));
-    if(/(tu|den|to|sang|->|--|\.\.)/.test(normalize(text))
+    if(/(\btu\b|\bden\b|\bto\b|\bsang\b|->|--|\.\.)/.test(String(text).toLowerCase())
       &&Number(m[1])>=Math.min(...ns)&&Number(m[1])<=Math.max(...ns))return true;
   }
   return found.length===0;
