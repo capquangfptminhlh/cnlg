@@ -85,3 +85,13 @@ test('checkout UI shows shipping retry, enforces province and ward, validates se
  assert.match(app,/retryShippingQuote'\)\.addEventListener\('click', updateCheckoutSummary\)/);
  assert.doesNotThrow(()=>new vm.Script(app));
 });
+
+
+test('backend rejects unsupported payment methods and gives actionable COD advice when bank unavailable',()=>{
+ const server=read('server.js');
+ assert.match(server,/if \(!\['COD','BANK'\]\.includes\(paymentMethod\)\)/);
+ assert.match(server,/Vui lòng chọn phương thức thanh toán hợp lệ/);
+ assert.match(server,/const msg = payOpts\.bank\.enabled/);
+ assert.match(server,/giảm giá trị đơn hoặc liên hệ cửa hàng/);
+ assert.match(server,/if \(paymentMethod === 'COD' && total_amount > payOpts\.cod\.maxTotal\)/);
+});
