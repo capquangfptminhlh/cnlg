@@ -1085,6 +1085,7 @@ const submitOrderBtn = document.getElementById('submitOrderBtn');
 let payOptions = { cod: { enabled: true, maxTotal: 5000000 }, bank: { enabled: false } };
 let payOptionsLoaded = false;
 let checkoutEstimatedTotal = 0;
+let checkoutShippingStatus = 'missing';
 
 async function loadWards(province, keep) {
   if (!province) {
@@ -1132,7 +1133,8 @@ function selectedPayMethod() {
 
 function paymentReadiness() {
   return window.BesiCheckoutGuard.evaluate(payOptions, selectedPayMethod(),
-    checkoutEstimatedTotal, { loaded: payOptionsLoaded, empty: state.cart.length === 0 });
+    checkoutEstimatedTotal, { loaded: payOptionsLoaded, empty: state.cart.length === 0,
+      shippingStatus: checkoutShippingStatus });
 }
 function updatePayButton() {
   const cod = selectedPayMethod() === 'COD';
@@ -1165,6 +1167,9 @@ async function updateCheckoutSummary() {
   const totalCount = state.cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = state.cart.reduce((sum, item) => sum + item.quantity * item.price, 0);
   checkoutEstimatedTotal = subtotal;
+  checkoutShippingStatus = state.cart.length && provinceSelect.value && wardSelect.value && !wardSelect.disabled
+    ? 'pending' : 'missing';
+  document.getElementById('retryShippingQuote').hidden = true;
   updatePayButton();
   summaryCount.innerText = totalCount + ' sản phẩm';
   const summaryItems = document.getElementById('summaryItems');
@@ -1185,8 +1190,8 @@ async function updateCheckoutSummary() {
     summaryTotal.innerText = '0 đ';
     return;
   }
-  if (!province) {
-    summaryShipping.innerText = 'Chọn tỉnh/thành để tính';
+  if (!province || !wardSelect.value || wardSelect.disabled) {
+    summaryShipping.innerText = !province ? 'Chọn tỉnh/thành để tính' : 'Chọn phường/xã để tính';
     summaryShippingNote.innerText = '';
     showEta(null);
     summaryTotal.innerText = formatPrice(subtotal);
@@ -1202,9 +1207,14 @@ async function updateCheckoutSummary() {
     if (seq !== quoteSeq) return;
     if (!json.success) throw new Error(json.error);
     const q = json.data;
+    if (!Number.isFinite(Number(q.fee)) || Number(q.fee) < 0 ||
+        !Number.isFinite(Number(q.total)) || Number(q.total) < 0) {
+      throw new Error('Phí vận chuyển hoặc tổng tiền trả về không hợp lệ.');
+    }
     summaryShipping.innerText = q.fee === 0 ? 'Miễn phí' : formatPrice(q.fee);
     summaryShippingNote.innerText = q.source === 'live' ? `Phí vận chuyển tiêu chuẩn: ${q.detail}` : q.detail;
-    checkoutEstimatedTotal = Number(q.total ?? subtotal + q.fee);
+    checkoutEstimatedTotal = Number(q.total);
+    checkoutShippingStatus = 'ready';
     updatePayButton();
     summaryTotal.innerText = formatPrice(checkoutEstimatedTotal);
     showEta(q);
@@ -1214,7 +1224,9 @@ async function updateCheckoutSummary() {
     summaryShippingNote.innerText = e.message;
     showEta(null);
     checkoutEstimatedTotal = subtotal;
-    updatePayButton(); // Still a pre-shipping estimate; server enforces final total.
+    checkoutShippingStatus = 'error';
+    document.getElementById('retryShippingQuote').hidden = false;
+    updatePayButton(); // Fail closed: unknown shipping must not permit a COD order.
     summaryTotal.innerText = formatPrice(subtotal);
   }
 }
@@ -1225,6 +1237,7 @@ provinceSelect.addEventListener('change', () => {
   updateCheckoutSummary();
 });
 wardSelect.addEventListener('change', updateCheckoutSummary);
+document.getElementById('retryShippingQuote').addEventListener('click', updateCheckoutSummary);
 
 function openCheckoutModal() {
   closeCartDrawer();
