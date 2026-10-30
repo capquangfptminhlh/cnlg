@@ -60,7 +60,7 @@ async function main(){
   }
   console.log('PASS full-industry indexed search and dynamic category options');
   const universalJs=await fetchText('/besi-universal.js');
-  assert.match(universalJs,/api\\/products\\/discover|api\/products\/discover/,
+  assert.match(universalJs,/api\/products\/discover/,
     'Live full-industry browser bundle is stale');
   const js=await fetchText('/besi-category-facets.js');
   assert.match(js,/category-facets|category-specs/,'Live browser bundle is stale');
