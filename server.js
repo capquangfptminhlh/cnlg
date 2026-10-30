@@ -1911,8 +1911,29 @@ const besiRelease = (() => {
       cwd: __dirname, timeout: 1200, encoding: 'utf8', windowsHide: true,
       stdio: ['ignore', 'pipe', 'ignore']
     }).trim();
-    return /^[0-9a-f]{7,12}$/i.test(sha) ? sha : 'unknown';
-  } catch (_) { return 'unknown'; }
+    if (/^[0-9a-f]{7,12}$/i.test(sha)) return sha;
+  } catch (_) {}
+  try {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const headPath = path.join(__dirname, '.git', 'HEAD');
+    if (fs.existsSync(headPath)) {
+      const head = fs.readFileSync(headPath, 'utf8').trim();
+      if (/^[0-9a-f]{40}$/i.test(head)) return head.slice(0, 12);
+      if (head.startsWith('ref: ')) {
+        const refFile = path.join(__dirname, '.git', head.slice(5).trim());
+        if (fs.existsSync(refFile)) return fs.readFileSync(refFile, 'utf8').trim().slice(0, 12);
+        const packed = path.join(__dirname, '.git', 'packed-refs');
+        if (fs.existsSync(packed)) {
+          const target = head.slice(5).trim();
+          for (const line of fs.readFileSync(packed, 'utf8').split('\n')) {
+            if (line.endsWith(' ' + target)) return line.split(' ')[0].slice(0, 12);
+          }
+        }
+      }
+    }
+  } catch (_) {}
+  return 'unknown';
 })();
 app.get('/healthz', (req, res) => res.json({
   ok: true, uptime: Math.round(process.uptime()),
