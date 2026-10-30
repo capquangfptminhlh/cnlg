@@ -1083,6 +1083,8 @@ const PROVINCE_KEY = 'hm_province';
 const wardSelect = document.getElementById('custWard');
 const submitOrderBtn = document.getElementById('submitOrderBtn');
 let payOptions = { cod: { enabled: true, maxTotal: 5000000 }, bank: { enabled: false } };
+let payOptionsLoaded = false;
+let checkoutEstimatedTotal = 0;
 
 async function loadWards(province, keep) {
   if (!province) {
@@ -1105,12 +1107,18 @@ async function loadWards(province, keep) {
 }
 
 async function loadPayOptions() {
+  payOptionsLoaded = false;
+  updatePayButton();
   try {
-    const json = await (await fetch('/api/checkout/options')).json();
-    if (json.success) payOptions = json.data;
-  } catch (e) {}
-  document.getElementById('payOptCod').style.display = payOptions.cod.enabled ? '' : 'none';
-  document.getElementById('payOptBank').style.display = payOptions.bank.enabled ? '' : 'none';
+    const response = await fetch('/api/checkout/options', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Không thể lấy phương thức thanh toán');
+    const json = await response.json();
+    if (!json.success || !json.data?.cod || !json.data?.bank) throw new Error('Cấu hình thanh toán không hợp lệ');
+    payOptions = json.data;
+    payOptionsLoaded = true;
+  } catch (e) { payOptionsLoaded = false; }
+  document.getElementById('payOptCod').style.display = payOptionsLoaded && payOptions.cod.enabled ? '' : 'none';
+  document.getElementById('payOptBank').style.display = payOptionsLoaded && payOptions.bank.enabled ? '' : 'none';
   const current = document.querySelector('input[name="payMethod"]:checked')?.value;
   const pick = (current === 'BANK' && payOptions.bank.enabled) || !payOptions.cod.enabled ? 'BANK' : 'COD';
   const radio = document.querySelector(`input[name="payMethod"][value="${pick}"]`);
@@ -1122,10 +1130,21 @@ function selectedPayMethod() {
   return document.querySelector('input[name="payMethod"]:checked')?.value || 'COD';
 }
 
+function paymentReadiness() {
+  return window.BesiCheckoutGuard.evaluate(payOptions, selectedPayMethod(),
+    checkoutEstimatedTotal, { loaded: payOptionsLoaded, empty: state.cart.length === 0 });
+}
 function updatePayButton() {
   const cod = selectedPayMethod() === 'COD';
-  submitOrderBtn.innerHTML = cod ? '<i class="fa-solid fa-check"></i> Đặt hàng – trả tiền khi nhận' : '<i class="fa-solid fa-qrcode"></i> Đặt hàng & nhận mã QR';
-  document.getElementById('payMethodNote').innerText = cod && payOptions.cod.maxTotal ? `COD áp dụng cho đơn đến ${formatPrice(payOptions.cod.maxTotal)}.` : '';
+  const readiness = paymentReadiness();
+  submitOrderBtn.disabled = !readiness.allowed;
+  submitOrderBtn.innerHTML = !readiness.allowed
+    ? '<i class="fa-solid fa-circle-exclamation"></i> Chưa thể đặt hàng'
+    : cod ? '<i class="fa-solid fa-check"></i> Đặt hàng – trả tiền khi nhận'
+      : '<i class="fa-solid fa-qrcode"></i> Đặt hàng & nhận mã QR';
+  const note = document.getElementById('payMethodNote');
+  note.innerText = readiness.note;
+  note.style.color = readiness.allowed ? '#66768d' : '#c2410c';
 }
 document.querySelectorAll('input[name="payMethod"]').forEach(r => r.addEventListener('change', updatePayButton));
 
@@ -1145,6 +1164,8 @@ let quoteSeq = 0;
 async function updateCheckoutSummary() {
   const totalCount = state.cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = state.cart.reduce((sum, item) => sum + item.quantity * item.price, 0);
+  checkoutEstimatedTotal = subtotal;
+  updatePayButton();
   summaryCount.innerText = totalCount + ' sản phẩm';
   const summaryItems = document.getElementById('summaryItems');
   if (summaryItems) summaryItems.innerHTML = state.cart.map(i => `
@@ -1183,13 +1204,17 @@ async function updateCheckoutSummary() {
     const q = json.data;
     summaryShipping.innerText = q.fee === 0 ? 'Miễn phí' : formatPrice(q.fee);
     summaryShippingNote.innerText = q.source === 'live' ? `Phí vận chuyển tiêu chuẩn: ${q.detail}` : q.detail;
-    summaryTotal.innerText = formatPrice(subtotal + q.fee);
+    checkoutEstimatedTotal = Number(q.total ?? subtotal + q.fee);
+    updatePayButton();
+    summaryTotal.innerText = formatPrice(checkoutEstimatedTotal);
     showEta(q);
   } catch (e) {
     if (seq !== quoteSeq) return;
     summaryShipping.innerText = 'Không tính được';
     summaryShippingNote.innerText = e.message;
     showEta(null);
+    checkoutEstimatedTotal = subtotal;
+    updatePayButton(); // Still a pre-shipping estimate; server enforces final total.
     summaryTotal.innerText = formatPrice(subtotal);
   }
 }
@@ -1215,6 +1240,11 @@ cancelCheckoutBtn.addEventListener('click', () => checkoutModal.classList.remove
 checkoutForm.addEventListener('submit', async e => {
   e.preventDefault();
 
+  const ready = paymentReadiness();
+  if (!ready.allowed) {
+    showToast(ready.note);
+    return;
+  }
   if (!wardSelect.value || wardSelect.disabled) {
     showToast('Vui lòng chọn Phường / Xã nhận hàng');
     wardSelect.focus();
