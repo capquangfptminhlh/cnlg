@@ -34,7 +34,7 @@ test('payment guard is installed before storefront app and evaluated with shippi
  const html=read('public/index.html'),app=read('public/app.js');
  assert.ok(html.indexOf('src="/besi-checkout-guard.js"')<html.indexOf('src="/app.js"'));
  assert.match(app,/BesiCheckoutGuard\.evaluate\(payOptions/);
- assert.match(app,/checkoutEstimatedTotal = Number\(q\.total \?\? subtotal \+ q\.fee\)/);
+ assert.match(app,/checkoutEstimatedTotal = Number\(q\.total\)/);
  assert.match(app,/submitOrderBtn\.disabled = !readiness\.allowed/);
  assert.match(app,/const ready = paymentReadiness\(\)/);
  assert.match(app,/if \(!ready\.allowed\)/);
