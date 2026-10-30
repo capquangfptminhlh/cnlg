@@ -1152,7 +1152,8 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     const phone = String(customer?.phone || '').replace(/[\s.-]/g, '');
     const address = String(customer?.address || '').trim();
     const province = String(customer?.province || '').trim();
-    const paymentMethod = req.body?.payment_method === 'COD' ? 'COD' : 'BANK';
+    const paymentMethod = String(req.body?.payment_method || '');
+    if (!['COD','BANK'].includes(paymentMethod)) return res.status(400).json({ success: false, error: 'Vui lòng chọn phương thức thanh toán hợp lệ.' });
     const payOpts = paymentOptions();
     if (paymentMethod === 'COD' && !payOpts.cod.enabled) return res.status(400).json({ success: false, error: 'Cửa hàng chưa nhận thanh toán khi nhận hàng (COD).' });
     if (paymentMethod === 'BANK' && !payOpts.bank.enabled) return res.status(400).json({ success: false, error: 'Cửa hàng chưa nhận chuyển khoản – vui lòng chọn thanh toán khi nhận hàng.' });
@@ -1226,7 +1227,10 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     const total_amount = subtotal + ship.fee;
     for (const it of orderItems) it.shipment_no = (ship.shipments || []).find(x => x.refs.includes(shipments.refOf(it)))?.no || 1;
     if (paymentMethod === 'COD' && total_amount > payOpts.cod.maxTotal) {
-      return res.status(400).json({ success: false, error: `Đơn trên ${payOpts.cod.maxTotal.toLocaleString('vi-VN')} đ vui lòng chọn chuyển khoản.` });
+      const msg = payOpts.bank.enabled
+        ? `Đơn trên ${payOpts.cod.maxTotal.toLocaleString('vi-VN')} đ vui lòng chọn chuyển khoản.`
+        : `Đơn vượt mức COD ${payOpts.cod.maxTotal.toLocaleString('vi-VN')} đ. Vui lòng giảm giá trị đơn hoặc liên hệ cửa hàng.`;
+      return res.status(400).json({ success: false, error: msg });
     }
 
     const order = orderStore.createOrder({

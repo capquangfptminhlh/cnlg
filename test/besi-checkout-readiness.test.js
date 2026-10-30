@@ -34,7 +34,7 @@ test('payment guard is installed before storefront app and evaluated with shippi
  const html=read('public/index.html'),app=read('public/app.js');
  assert.ok(html.indexOf('src="/besi-checkout-guard.js"')<html.indexOf('src="/app.js"'));
  assert.match(app,/BesiCheckoutGuard\.evaluate\(payOptions/);
- assert.match(app,/checkoutEstimatedTotal = Number\(q\.total \?\? subtotal \+ q\.fee\)/);
+ assert.match(app,/checkoutEstimatedTotal = Number\(q\.total\)/);
  assert.match(app,/submitOrderBtn\.disabled = !readiness\.allowed/);
  assert.match(app,/const ready = paymentReadiness\(\)/);
  assert.match(app,/if \(!ready\.allowed\)/);
@@ -52,4 +52,46 @@ test('Windows updater self-heals disk/main parity but stale Node release safely'
  assert.match(script,/if \(RestartStore \$new\) \{/);
  assert.match(script,/WithCatalogKept \{ RunGit reset --hard --quiet \$runningCommit/);
  assert.match(script,/if \(RestartStore \$runningCommit \$false\)/);
+});
+
+
+test('checkout is blocked until shipping quote is confirmed, even when item subtotal is under COD cap',()=>{
+ const options={cod:{enabled:true,maxTotal:5000000},bank:{enabled:false}};
+ for(const shippingStatus of ['missing','pending','error']){
+  const result=guard.evaluate(options,'COD',4950000,{shippingStatus});
+  assert.equal(result.allowed,false);
+  assert.equal(result.reason,'shipping-'+shippingStatus);
+  assert.ok(result.note.length>15);
+ }
+ assert.equal(guard.evaluate(options,'COD',4950000,{shippingStatus:'ready'}).allowed,true);
+ assert.equal(guard.evaluate(options,'COD',5010000,{shippingStatus:'ready'}).allowed,false);
+});
+test('bank selection also awaits correct shipping total and never bypasses quote',()=>{
+ const options={cod:{enabled:true,maxTotal:5000000},bank:{enabled:true}};
+ assert.equal(guard.evaluate(options,'BANK',6000000,{shippingStatus:'pending'}).allowed,false);
+ assert.equal(guard.evaluate(options,'BANK',6000000,{shippingStatus:'error'}).allowed,false);
+ assert.equal(guard.evaluate(options,'BANK',6000000,{shippingStatus:'ready'}).allowed,true);
+});
+test('checkout UI shows shipping retry, enforces province and ward, validates server quote',()=>{
+ const html=read('public/index.html'),app=read('public/app.js');
+ assert.match(html,/id="retryShippingQuote"/);
+ assert.match(app,/let checkoutShippingStatus = 'missing'/);
+ assert.match(app,/shippingStatus: checkoutShippingStatus/);
+ assert.match(app,/\? 'pending' : 'missing'/);
+ assert.match(app,/!province \|\| !wardSelect\.value \|\| wardSelect\.disabled/);
+ assert.match(app,/Number\.isFinite\(Number\(q\.total\)\)/);
+ assert.match(app,/checkoutShippingStatus = 'ready'/);
+ assert.match(app,/checkoutShippingStatus = 'error'/);
+ assert.match(app,/retryShippingQuote'\)\.addEventListener\('click', updateCheckoutSummary\)/);
+ assert.doesNotThrow(()=>new vm.Script(app));
+});
+
+
+test('backend rejects unsupported payment methods and gives actionable COD advice when bank unavailable',()=>{
+ const server=read('server.js');
+ assert.match(server,/if \(!\['COD','BANK'\]\.includes\(paymentMethod\)\)/);
+ assert.match(server,/Vui lòng chọn phương thức thanh toán hợp lệ/);
+ assert.match(server,/const msg = payOpts\.bank\.enabled/);
+ assert.match(server,/giảm giá trị đơn hoặc liên hệ cửa hàng/);
+ assert.match(server,/if \(paymentMethod === 'COD' && total_amount > payOpts\.cod\.maxTotal\)/);
 });

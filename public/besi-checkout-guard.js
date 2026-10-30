@@ -8,7 +8,7 @@
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.BesiCheckoutGuard=api;
 })(typeof globalThis!=='undefined'?globalThis:this,()=>{
-  function evaluate(options,method,total,{loaded=true,empty=false}={}){
+  function evaluate(options,method,total,{loaded=true,empty=false,shippingStatus='ready'}={}){
     const amount=Number(total);
     if(!loaded||!options||!options.cod||!options.bank){
       return {allowed:false,reason:'unavailable',
@@ -17,6 +17,15 @@
     if(empty||!Number.isFinite(amount)||amount<0){
       return {allowed:false,reason:'invalid',
         note:'Giỏ hàng trống hoặc tổng tiền không hợp lệ.'};
+    }
+    if(shippingStatus!=='ready'){
+      const notes={
+        missing:'Vui lòng chọn tỉnh/thành và phường/xã để xác nhận tổng tiền bao gồm phí vận chuyển.',
+        pending:'Đang tính phí vận chuyển. Vui lòng đợi trước khi đặt hàng.',
+        error:'Chưa tính được phí vận chuyển. Bấm “Tính lại phí ship” để thử lại.'
+      };
+      return {allowed:false,reason:'shipping-'+shippingStatus,
+        note:notes[shippingStatus]||notes.error};
     }
     const cod=options.cod.enabled===true;
     const bank=options.bank.enabled===true;
