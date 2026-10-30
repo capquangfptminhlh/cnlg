@@ -118,15 +118,17 @@ function compile(products,categories){
       !(Number(p.price)>0))continue;
     const catId=Number(p.category_id)||0;
     const catName=cat.byId.get(catId)?.name||String(p.category_name||'Khác');
+    const ancestorLabels=[...(cat.ancestry.get(catId)||[])].map(id=>cat.byId.get(id)?.name||'');
+    const categoryContext=[catName,...ancestorLabels].join(' ');
     const brand=String(p.brand||'').trim().slice(0,80);
     const list=Array.isArray(p.variants)&&p.variants.length?p.variants:[null];
     const missingVariants=Number(p.variant_count||0)>list.length;
-    const parent=parseAttrs(p.name,catName),title=norm(p.name),brandNorm=norm(brand);
+    const parent=parseAttrs(p.name,categoryContext),title=norm(p.name),brandNorm=norm(brand);
     let hadStock=false;
     for(const variant of list){
       if(variant&&(variant.in_stock===false||!(Number(variant.price)>0)))continue;
       hadStock=true;
-      const typed=variant?parseAttrs(variant.name,catName):null;
+      const typed=variant?parseAttrs(variant.name,categoryContext):null;
       const attributes={};
       for(const key of attributeKeys){
         // Explicit variation metadata takes priority. A multi-option parent
@@ -140,6 +142,7 @@ function compile(products,categories){
       }
       const phrase=norm([p.name,variant?.name,brand,p.sku,catName].filter(Boolean).join(' '));
       rows.push({product:p,variant,categoryId:catId,categoryName:catName,
+        context: norm(categoryContext+' '+p.name+' '+(variant?.name||'')),
         brand,brandNorm,attributes,missingVariants,
         nameNorm:title,hay:phrase,
         // Catalog base prices are valid; variation-specific price only from
@@ -189,11 +192,39 @@ const ALIASES={
   giay:['shoe','sneaker'],ao:['shirt','clothing'],pin:['battery']
 };
 function wordsMatch(hay,words){
+  const tokens=new Set(hay.split(/[^a-z0-9]+/).filter(Boolean));
   for(const word of words){
     const variations=[word,...(ALIASES[word]||[])];
-    if(!variations.some(v=>hay.includes(v)))return false;
+    if(!variations.some(v=>
+      // Short Vietnamese words must be whole tokens: "ao" must NOT
+      // match "thao" or "bao", and "op" must NOT match "hop".
+      v.length<=2?tokens.has(v):hay.includes(v)))return false;
   }
   return true;
+}
+/**
+ * Which product families can reasonably have a requested specification?
+ * Otherwise selecting XL lists every gadget that merely lacks a size field.
+ * This is a relevance screen ONLY. Unknown variants inside a plausible
+ * product family are still shown as uncertain suggestions.
+ */
+function isRelevantUnknown(row,attr,filter){
+  const text=row.context||norm(row.categoryName+' '+row.nameNorm);
+  const apparel=/\b(ao|quan|vay|dam|giay|dep|tui|thoi trang|clothing|shirt|shoe|sneaker|dress|fashion|size)\b/;
+  const cables=/\b(cap|cable|day sac|day cap|cord|wire|lightning|usb)\b/;
+  const electric=/\b(cu sac|sac|charger|powerbank|pin du phong|den|led|may|dien|adapter|watts|usb)\b/;
+  if(attr==='size')return apparel.test(text);
+  if(attr==='length')return cables.test(text)||Boolean(filter.category||filter.words.length);
+  if(attr==='connector')return cables.test(text);
+  if(attr==='model')return /\b(op lung|op dien thoai|iphone|samsung|galaxy|bao da|case|kinh cuong luc)\b/.test(text);
+  if(attr==='capacity')return /\b(pin|power ?bank|mah|battery|sac du phong)\b/.test(text);
+  if(attr==='watt')return electric.test(text);
+  if(attr==='ram'||attr==='storage')
+    return /\b(dien thoai|smartphone|laptop|may tinh|computer|tablet|ssd|hdd|usb|the nho|o cung|ram|rom|storage)\b/.test(text);
+  // Color and material apply broadly. An unspecified result without any
+  // user context is an unrelated product, not a meaningful suggestion.
+  if(attr==='color'||attr==='material')return Boolean(filter.category||filter.words.length||filter.brand);
+  return false;
 }
 function scoreRow(row,words){
   if(!words.length)return 0;
@@ -259,7 +290,10 @@ function search(index,q={}){
       !row.attributes[f.attr].includes(f.value))continue;
     const reasons=[];
     if(f.attr&&f.value){
-      if(!row.attributes[f.attr].length)reasons.push('Thông số chưa được công bố');
+      if(!row.attributes[f.attr].length){
+        if(!isRelevantUnknown(row,f.attr,f))continue;
+        reasons.push('Thông số chưa được công bố');
+      }
       if(row.attributes[f.attr].length>1)reasons.push('Có nhiều lựa chọn thông số');
       if(row.missingVariants)reasons.push('Chưa có chi tiết từng phân loại');
     }
@@ -283,4 +317,4 @@ function search(index,q={}){
     matched:hit.slice((f.page-1)*f.limit,f.page*f.limit).map(x=>x.row),
     possible:maybe.slice((f.possiblePage-1)*8,f.possiblePage*8)};
 }
-module.exports={compile,search,facetOptions,parseAttrs,norm,validate,wordsMatch,sizes,memory,ATTRS};
+module.exports={compile,search,facetOptions,parseAttrs,norm,validate,wordsMatch,isRelevantUnknown,sizes,memory,ATTRS};

@@ -41,10 +41,32 @@ async function main(){
   assert.ok(Array.isArray(search.data),'Category index did not return product list');
   assert.ok(Number.isInteger(search.total),'Missing exact search total');
   console.log('PASS indexed category search (matches='+search.total+')');
+  // Full-industry search and dynamic attribute options must also work on
+  // the actual running Windows origin, not only in GitHub Actions.
+  const universal=await json('/api/products/discover/options');
+  assert.equal(universal.success,true,'Universal facets API is unavailable');
+  assert.ok(Array.isArray(universal.categories),'Dynamic industry categories missing');
+  assert.ok(universal.categories.length>0,'No populated categories discovered');
+  const browse=await json('/api/products/discover?limit=2');
+  assert.equal(browse.success,true,'Universal search endpoint is unavailable');
+  assert.ok(Array.isArray(browse.data),'Universal search items missing');
+  assert.ok(Number(browse.total)>0,'Universal search returned an empty live store');
+  if((universal.facets?.size||[]).some(x=>x.value==='XL')){
+    const size=await json('/api/products/discover?attr=size&value=XL&limit=1');
+    assert.equal(size.success,true,'Size facet search failed');
+    assert.ok(Number(size.possibleTotal)<Number(browse.total)*0.5,
+      'Unrelated items flood the possible-size result list');
+    console.log('PASS size XL possible-results relevance ('+size.possibleTotal+' candidates)');
+  }
+  console.log('PASS full-industry indexed search and dynamic category options');
+  const universalJs=await fetchText('/besi-universal.js');
+  assert.match(universalJs,/api\/products\/discover/,
+    'Live full-industry browser bundle is stale');
   const js=await fetchText('/besi-category-facets.js');
   assert.match(js,/category-facets|category-specs/,'Live browser bundle is stale');
   const html=await fetchText('/');
   assert.match(html,/besi-category-facets\.js/,'Live HTML does not load new filters');
+  assert.match(html,/besi-universal\.js/,'Live HTML does not load full-industry search');
   console.log('PASS live frontend assets + HTML');
   console.log('BESI PRODUCTION VERIFIED');
 }

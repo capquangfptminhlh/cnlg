@@ -785,7 +785,10 @@ app.get('/api/products', (req, res) => {
     if (isDefaultQuery) {
       products = cachedDefaultMixed;
     } else {
-      products = cachedSellable;
+      // Never mutate shared cachedSellable while sorting browse results.
+      // Otherwise a price-sort request can silently reorder other visitors'
+      // search results or catalog indexes in the same Node process.
+      products = [...cachedSellable];
 
       if (category && category !== 'all') {
         const ids = categoryIdsFor(parseInt(category, 10));
