@@ -109,7 +109,95 @@ try {
   }
   $old = RunGit rev-parse HEAD
   $new = RunGit rev-parse origin/main
-  if ($old -eq $new) { return }
+  if ($old -eq $new) {
+    # The file checkout may already be main while an old Node process is still
+    # listening on :3000. In that case a regular git-only updater would return
+    # forever and never activate the already-deployed code.
+    $live = $null
+    try { $live = Invoke-RestMethod 'http://127.0.0.1:3000/healthz' -TimeoutSec 5 } catch {
+      Log 'KHÔNG RESTART: origin healthz không truy cập được; cần kiểm tra tác vụ máy chủ.'
+      return
+    }
+    if ($live.release -eq $new.Substring(0,12)) { return }
+    if ((Test-Path $rejected) -and (Get-Content $rejected -Raw).Trim() -eq $new) { return }
+    $runningShort = [string]$live.release
+    if ($runningShort -notmatch '^[0-9a-f]{12}
+  if ((Test-Path $rejected) -and (Get-Content $rejected -Raw).Trim() -eq $new) { return }
+  # Chỉ nhận bản đi tiếp từ bản đang chạy (không ghi đè sửa tay trên máy chủ)
+  $isAncestor = $true
+  try { RunGit merge-base --is-ancestor $old $new | Out-Null } catch { $isAncestor = $false }
+  if (-not $isAncestor) { Log "BỎ QUA: origin/main ($($new.Substring(0,7))) không đi tiếp từ bản đang chạy ($($old.Substring(0,7))) – cần xử lý tay."; return }
+  $dirty = (RunGit status --porcelain --untracked-files=no) -split "`n" | Where-Object { $_ -and $_ -notmatch 'data/products\.json$' }
+  if ($dirty) { Log "BỎ QUA: máy chủ có file mã bị sửa tay: $($dirty -join ', ')"; return }
+
+  $subject = RunGit log -1 --format=%s $new
+  Log "Có bản mới $($new.Substring(0,7)): $subject"
+  $lockChanged = [bool](RunGit diff --name-only $old $new -- package-lock.json)
+  WithCatalogKept { RunGit merge --ff-only --quiet $new | Out-Null }
+  if ($lockChanged) { Log 'package-lock đổi → cài lại thư viện'; if ((RunNpm ci --no-audit --no-fund).Code) { throw 'npm ci lỗi' } }
+
+  $test = RunNpm test
+  if (-not $test.Code) {
+    Log 'Backend tests đạt; đang kiểm tra bộ lọc và giao diện (npm run test:ui).'
+    $test = RunNpm run test:ui
+  }
+  if ($test.Code) {
+    $failed = ($test.Out | Select-String 'fail (\d+)' | ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -Last 1)
+    Log "TEST HỎNG ($failed bài) → giữ bản cũ $($old.Substring(0,7)), không thử lại bản $($new.Substring(0,7)) nữa."
+    Set-Content $rejected $new
+    WithCatalogKept { RunGit reset --hard --quiet $old | Out-Null }
+    if ($lockChanged) { RunNpm ci --no-audit --no-fund | Out-Null }
+    return
+  }
+  if (RestartStore $new) { Log "ĐÃ CẬP NHẬT lên $($new.Substring(0,7)), health release và API lọc đều đạt."; return }
+
+  Log "CỬA HÀNG KHÔNG LÊN với bản $($new.Substring(0,7)) → quay về $($old.Substring(0,7))"
+  Set-Content $rejected $new
+  WithCatalogKept { RunGit reset --hard --quiet $old | Out-Null }
+  if ($lockChanged) { RunNpm ci --no-audit --no-fund | Out-Null }
+  if (RestartStore $old $false) { Log 'Đã quay về bản cũ, health check đạt.' } else { Log 'CẢNH BÁO: chưa xác nhận máy chủ chạy bản cũ. Kiểm tra tác vụ HoangMinh Store và data\server.log.' }
+} catch {
+  Log "LỖI: $($_.Exception.Message)"
+} finally {
+  Remove-Item $lock -Force -ErrorAction SilentlyContinue
+}
+) {
+      Log 'KHÔNG RESTART: không xác định được commit tiến trình hiện tại để rollback an toàn.'
+      return
+    }
+    $runningCommit = $null
+    try { $runningCommit = RunGit rev-parse --verify "$($runningShort)^{commit}" } catch {
+      Log "KHÔNG RESTART: commit tiến trình $runningShort không có trong Git local."
+      return
+    }
+    try { RunGit merge-base --is-ancestor $runningCommit $new | Out-Null } catch {
+      Log "KHÔNG RESTART: phiên bản tiến trình $runningShort không thuộc lịch sử main."
+      return
+    }
+    $dirtyLive = RunGit status --porcelain --untracked-files=no
+    if ($dirtyLive) { Log 'KHÔNG RESTART: Git có file tracked sửa tại máy chủ.'; return }
+    Log "Code đã ở main nhưng Node đang chạy $runningShort, thử self-heal sau kiểm thử."
+    $check = RunNpm test
+    if (-not $check.Code) { $check = RunNpm run test:ui }
+    if ($check.Code) {
+      Log 'KHÔNG RESTART: self-heal test lỗi.'
+      Set-Content $rejected $new
+      return
+    }
+    if (RestartStore $new) {
+      Log "SELF-HEAL thành công: tiến trình đã chạy $($new.Substring(0,12))."
+      return
+    }
+    Log "SELF-HEAL lỗi: rollback source về $runningShort và thử bật lại."
+    Set-Content $rejected $new
+    WithCatalogKept { RunGit reset --hard --quiet $runningCommit | Out-Null }
+    $packagesChanged = [bool](RunGit diff --name-only $runningCommit $new -- package-lock.json)
+    if ($packagesChanged) { RunNpm ci --no-audit --no-fund | Out-Null }
+    if (RestartStore $runningCommit $false) {
+      Log "Đã khôi phục tiến trình phiên bản $runningShort."
+    } else { Log 'CẢNH BÁO: chưa xác nhận rollback self-heal; kiểm tra HoangMinh Store.' }
+    return
+  }
   if ((Test-Path $rejected) -and (Get-Content $rejected -Raw).Trim() -eq $new) { return }
   # Chỉ nhận bản đi tiếp từ bản đang chạy (không ghi đè sửa tay trên máy chủ)
   $isAncestor = $true
