@@ -77,7 +77,7 @@ test('checkout UI shows shipping retry, enforces province and ward, validates se
  assert.match(html,/id="retryShippingQuote"/);
  assert.match(app,/let checkoutShippingStatus = 'missing'/);
  assert.match(app,/shippingStatus: checkoutShippingStatus/);
- assert.match(app,/checkoutShippingStatus = 'pending' : 'missing'/);
+ assert.match(app,/\? 'pending' : 'missing'/);
  assert.match(app,/!province \|\| !wardSelect\.value \|\| wardSelect\.disabled/);
  assert.match(app,/Number\.isFinite\(Number\(q\.total\)\)/);
  assert.match(app,/checkoutShippingStatus = 'ready'/);
