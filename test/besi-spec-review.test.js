@@ -50,7 +50,7 @@ test('approved variant survives reindex and source refresh; other options stay u
       connector:'c-lightning',length:2,color:'den',confirmed:true},lookup);
     assert.equal(updated.revision,1);
     assert.equal(store.get(124062,'iphone-black').connector,'c-lightning');
-    assert.equal(fs.statSync(filename).mode&0o777,0o600);
+    if (process.platform !== 'win32') assert.equal(fs.statSync(filename).mode&0o777,0o600);
     const cloned={...sample,price:30000,updated_at:'next source sync',
       variants:sample.variants.map(v=>({...v,price:v.price+500}))};
     const fresh=createStore(filename).snapshot();
