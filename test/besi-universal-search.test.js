@@ -161,3 +161,40 @@ test('a 20k item full-industry catalog remains searchable with page-level respon
  assert.equal(res.possibleTotal,0);
  assert.ok(discover.facetOptions(idx,{category:11}).facets.model.some(x=>x.value==='iphone-16-pro-max'));
 });
+
+test('missing size attributes cannot turn unrelated electronics into possible clothing',()=>{
+ const idx=discover.compile([
+  p(301,'Áo thun cotton size XL',21,{price:120000}),
+  p(302,'Áo polo cotton trơn',21,{price:99000}),
+  p(303,'Tai nghe không dây Bluetooth',10,{price:39000}),
+  p(304,'Củ sạc USB-C 35W',10,{price:99000}),
+  p(305,'Bàn là mini',31,{price:89000}),
+  p(306,'Khăn thể thao cotton',31,{price:39000})
+ ],cats);
+ const r=discover.search(idx,{attr:'size',value:'XL'});
+ assert.equal(r.total,1);
+ assert.equal(r.matched[0].product.id,301);
+ assert.equal(r.possibleTotal,1,'Only plausible apparel missing size should be suggested');
+ assert.equal(r.possible[0].row.product.id,302);
+ assert.ok(!r.possible.some(x=>[303,304,305,306].includes(x.row.product.id)));
+ assert.equal(discover.search(idx,{q:'ao cotton'}).total,2,
+   'Áo cotton must not match thao in khăn thể thao cotton');
+});
+test('color without category or keyword avoids a flood of unknown products',()=>{
+ const idx=discover.compile([
+  p(311,'Ốp lưng iPhone màu đen',11),
+  p(312,'Tai nghe Bluetooth không ghi màu',10),
+  p(313,'Giày nữ không ghi màu',22)
+ ],cats);
+ const broad=discover.search(idx,{attr:'color',value:'den'});
+ assert.equal(broad.total,1);
+ assert.equal(broad.possibleTotal,0);
+ const scoped=discover.search(idx,{category:22,attr:'color',value:'den'});
+ assert.equal(scoped.total,0);
+ assert.equal(scoped.possibleTotal,1);
+});
+test('legacy catalog sorting must not mutate shared cachedSellable',()=>{
+ const server=load('server.js');
+ assert.match(server,/products = \[\.\.\.cachedSellable\];/);
+ assert.doesNotMatch(server,/products = cachedSellable;\s+if \(category && category !== 'all'\)/);
+});
