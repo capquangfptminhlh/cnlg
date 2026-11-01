@@ -62,9 +62,10 @@ function rootCategoryMap(categories = []) {
  */
 function computePrice(p, rules, rootMap = new Map()) {
   const publicPrice = Number(p.public_price) || 0;
-  const hasWholesale = Number(p.wholesale) > 0;
+  const wholesaleNum = Number(p.wholesale);
+  const hasWholesale = Number.isFinite(wholesaleNum) && wholesaleNum > 0 && (!publicPrice || wholesaleNum < publicPrice);
   const useWholesale = rules.base === 'wholesale' && hasWholesale;
-  const cost = useWholesale ? Number(p.wholesale) : publicPrice;
+  const cost = useWholesale ? wholesaleNum : publicPrice;
   const round = v => Math.ceil(v / rules.roundTo) * rules.roundTo;
 
   let price;

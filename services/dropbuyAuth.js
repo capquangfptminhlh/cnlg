@@ -73,13 +73,17 @@ async function getAuthStatus() {
 
   const check = await verifySession(db.cookieHeader);
   if (check.valid) {
+    const hasGoodPricing = check.user?.good_pricing !== 'F';
     return {
       authenticated: true,
       username: db.username || check.user?.name || check.user?.email || 'Đại lý DropBuy',
       user: check.user,
       expires: check.expires,
-      wholesaleActive: true,
-      message: 'Đã kết nối tài khoản DropBuy. Giá sỉ đại lý F1 đang được kích hoạt.'
+      wholesaleActive: hasGoodPricing,
+      goodPricing: hasGoodPricing,
+      message: hasGoodPricing
+        ? 'Đã kết nối tài khoản DropBuy. Giá sỉ đại lý F1 đang được kích hoạt.'
+        : 'Tài khoản DropBuy đã kết nối nhưng chưa kích hoạt giá sỉ F1 (cần tiền ký quỹ tối thiểu 500.000đ trên dropbuy.vn).'
     };
   } else {
     return {

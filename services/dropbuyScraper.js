@@ -184,22 +184,27 @@ async function fetchWholesalePrices(items, config = getConfig()) {
         return;
       }
       for (const p of json.data) {
-        // fe_price_override = giá thực tế DropBuy hiển thị cho CTV (gồm cả Flash Sale hoặc F1)
+        // Nguồn 'P' = Public price (DropBuy trả về giá bán lẻ công khai khi tài khoản chưa đủ điều kiện chiết khấu F1 hoặc ký quỹ < 500k)
+        const source = String(p.fe_price_override_source || 'F1').toUpperCase();
+        if (source === 'P') continue;
+
+        const publicPrice = Number(p.fe_price_public || 0);
         const override = Number(p.fe_price_override || 0);
         const group = Number(p.fe_price_group || 0);
         const cost = override > 0 ? override : group;
-        const fsCode = p.fe_price_override_source === 'FS' && p.fs_program_code && (group === 0 || override <= group)
+        // Giá sỉ hợp lệ phải dương và thấp hơn giá bán lẻ công khai (nếu có giá bán lẻ)
+        if (cost <= 0 || (publicPrice > 0 && cost >= publicPrice)) continue;
+
+        const fsCode = source === 'FS' && p.fs_program_code && (group === 0 || override <= group)
           ? p.fs_program_code
           : null;
-        if (cost > 0) {
-          map.set(p.variation_id, {
-            cost,
-            group_cost: group || cost,
-            public_price: Number(p.fe_price_public || 0),
-            source: p.fe_price_override_source || 'F1',
-            fs_program_code: fsCode
-          });
-        }
+        map.set(p.variation_id, {
+          cost,
+          group_cost: group || cost,
+          public_price: publicPrice,
+          source,
+          fs_program_code: fsCode
+        });
       }
     } catch (e) {
       console.warn('[Scraper] Lỗi lấy giá sỉ:', e.message);
@@ -225,7 +230,8 @@ function mapItem(item, { ctx = getPricingContext(), priceMap, previous, keepWhol
   const pid = item.product_id || item.id;
   const publicPrice = Number(item.price_public || item.regular_price || 0);
   const live = priceMap?.get(item.unique_id);
-  const wholesale = live ? live.cost : keepWholesale && previous?.wholesale_price ? previous.wholesale_price : null;
+  const prevWholesale = (previous?.wholesale_price > 0 && (!publicPrice || previous.wholesale_price < publicPrice)) ? previous.wholesale_price : null;
+  const wholesale = live ? live.cost : (keepWholesale && prevWholesale ? prevWholesale : (prevWholesale || null));
   const fsCode = live ? (live.fs_program_code || null) : (keepWholesale && previous?.fs_program_code ? previous.fs_program_code : null);
   const isFlashSale = item.is_flash_sale === 'T' || item.is_flash_sale === true || live?.source === 'FS';
   const base = {

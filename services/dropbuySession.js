@@ -50,7 +50,7 @@ async function ensureSession(config, { force = false } = {}) {
     sid: u.sid,
     exp: exps.length ? Math.min(...exps) : Date.now() + 60 * 60e3,
     checkedAt: Date.now(),
-    user: { id: u.user_id ?? u.id, username: u.username, name: u.display_name || u.name, otp_required_above: u.order_comodity_amount_required_otp || 0, mfa_enabled: !!u.mfa_enabled }
+    user: { id: u.user_id ?? u.id, username: u.username, name: u.display_name || u.name, good_pricing: u.good_pricing === 'T', otp_required_above: u.order_comodity_amount_required_otp || 0, mfa_enabled: !!u.mfa_enabled }
   };
   return { sid: cache.sid, user: cache.user, expiresAt: new Date(cache.exp).toISOString() };
 }

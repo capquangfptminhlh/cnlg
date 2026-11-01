@@ -142,12 +142,25 @@ async function tick(io) {
         try {
           const bal = await dropbuySession.bff('/balance/my-balance', { config: cfg });
           balance = Number(bal?.avail_balance_current ?? NaN);
+          const depositBal = Number(bal?.deposit_balance_current ?? NaN);
           if (rules.enabled && Number.isFinite(balance) && balance < rules.lowBalanceAlert) {
             alerts.push(`Quỹ DropBuy thấp: ${balance.toLocaleString('vi-VN')} đ.`);
-            alertOnce(`lowbal:${vnDate()}`, `Quỹ DropBuy còn ${balance.toLocaleString('vi-VN')} đ (dưới ngưỡng ${rules.lowBalanceAlert.toLocaleString('vi-VN')} đ). Nạp thêm để đơn COD không bị chặn.`);
+            alertOnce(`lowbal:${vnDate()}`, `Quỹ khả dụng DropBuy còn ${balance.toLocaleString('vi-VN')} đ (dưới ngưỡng ${rules.lowBalanceAlert.toLocaleString('vi-VN')} đ). Nạp thêm để đơn COD không bị chặn.`);
+          }
+          if (Number.isFinite(depositBal) && depositBal < 500000) {
+            alerts.push(`Tiền ký quỹ DropBuy thấp: ${depositBal.toLocaleString('vi-VN')} đ (< 500.000đ).`);
+            alertOnce(`deposit_low:${vnDate()}`, `⚠️ Tiền ký quỹ DropBuy còn ${depositBal.toLocaleString('vi-VN')} đ (dưới mức 500.000đ để hưởng giá sỉ F1). Nạp ký quỹ trên DropBuy để duy trì giá sỉ.`);
+          } else if (depositBal >= 500000) {
+            sent.delete(`deposit_low:${vnDate()}`);
           }
         } catch (e) {
           console.warn('[Watchdog] Không đọc được số dư quỹ:', e.message);
+        }
+        if (session?.user && session.user.good_pricing === false) {
+          alerts.push('Tài khoản DropBuy mất quyền giá sỉ F1 (good_pricing: F).');
+          alertOnce(`good_pricing:${vnDate()}`, '⚠️ Tài khoản DropBuy mất quyền giá sỉ F1 (good_pricing: F). Kiểm tra tiền ký quỹ hoặc đăng nhập lại trên DropBuy.');
+        } else if (session?.user?.good_pricing === true) {
+          sent.delete(`good_pricing:${vnDate()}`);
         }
         await retryWaiting(io);
       }
