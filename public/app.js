@@ -40,6 +40,7 @@ const searchClearBtn = document.getElementById('searchClearBtn');
 const searchDropdown = document.getElementById('searchDropdown');
 const sortSelect = document.getElementById('sortSelect');
 const pricePills = document.querySelectorAll('.price-pill');
+const shareFilterBtn = document.getElementById('shareFilterBtn');
 
 // Cart & Drawer DOM
 const openCartBtn = document.getElementById('openCartBtn');
@@ -235,6 +236,7 @@ function renderBrandPills() {
       } else {
         catalogTitle.innerText = `Thương hiệu ${b} chính hãng`;
       }
+      if (typeof syncFilterUrl === 'function') syncFilterUrl({ push: true });
       fetchProducts();
     });
   });
@@ -881,8 +883,9 @@ function setProductHash(prod) {
   document.title = `${prod.name} | Hoàng Minh Store`;
 }
 function clearProductHash() {
-  if (location.pathname.startsWith('/sp/') || location.hash.startsWith('#/sp/')) history.pushState(null, '', '/');
-  document.title = HOME_TITLE;
+  const targetUrl = typeof buildFilterUrl === 'function' ? buildFilterUrl() : '/';
+  if (location.pathname.startsWith('/sp/') || location.hash.startsWith('#/sp/')) history.pushState(null, '', targetUrl);
+  document.title = (state.searchQuery ? `Kết quả cho "${state.searchQuery}" | BESI` : HOME_TITLE);
 }
 function openFromHash() {
   // Hỗ trợ cả link cũ dạng /#/sp/<id>
@@ -1608,6 +1611,7 @@ searchClearBtn.addEventListener('click',()=>{
   state.searchQuery='';
   state.currentPage=1;
   catalogTitle.innerText='Tất Cả Sản Phẩm';
+  syncFilterUrl({ push: true });
   fetchProducts();
   searchInput.focus();
 });
@@ -1621,14 +1625,26 @@ function runSearch(){
   state.searchQuery=searchInput.value.trim();
   state.currentPage=1;
   state.currentBrand='all';
+  state.currentCategory='all';
   const brandPills = document.getElementById('brandPills');
   if (brandPills) {
     brandPills.querySelectorAll('.brand-pill').forEach(b => {
       b.classList.toggle('active', b.getAttribute('data-brand') === 'all');
     });
   }
+  const catContainer = document.getElementById('categoriesContainer');
+  if (catContainer) {
+    catContainer.querySelectorAll('.cat-btn').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-id') === 'all');
+    });
+  }
   catalogTitle.innerText=state.searchQuery?'Kết quả cho "'+state.searchQuery+'"':'Tất Cả Sản Phẩm';
+  syncFilterUrl({ push: true });
   fetchProducts();
+  const catalogEl = document.getElementById('catalog');
+  if (catalogEl) {
+    catalogEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 searchBtn.addEventListener('click',runSearch);
 searchInput.addEventListener('keyup',e=>{
@@ -1639,6 +1655,7 @@ searchInput.addEventListener('keyup',e=>{
 sortSelect.addEventListener('change', () => {
   state.sort = sortSelect.value;
   state.currentPage = 1;
+  syncFilterUrl({ push: true });
   fetchProducts();
 });
 
@@ -1653,8 +1670,212 @@ pricePills.forEach(pill => {
       catalogTitle.innerText = state.flashSaleOnly ? '⚡ Đang Flash Sale Giá Sỉ' : (state.maxPrice === '99000' ? '🔥 Xả Kho Đồng Giá Dưới 99K' : 'Bảng Giá Sỉ Toàn Kho');
     }
     state.currentPage = 1;
+    syncFilterUrl({ push: true });
     fetchProducts();
   });
+});
+
+// --- URL Synchronization & Shareable Filter Links ---
+function slugifyQuery(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+}
+
+function buildFilterUrl() {
+  const sp = new URLSearchParams();
+  if (state.searchQuery && state.searchQuery.trim()) {
+    sp.set('q', state.searchQuery.trim());
+  }
+  if (state.currentCategory && state.currentCategory !== 'all') {
+    const cat = Array.isArray(state.categories) ? state.categories.find(c => String(c.id) === String(state.currentCategory)) : null;
+    const slug = cat ? '-' + slugifyQuery(cat.name) : '';
+    sp.set('danh-muc', `${state.currentCategory}${slug}`);
+  }
+  if (state.currentBrand && state.currentBrand !== 'all') {
+    sp.set('brand', state.currentBrand);
+  }
+  if (state.minPrice) sp.set('min', state.minPrice);
+  if (state.maxPrice) sp.set('max', state.maxPrice);
+  if (state.flashSaleOnly) sp.set('flash', '1');
+  if (state.sort && state.sort !== 'default') sp.set('sort', state.sort);
+
+  const qs = sp.toString();
+  return qs ? `/?${qs}` : '/';
+}
+window.buildFilterUrl = buildFilterUrl;
+
+function syncFilterUrl({ push = false } = {}) {
+  const targetUrl = buildFilterUrl();
+  const currentUrl = location.pathname + location.search;
+  if (currentUrl !== targetUrl) {
+    if (push) {
+      history.pushState({ filter: true }, '', targetUrl);
+    } else {
+      history.replaceState({ filter: true }, '', targetUrl);
+    }
+  }
+  updateShareButton();
+}
+window.syncFilterUrl = syncFilterUrl;
+
+function updateShareButton() {
+  const btn = document.getElementById('shareFilterBtn');
+  if (!btn) return;
+  const hasFilter = Boolean(state.searchQuery || (state.currentBrand && state.currentBrand !== 'all') || (state.currentCategory && state.currentCategory !== 'all') || state.minPrice || state.maxPrice || state.flashSaleOnly);
+  btn.classList.toggle('is-highlighted', hasFilter);
+  if (state.searchQuery) {
+    btn.setAttribute('title', `Sao chép link tìm kiếm "${state.searchQuery}" để gửi cho khách`);
+  } else if (state.currentBrand && state.currentBrand !== 'all') {
+    btn.setAttribute('title', `Sao chép link thương hiệu "${state.currentBrand}" để gửi cho khách`);
+  } else {
+    btn.setAttribute('title', 'Sao chép link danh sách này để gửi cho khách');
+  }
+}
+
+async function copyFilterLink() {
+  const fullUrl = new URL(buildFilterUrl(), window.location.origin).href;
+  let copied = false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(fullUrl);
+      copied = true;
+    }
+  } catch (_) {}
+  if (!copied) {
+    const ta = document.createElement('textarea');
+    ta.value = fullUrl;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { copied = document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
+  }
+
+  const btn = document.getElementById('shareFilterBtn');
+  if (btn) {
+    const originalHtml = btn.innerHTML;
+    btn.classList.add('copied');
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>Đã chép link!</span>';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = originalHtml;
+    }, 2500);
+  }
+
+  const queryDesc = state.searchQuery ? `"${state.searchQuery}"` : (state.currentBrand && state.currentBrand !== 'all' ? `thương hiệu ${state.currentBrand}` : 'danh sách sản phẩm');
+  showToast(`Đã sao chép link ${queryDesc}! Bạn có thể dán vào Zalo/Messenger để gửi khách.`);
+
+  if (navigator.share && window.matchMedia('(max-width: 768px)').matches) {
+    try {
+      await navigator.share({
+        title: document.title,
+        text: `Xem ${queryDesc} giá sỉ & lẻ tốt nhất trên BESI:`,
+        url: fullUrl
+      });
+    } catch (_) {}
+  }
+}
+window.copyFilterLink = copyFilterLink;
+if (shareFilterBtn) {
+  shareFilterBtn.addEventListener('click', copyFilterLink);
+}
+
+function applyFilterFromUrl({ initial = false, fetch = true, scroll = false } = {}) {
+  const sp = new URLSearchParams(window.location.search);
+  const q = (sp.get('q') || sp.get('search') || '').trim();
+  const brand = (sp.get('brand') || 'all').trim();
+  const catRaw = sp.get('danh-muc') || sp.get('category') || 'all';
+  const catMatch = String(catRaw).match(/^(\d+)/);
+  const catId = catMatch ? catMatch[1] : (catRaw === 'all' ? 'all' : catRaw);
+  const min = (sp.get('min') || sp.get('minPrice') || '').trim();
+  const max = (sp.get('max') || sp.get('maxPrice') || '').trim();
+  const flash = sp.get('flash') === '1' || sp.get('flashSale') === '1';
+  const sort = (sp.get('sort') || 'default').trim();
+
+  state.searchQuery = q;
+  state.currentBrand = brand;
+  state.currentCategory = catId;
+  state.minPrice = min;
+  state.maxPrice = max;
+  state.flashSaleOnly = flash;
+  state.sort = sort;
+  state.currentPage = 1;
+
+  if (typeof searchInput !== 'undefined' && searchInput) {
+    searchInput.value = q;
+  }
+  if (typeof searchClearBtn !== 'undefined' && searchClearBtn) {
+    searchClearBtn.classList.toggle('hidden', q.length === 0);
+  }
+  if (typeof sortSelect !== 'undefined' && sortSelect) {
+    if ([...sortSelect.options].some(o => o.value === sort)) {
+      sortSelect.value = sort;
+    } else {
+      sortSelect.value = 'default';
+    }
+  }
+  if (typeof pricePills !== 'undefined' && pricePills) {
+    pricePills.forEach(pill => {
+      const pMin = pill.getAttribute('data-min') || '';
+      const pMax = pill.getAttribute('data-max') || '';
+      const pFlash = pill.getAttribute('data-flash') === '1';
+      let match = false;
+      if (flash) match = pFlash;
+      else if (min || max) match = !pFlash && pMin === min && pMax === max;
+      else match = !pFlash && !pMin && !pMax;
+      pill.classList.toggle('active', match);
+    });
+  }
+  const brandContainer = document.getElementById('brandPills');
+  if (brandContainer) {
+    brandContainer.querySelectorAll('.brand-pill').forEach(btn => {
+      const b = btn.getAttribute('data-brand') || '';
+      const isAct = (brand === 'all' && b === 'all') || (brand.toLowerCase() === b.toLowerCase());
+      btn.classList.toggle('active', isAct);
+    });
+  }
+  const catContainer = document.getElementById('categoriesContainer');
+  if (catContainer) {
+    catContainer.querySelectorAll('.cat-btn').forEach(btn => {
+      const bId = btn.getAttribute('data-id');
+      btn.classList.toggle('active', String(bId) === String(catId));
+    });
+  }
+  if (typeof catalogTitle !== 'undefined' && catalogTitle) {
+    if (state.searchQuery) {
+      catalogTitle.innerText = `Kết quả cho "${state.searchQuery}"`;
+    } else if (state.currentBrand && state.currentBrand !== 'all') {
+      catalogTitle.innerText = `Thương hiệu ${state.currentBrand} chính hãng`;
+    } else if (state.flashSaleOnly) {
+      catalogTitle.innerText = '⚡ Đang Flash Sale Giá Sỉ';
+    } else if (state.maxPrice === '99000') {
+      catalogTitle.innerText = '🔥 Xả Kho Đồng Giá Dưới 99K';
+    } else if (state.currentCategory && state.currentCategory !== 'all') {
+      const catObj = Array.isArray(state.categories) ? state.categories.find(c => String(c.id) === String(state.currentCategory)) : null;
+      catalogTitle.innerText = catObj ? catObj.name : 'Tất Cả Sản Phẩm';
+    } else {
+      catalogTitle.innerText = 'Sản phẩm dành cho bạn';
+    }
+  }
+  updateShareButton();
+  if (fetch) {
+    fetchProducts();
+  }
+  if (scroll) {
+    const hasFilter = Boolean(q || brand !== 'all' || catId !== 'all' || min || max || flash || sort !== 'default');
+    if (hasFilter) {
+      setTimeout(() => {
+        const catalogEl = document.getElementById('catalog');
+        if (catalogEl) catalogEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 350);
+    }
+  }
+}
+window.applyFilterFromUrl = applyFilterFromUrl;
+
+window.addEventListener('popstate', (e) => {
+  if (location.pathname.startsWith('/sp/') || location.hash.startsWith('#/sp/')) return;
+  applyFilterFromUrl({ initial: false, fetch: true, scroll: false });
 });
 
 // Cart Drawer Handlers
@@ -1669,7 +1890,7 @@ loadCart();
 updateCartUI();
 fetchCategories();
 loadBrands();
-fetchProducts();
+applyFilterFromUrl({ initial: true, fetch: true, scroll: Boolean(location.search) });
 refreshCartPrices();
 openFromHash();
 

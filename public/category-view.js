@@ -114,11 +114,26 @@
   window.storeSelectCategory = select;
 
   function urlFor(id) {
+    if (typeof window.buildFilterUrl === 'function') {
+      const prevCat = state.currentCategory;
+      state.currentCategory = id;
+      const u = window.buildFilterUrl();
+      state.currentCategory = prevCat;
+      return u;
+    }
     if (String(id) === 'all') return location.pathname === '/' ? '/' : '/';
     const cat = catById(id);
     return `/?danh-muc=${id}${cat ? '-' + slugify(cat.name) : ''}`;
   }
   function pushUrl(id) {
+    if (typeof window.syncFilterUrl === 'function') {
+      state.currentCategory = id;
+      state.searchQuery = '';
+      if (typeof searchInput !== 'undefined' && searchInput) searchInput.value = '';
+      if (typeof searchClearBtn !== 'undefined' && searchClearBtn) searchClearBtn.classList.add('hidden');
+      window.syncFilterUrl({ push: true });
+      return;
+    }
     const url = urlFor(id);
     if (location.pathname + location.search !== url) history.pushState({ cat: String(id) }, '', url);
   }

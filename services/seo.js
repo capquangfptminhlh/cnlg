@@ -114,22 +114,43 @@ function renderProductPage(req, product, detail, config) {
     .replace('</head>', `${head}\n</head>`);
 }
 
-/** HTML trang chủ kèm meta mô tả cửa hàng */
+/** HTML trang chủ kèm meta mô tả cửa hàng (tự động đổi theo từ khoá tìm kiếm / bộ lọc) */
 function renderHomePage(req, config, total) {
   const name = storeName(config, req);
-  const desc = isBesiHost(req)
+  const q = String(req.query?.q || req.query?.search || '').trim();
+  const brand = String(req.query?.brand || '').trim();
+
+  let pageTitle = isBesiHost(req) ? 'BESI | Sàn mua lẻ giá tốt, nhập sỉ từ nhiều tổng kho' : (config.store?.slogan ? `${name} | ${config.store.slogan}` : name);
+  let ogTitle = name;
+  let desc = isBesiHost(req)
     ? `BESI tập hợp ${total.toLocaleString('vi-VN')} sản phẩm từ nhiều tổng kho và nhà phân phối. Mua lẻ giá tốt, nhập sỉ số lượng lớn và khám phá nhiều ngành hàng trong một nơi.`
     : `${config.store?.slogan || 'Tổng kho phân phối sỉ & lẻ chính hãng'} – Hơn ${total.toLocaleString('vi-VN')} sản phẩm công nghệ & gia dụng chính hãng, giao toàn quốc, kiểm tra hàng – trả tiền khi nhận.`;
+
+  if (q) {
+    pageTitle = `Tìm kiếm "${q}" | ${name}`;
+    ogTitle = `Tìm kiếm "${q}" | ${name}`;
+    desc = `Danh sách sản phẩm "${q}" giá sỉ & lẻ tốt nhất tại ${name}. Hơn ${total.toLocaleString('vi-VN')} sản phẩm chính hãng, kiểm tra trước khi nhận, giao hàng toàn quốc.`;
+  } else if (brand && brand !== 'all') {
+    pageTitle = `Thương hiệu ${brand} | ${name}`;
+    ogTitle = `Thương hiệu ${brand} | ${name}`;
+    desc = `Khám phá các sản phẩm thương hiệu ${brand} chính hãng, giá sỉ tốt nhất tại ${name}.`;
+  }
+
+  const base = baseUrl(req);
+  const canonicalUrl = `${base}${req.originalUrl || '/'}`;
   const head = `
+  <title>${escAttr(pageTitle)}</title>
   <meta name="description" content="${escAttr(desc)}">
-  <link rel="canonical" href="${escAttr(baseUrl(req) + '/')}">
+  <link rel="canonical" href="${escAttr(canonicalUrl)}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="${escAttr(name)}">
-  <meta property="og:title" content="${escAttr(name)}">
+  <meta property="og:title" content="${escAttr(ogTitle)}">
   <meta property="og:description" content="${escAttr(desc)}">
-  <meta property="og:image" content="${escAttr(baseUrl(req) + (isBesiHost(req) ? '/besi-logo.svg' : '/logo.svg'))}">
-  <meta property="og:url" content="${escAttr(baseUrl(req) + '/')}">`;
-  return getTemplate().replace('</head>', `${head}\n</head>`);
+  <meta property="og:image" content="${escAttr(base + (isBesiHost(req) ? '/besi-logo.svg' : '/logo.svg'))}">
+  <meta property="og:url" content="${escAttr(canonicalUrl)}">`;
+  return getTemplate()
+    .replace(/<title>[\s\S]*?<\/title>/, '')
+    .replace('</head>', `${head}\n</head>`);
 }
 
 function sitemapXml(req, products) {
