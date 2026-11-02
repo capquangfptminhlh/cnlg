@@ -55,3 +55,15 @@ test('public production smoke check does not require admin or mutate orders',()=
   assert.match(workflow,/check-besi-production\.js https:\/\/besi\.com\.vn/);
   assert.match(workflow,/workflow_dispatch/);
 });
+
+test('Windows updater has complete self-heal control flow, no broken duplicated block',()=>{
+  const script=read('scripts/auto-update.ps1');
+  assert.match(script,/if \(\$runningShort -notmatch '\^\[0-9a-f\]\{12\}\$'\) \{/);
+  assert.equal((script.match(/Log "LỖI: /g)||[]).length,1,'duplicated try/catch block');
+  assert.equal((script.match(/\$old = RunGit rev-parse HEAD/g)||[]).length,1);
+  assert.equal((script.match(/if \(RestartStore \$new\)/g)||[]).length,1);
+  assert.match(script,/SELF-HEAL thành công/);
+  const workflow=read('.github/workflows/storefront-check.yml');
+  assert.match(workflow,/windows-updater-parser:/);
+  assert.match(workflow,/System\.Management\.Automation\.Language\.Parser/);
+});
