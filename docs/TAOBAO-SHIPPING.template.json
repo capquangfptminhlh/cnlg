@@ -1,0 +1,15 @@
+{
+  "route": "CN-VN",
+  "currency": "VND",
+  "provider": "REPLACE_WITH_CONTRACTED_CARRIER",
+  "updated_at": "REPLACE_WITH_ISO_DATE_TIME",
+  "international_vnd_per_kg": null,
+  "billing_step_kg": null,
+  "volumetric_divisor": null,
+  "handling_vnd": null,
+  "domestic_vnd": {
+    "hcm": null,
+    "hn": null,
+    "other": null
+  }
+}
