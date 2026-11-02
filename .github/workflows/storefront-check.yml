@@ -39,3 +39,22 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run test:ui
+
+  windows-updater-parser:
+    name: Parse BESI Windows updater with Windows PowerShell 5.1
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify updater syntax before accepting changes
+        shell: powershell
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          $filename = Join-Path (Get-Location) 'scripts/auto-update.ps1'
+          [System.Management.Automation.Language.Parser]::ParseFile($filename, [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            foreach ($issue in $parseErrors) { Write-Host ($issue.ToString()) }
+            exit 1
+          }
+          Write-Host 'BESI Windows updater syntax valid'
