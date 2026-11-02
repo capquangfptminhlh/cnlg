@@ -119,11 +119,20 @@ async function sync(keywords,opt={}) {
       if(!row||seen.has(row.id)) continue;
       seen.add(row.id);fetched++;
       const old=items.get(row.id);
-      if(old&&old.title_zh===row.title_zh&&old.description_zh===row.description_zh
-        &&JSON.stringify(old.options_zh)===JSON.stringify(row.options_zh)
-        &&old.translation_status==='translated') {
+      // Reviews survive harmless re-syncs, but invalidate if Chinese source
+      // text/variants changed. Promotional price updates never enable checkout.
+      const sameText=old&&old.title_zh===row.title_zh
+        &&old.description_zh===row.description_zh
+        &&JSON.stringify(old.options_zh)===JSON.stringify(row.options_zh);
+      if(sameText&&old.translation_status==='translated') {
         row.title_vi=old.title_vi;row.description_vi=old.description_vi;
         row.options_vi=old.options_vi;row.translation_status='translated';
+        if(old.preview_approved===true&&old.rights_verified===true
+          &&old.published===true&&old.purchasable===false) {
+          row.preview_approved=true;row.rights_verified=true;row.published=true;
+          row.category_vi=old.category_vi;row.besi_image=old.besi_image;
+          row.preview_reviewed_at=old.preview_reviewed_at;
+        }
       } else pending.push(row);
       items.set(row.id,row);
     }
@@ -143,4 +152,4 @@ async function sync(keywords,opt={}) {
     needs_translation:[...items.values()].filter(x=>x.translation_status!=='translated').length,
     published:0};
 }
-module.exports={timestamp,sign,extract,fetchPage,normalize,hasHan,translate,read,sync,MAX_ITEMS};
+module.exports={timestamp,sign,extract,fetchPage,normalize,hasHan,translate,read,save,sync,MAX_ITEMS};
