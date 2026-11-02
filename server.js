@@ -32,6 +32,7 @@ const watchdog = require('./services/dropbuyWatchdog');
 const vault = require('./services/credentialVault');
 const customerMessage = require('./services/customerMessage');
 const catalogImage = require('./services/catalogImage');
+const taobaoPublic = require('./services/taobaoPublic');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
@@ -142,6 +143,20 @@ app.use(express.json({ limit: '100kb' }));
 // --- Trang có SEO (render phía server) – đặt trước static để "/" không trả index.html trần ---
 app.get('/', (req, res) => {
   res.type('html').send(seo.renderHomePage(req, readConfig(), storeCatalog.getProducts().length));
+});
+
+// Taobao is a separate BESI browsing tab; private staged products never enter the
+// main product catalog, cart, orders, and public APIs.
+app.get('/taobao', (req,res) => res.type('html').set('X-Robots-Tag','noindex, follow')
+  .sendFile(path.join(__dirname,'public','taobao.html')));
+app.get('/api/taobao/products', rateLimit('taobao-products',60e3,100), (req,res) => {
+  try {
+    res.set('Cache-Control','no-store').json(taobaoPublic.catalogFromStage(req.query));
+  } catch (error) {
+    console.error('[Taobao preview] Unable to read reviewed catalog:',error.message);
+    res.status(503).set('Cache-Control','no-store')
+      .json({success:false,error:'Danh mục Taobao tạm thời chưa sẵn sàng'});
+  }
 });
 
 app.get('/sp/:slugId', async (req, res) => {
