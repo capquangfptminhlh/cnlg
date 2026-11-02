@@ -67,6 +67,19 @@ async function main(){
   const html=await fetchText('/');
   assert.match(html,/besi-category-facets\.js/,'Live HTML does not load new filters');
   assert.match(html,/besi-universal\.js/,'Live HTML does not load full-industry search');
+  // The separate Taobao tab must be deployed with its own source-safe API.
+  const taobaoHtml=await fetchText('/taobao');
+  assert.match(taobaoHtml,/id="taobaoProducts"/,'Taobao dedicated tab is unavailable');
+  assert.match(taobaoHtml,/taobao\\.js/,'Taobao UI bundle is not linked');
+  const taobao=await json('/api/taobao/products?limit=1');
+  assert.equal(taobao.success,true,'Taobao separate catalog API unavailable');
+  assert.ok(Array.isArray(taobao.data),'Taobao separate catalog response is malformed');
+  for(const item of taobao.data){
+    assert.equal(item.can_order,false,'Unverified Taobao item is purchasable');
+    for(const k of ['title_zh','source_id','supplier_cost','price_cny_reference','link_reference'])
+      assert.equal(Object.hasOwn(item,k),false,'Private Taobao field leaked: '+k);
+  }
+  console.log('PASS Taobao independent storefront tab and safe preview API');
   console.log('PASS live frontend assets + HTML');
   console.log('BESI PRODUCTION VERIFIED');
 }

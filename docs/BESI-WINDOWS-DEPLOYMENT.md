@@ -68,3 +68,24 @@ GitHub workflow BESI live production deployment check performs the public smoke 
 - Existing .env, orders and supplier integrations are never copied to GitHub.
 - A release fingerprint of 'unknown' means Git metadata was unavailable on the running server. Configure BESI_DEPLOY_SHA in the private environment or install Git to enable exact deployment parity.
 - Do not change the Cloudflare Tunnel or DNS simply to deploy a new version; the problem is normally an old local Node process or updater.
+
+## Taobao tab deployment issue (2026-11-02)
+
+The Taobao tab was merged into `main` in release `37ed9562f075`, while the
+external production smoke check observed `67a4366a2e55` on the Windows
+origin. CI tested the Taobao tab but did not deploy it.
+
+Investigation found that `scripts/auto-update.ps1` in GitHub had a corrupt
+PowerShell condition with a duplicated block inserted into a quoted regex.
+This prevents Windows PowerShell 5.1 from parsing the script, so the updater
+cannot execute at all when that version is present on the server. The source
+has now been repaired, with a Windows PowerShell parser job added to CI and
+live smoke checks for `/taobao` and `/api/taobao/products`.
+
+**To recover the existing Windows origin**, an administrator must bootstrap
+from the fixed GitHub script as shown in the one-time bootstrap section above.
+A broken installed updater cannot fetch its own fix. Inspect the script first,
+check backups and run only on the actual origin with its existing watchdog.
+Do not run the updater in CI or restart a second Node server. The site is
+confirmed updated only when `/healthz` matches GitHub main and the separate
+Taobao route and API pass production smoke checks.
