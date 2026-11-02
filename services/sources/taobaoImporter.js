@@ -49,12 +49,22 @@ function normalize(raw,keyword) {
   if(!/^[0-9]{6,20}$/.test(id)||!zh) return null;
   const cny=Number(raw.zk_final_price||raw.reserve_price);
   const images=raw.small_images?.string;
+  const n=x=>x!==null&&x!==undefined&&String(x).trim()!==''&&Number.isFinite(Number(x))?Number(x):null;
+  const actual=n(raw.shipping_weight_kg??raw.weight_kg);
+  const chinaShip=n(raw.china_domestic_shipping_cny??raw.domestic_shipping_cny);
+  const sourceDims=raw.dimensions_cm||{};
+  const dims={length:n(sourceDims.length??raw.length_cm),
+    width:n(sourceDims.width??raw.width_cm),height:n(sourceDims.height??raw.height_cm)};
+  const dimensions_cm=Object.values(dims).every(x=>x!==null&&x>0&&x<1000)?dims:null;
   const validUrl=x=>/^https:\/\/[a-z0-9.-]+\/[^<>"']+$/i.test(String(x||''))?clean(x,1500):'';
   return {id,keyword:clean(keyword,100),title_zh:zh,
     category_zh:clean(raw.category_zh||raw.category_name||'',160),
     description_zh:clean(raw.item_description||raw.description),
     options_zh:Array.isArray(raw.sku_options)?raw.sku_options.map(x=>clean(x,180)).slice(0,50):[],
     price_cny_reference:Number.isFinite(cny)&&cny>0?cny:null,
+    shipping_weight_kg:actual!==null&&actual>0&&actual<=200?actual:null,
+    china_domestic_shipping_cny:chinaShip!==null&&chinaShip>=0&&chinaShip<=50000?chinaShip:null,
+    dimensions_cm,
     image_reference:validUrl(raw.pict_url),
     gallery_references:(Array.isArray(images)?images:(images?[images]:[])).map(validUrl).filter(Boolean).slice(0,12),
     link_reference:validUrl(raw.item_url),
@@ -242,6 +252,11 @@ async function importFeed(feedPath,opt={}) {
         category_zh:item.category_zh??item.category,
         sku_options:item.options_zh??item.options,
         zk_final_price:item.price_cny_reference??item.price_cny,
+        shipping_weight_kg:item.shipping_weight_kg??item.weight_kg,
+        china_domestic_shipping_cny:item.china_domestic_shipping_cny,
+        dimensions_cm:item.dimensions_cm||{
+          length:item.length_cm,width:item.width_cm,height:item.height_cm
+        },
         pict_url:item.image_reference??item.image,
         small_images:{string:item.gallery_references??[]},
         item_url:item.link_reference??item.url
