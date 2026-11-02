@@ -173,3 +173,35 @@ npm run taobao:review -- list
   định danh nhà cung cấp. Không trộn vào TechMall/DropBuy.
   Đồng bộ giá từ Taobao chỉ thực hiện khi có API/feed được cấp quyền và
   job sync nhập lại dữ liệu; bộ tỷ giá cập nhật độc lập.
+
+
+
+## Đồng bộ giá Taobao từ dữ liệu được cấp quyền
+
+Chỉ khi server có API Taobao đủ quyền và được phép dùng dữ liệu, đặt trong `.env`:
+
+```dotenv
+TAOBAO_AUTO_SYNC=1
+TAOBAO_DATA_PERMISSION=1
+TAOBAO_APP_KEY=...
+TAOBAO_APP_SECRET=...
+TAOBAO_ADZONE_ID=...
+TAOBAO_AUTO_SYNC_KEYWORDS=手机充电线;手机壳;背包
+TAOBAO_PAGES_PER_KEYWORD=2
+TAOBAO_SYNC_INTERVAL_HOURS=12
+TAOBAO_FX_AUTO_REFRESH=1
+```
+
+- Tự quét danh mục/giá CNY **trong giới hạn API đã được cấp**, tối đa một
+  lượt đang chạy tại một thời điểm. Không vượt CAPTCHA, không sao chép toàn sàn.
+- Giá CNY mới được cập nhật trong staging khi bên nguồn đổi giá, không cần
+  dịch lại nội dung nếu tên, mô tả, ngành hàng và biến thể không đổi.
+- Khi khách mở tab Taobao, giá tham khảo VNĐ được **tính lại từ snapshot
+  tỷ giá còn hạn** và biểu phí logistics hiện có; không ghi giá CNY cố định
+  sang catalog BESI đang bán.
+- Nếu không có APP KEY/APP SECRET/ADZONE_ID, hoặc chưa xác nhận quyền dữ
+  liệu, job tự đồng bộ sản phẩm **không chạy**, không làm ảnh hưởng website.
+- Tỷ giá FX có thể tự refresh độc lập kể cả khi không có sản phẩm Taobao.
+- Để tự cập nhật từ nguồn dữ liệu đối tác khác, cần tích hợp đúng API/feed
+  được quyền sử dụng; command `npm run taobao:feed -- ... --confirm-rights`
+  hiện chỉ nhận file, chưa chạy theo lịch tự động.
