@@ -26,6 +26,7 @@
   <link rel="stylesheet" href="/besi-spec-filters.css">
   <link rel="stylesheet" href="/besi-category-facets.css">
   <link rel="stylesheet" href="/besi-universal.css">
+  <link rel="stylesheet" href="/taobao-nav.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -95,7 +96,7 @@
     </aside>
     <div class="market-discovery">
       <nav class="market-links" aria-label="Điều hướng cửa hàng">
-        <a class="active" href="/">Trang chủ</a><a href="#catalog">Tất cả sản phẩm</a><a href="#categoryPanel">Danh mục</a><a href="#flashSaleSection" class="nav-flash-link"><i class="fa-solid fa-bolt"></i> Flash Sale</a><button type="button" data-store-action="sort-low">Giá tốt mỗi ngày</button><button type="button" data-store-action="sort-discount">Ưu đãi nổi bật</button><button type="button" data-store-action="favorites"><i class="fa-regular fa-heart"></i> Yêu thích</button><button type="button" data-store-action="track">Đơn hàng</button>
+        <a class="active" href="/">Trang chủ</a><a href="#catalog">Tất cả sản phẩm</a><a class="nav-taobao" href="/taobao"><i class="fa-solid fa-globe"></i> Taobao</a><a href="#categoryPanel">Danh mục</a><a href="#flashSaleSection" class="nav-flash-link"><i class="fa-solid fa-bolt"></i> Flash Sale</a><button type="button" data-store-action="sort-low">Giá tốt mỗi ngày</button><button type="button" data-store-action="sort-discount">Ưu đãi nổi bật</button><button type="button" data-store-action="favorites"><i class="fa-regular fa-heart"></i> Yêu thích</button><button type="button" data-store-action="track">Đơn hàng</button>
       </nav>
       <section class="market-hero" aria-label="Giới thiệu cửa hàng">
         <div class="market-main-banner">
@@ -807,6 +808,7 @@
   <nav class="mobile-bottom-nav" aria-label="Điều hướng mua sắm trên điện thoại">
     <a href="/" class="active" aria-label="Trang chủ"><i class="fa-solid fa-house"></i><span>Trang chủ</span></a>
     <a href="#categoryPanel" aria-label="Danh mục"><i class="fa-solid fa-border-all"></i><span>Danh mục</span></a>
+    <a href="/taobao" class="mobile-taobao" aria-label="Khu hàng Taobao"><i class="fa-solid fa-globe"></i><span>Taobao</span></a>
     <button type="button" aria-label="Tra cứu đơn hàng" data-store-action="track"><i class="fa-solid fa-box"></i><span>Đơn hàng</span></button>
     <button type="button" aria-label="Mở giỏ hàng" data-store-action="cart"><i class="fa-solid fa-cart-shopping"></i><span>Giỏ hàng</span><b class="mobile-cart-count" id="mobileCartCount" hidden>0</b></button>
     <button type="button" aria-label="Sản phẩm yêu thích" data-store-action="favorites"><i class="fa-regular fa-heart"></i><span>Yêu thích</span></button>

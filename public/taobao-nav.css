@@ -1,0 +1,10 @@
+/* The Taobao source has its own storefront tab and must not share the BESI shopping grid. */
+.market-links .nav-taobao{color:#ee4f2e!important;font-weight:800!important;gap:7px;white-space:nowrap}
+.market-links .nav-taobao:hover{background:#fff3ed;border-bottom-color:#ee4f2e!important}
+.mobile-bottom-nav .mobile-taobao{color:#ea522d!important;font-weight:750!important}
+@media(max-width:700px){
+  .mobile-bottom-nav{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+  .mobile-bottom-nav a,.mobile-bottom-nav button{min-width:0;padding-left:1px!important;padding-right:1px!important}
+  .mobile-bottom-nav a span,.mobile-bottom-nav button span{font-size:9px!important;letter-spacing:-.02em}
+  .mobile-bottom-nav a i,.mobile-bottom-nav button i{font-size:17px!important}
+}
