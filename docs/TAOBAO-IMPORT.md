@@ -55,3 +55,35 @@ Next phase: build reviewed sourcing contracts + a private indexed database,
 translate full detail/variants when supplied by an authorized feed, confirm
 landed-cost/availability with partner, then enable sellable products behind
 a dedicated fulfillment adapter, with smoke tests before rollout.
+
+
+## Local, manually reviewed preview publication (separate `/taobao` tab)
+
+Importing alone does NOT make a Taobao item publicly visible or sellable.
+After an authorized import and completed Vietnamese translations, the Windows
+BESI operator can inspect the private staging data and approve individual
+**informational previews** only (no prices, no customer checkout):
+
+```powershell
+npm run taobao:review -- list
+npm run taobao:review -- approve 123456789012 --rights-confirmed --translation-reviewed --category "Phụ kiện điện thoại"
+npm run taobao:review -- revoke 123456789012
+```
+
+By approving, the operator explicitly asserts they have the right to republish
+the relevant listing information and have manually checked the Vietnamese
+translation. An optional approved first-party image under
+`/images/taobao/...` may be passed with `--image`; external Taobao image
+hotlinks are rejected. Missing images display a placeholder.
+
+Unchanged source titles/descriptions/variants keep their prior preview
+approval on subsequent imports. Any change to these fields invalidates
+approval and the new content must be translated and reviewed again. This
+prevents a sync from silently republishing changed or Chinese content.
+Review only one running importer or review command at a time on the
+same local JSON file; use a database and transactions for concurrent workers.
+
+The public `GET /api/taobao/products` route is independent from BESI's
+normal catalog. It never exposes original Chinese details, Taobao item IDs,
+reference CNY prices, supplier URLs or purchase buttons. Preview approval
+DOES NOT authorize ordering, payment or international shipping.
