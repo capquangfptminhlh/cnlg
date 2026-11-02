@@ -6,6 +6,7 @@
  */
 const {read,hasHan}=require('./sources/taobaoImporter');
 const crypto=require('node:crypto');
+const shipping=require('./taobaoPriceShipping');
 const clean=(x,max=500)=>String(x??'').trim().slice(0,max);
 const imagePath=x=>/^\/images\/taobao\/[a-z0-9/_-]+\.(?:jpg|jpeg|png|webp)$/i.test(String(x||''))?x:null;
 function approved(row) {
@@ -15,7 +16,10 @@ function approved(row) {
     && !!row?.title_vi && !hasHan(row.title_vi)
     && (!row.description_vi||!hasHan(row.description_vi));
 }
-function getPublicCatalog(rows,query={}) {
+function getPublicCatalog(rows,query={},options={}) {
+  const rate=Object.hasOwn(options,'rate')?options.rate:shipping.getRate();
+  const tariff=Object.hasOwn(options,'tariff')?options.tariff:shipping.getTariff();
+  const region=String(query.region||'hcm').toLowerCase();
   const q=clean(query.q,80).toLocaleLowerCase('vi');
   const category=clean(query.category,80).toLocaleLowerCase('vi');
   const page=Math.max(1,Math.min(1000,parseInt(query.page,10)||1));
@@ -26,7 +30,8 @@ function getPublicCatalog(rows,query={}) {
       name:clean(row.title_vi,250),description:clean(row.description_vi,1200),
       category:clean(row.category_vi||'Sản phẩm Taobao',100),
       image:imagePath(row.besi_image),
-      status:'Đang xác minh đặt hàng',can_order:false
+      status:'Đang xác minh đặt hàng',can_order:false,
+      pricing:shipping.quote(row,{region,rate,tariff})
     }))
     .filter(row=>(!q||(row.name+' '+row.category+' '+row.description).toLocaleLowerCase('vi').includes(q))
       &&(!category||row.category.toLocaleLowerCase('vi')===category));
@@ -35,8 +40,8 @@ function getPublicCatalog(rows,query={}) {
   return {success:true,total:list.length,page,limit,categories,
     data:list.slice((page-1)*limit,page*limit)};
 }
-function catalogFromStage(query={},readFn=read) {
+function catalogFromStage(query={},readFn=read,options={}) {
   const state=readFn();
-  return getPublicCatalog(state.items,query);
+  return getPublicCatalog(state.items,query,options);
 }
 module.exports={approved,getPublicCatalog,catalogFromStage};
