@@ -61,7 +61,7 @@ test('Windows updater has complete self-heal control flow, no broken duplicated 
   assert.match(script,/if \(\$runningShort -notmatch '\^\[0-9a-f\]\{12\}\$'\) \{/);
   assert.equal((script.match(/Log "LỖI: /g)||[]).length,1,'duplicated try/catch block');
   assert.equal((script.match(/\$old = RunGit rev-parse HEAD/g)||[]).length,1);
-  assert.equal((script.match(/if \(RestartStore \$new\)/g)||[]).length,1);
+  assert.equal((script.match(/if \(RestartStore \$new\)/g)||[]).length,2,'expected normal upgrade and self-heal');
   assert.match(script,/SELF-HEAL thành công/);
   const workflow=read('.github/workflows/storefront-check.yml');
   assert.match(workflow,/windows-updater-parser:/);
