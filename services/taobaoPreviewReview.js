@@ -25,6 +25,7 @@ function cleanVi(value,max=100){
 function isFullyTranslated(row){
   if(row.translation_status!=='translated'||!row.title_vi||importer.hasHan(row.title_vi))return false;
   if(row.description_zh&&(!row.description_vi||importer.hasHan(row.description_vi)))return false;
+  if(row.category_zh&&(!row.category_vi||importer.hasHan(row.category_vi)))return false;
   const originals=Array.isArray(row.options_zh)?row.options_zh:[];
   const translated=Array.isArray(row.options_vi)?row.options_vi:[];
   if(originals.length!==translated.length)return false;

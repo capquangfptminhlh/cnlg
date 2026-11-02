@@ -87,3 +87,37 @@ The public `GET /api/taobao/products` route is independent from BESI's
 normal catalog. It never exposes original Chinese details, Taobao item IDs,
 reference CNY prices, supplier URLs or purchase buttons. Preview approval
 DOES NOT authorize ordering, payment or international shipping.
+
+
+## Nhập đầy đủ tiêu đề, mô tả, ngành hàng và phân loại từ feed được cấp quyền
+
+API tìm kiếm vật liệu Taobao chỉ cung cấp các trường thuộc kết quả quảng bá; không nên
+tự suy diễn rằng đã có mô tả/biến thể đầy đủ. Khi có dữ liệu xuất hợp lệ từ đối tác
+hoặc tài khoản được cấp quyền, sử dụng file **JSON Lines (JSONL)** riêng tư,
+mỗi dòng là một sản phẩm:
+
+```json
+{"item_id":"123456789012","title_zh":"手机充电线","description_zh":"耐用 100W","category_zh":"手机配件","options_zh":["红色","蓝色"],"price_cny_reference":19.5}
+```
+
+Chạy **trên máy chủ** có Ollama và biến `TAOBAO_DATA_PERMISSION=1` trong
+`.env`, sau khi xác nhận quyền tái sử dụng feed:
+
+```powershell
+npm run taobao:feed -- .\private\products.jsonl --confirm-rights
+npm run taobao:review -- list
+```
+
+- Tự dịch tiêu đề, mô tả, ngành hàng, tên biến thể sang tiếng Việt. Nếu bất cứ
+  phần chữ Hán nào vẫn chưa dịch thì trạng thái vẫn là `pending`.
+- Khôi phục bản dịch và phê duyệt preview khi nội dung gốc không đổi;
+  đổi tiêu đề/mô tả/ngành hàng/biến thể sẽ bắt kiểm duyệt lại.
+- Ghi dữ liệu sau mỗi 100 dòng; nếu file lỗi sau đó, các lô trước vẫn còn.
+- Không dùng giá nhân dân tệ của chương trình affiliate làm giá vốn, không
+  tự tạo tồn kho/vận chuyển, không đưa sản phẩm vào giỏ hàng.
+- Đây là **đường nhập file** từ nguồn đã cấp quyền, không phải chức năng quét
+  hoặc sao chép toàn bộ taobao.com; số dòng bị giới hạn 25.000 trong cơ chế
+  staging JSON hiện tại. Để có hàng triệu sản phẩm cần CSDL có chỉ mục,
+  job hàng đợi, lưu ảnh và thỏa thuận dữ liệu phù hợp.
+- Chạy một tác vụ nhập/duyệt tại một thời điểm vì staging JSON không có
+  giao dịch đa tiến trình. Không đăng feed hay thông tin nguồn lên GitHub.
