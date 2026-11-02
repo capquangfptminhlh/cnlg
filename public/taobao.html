@@ -49,11 +49,21 @@
         <label for="taobaoQuery">Tìm sản phẩm Taobao đã dịch</label>
         <div class="search-row"><input id="taobaoQuery" type="search" maxlength="80" autocomplete="off" placeholder="Ví dụ: ốp điện thoại, áo khoác, túi xách…"><button type="submit">Tìm kiếm <span aria-hidden="true">→</span></button></div>
       </form>
+      <div class="taobao-destination">
+        <label for="taobaoRegion">Khu vực giao hàng dự kiến</label>
+        <select id="taobaoRegion" aria-label="Chọn khu vực giao hàng">
+          <option value="hcm">TP. Hồ Chí Minh</option>
+          <option value="hn">Hà Nội</option>
+          <option value="other">Tỉnh/thành khác</option>
+        </select>
+        <span>Phí ship là ước tính theo biểu phí đối tác, chưa phải báo giá vận chuyển chính thức.</span>
+      </div>
       <div class="category-wrap"><span class="category-title">Ngành hàng</span><div id="taobaoCategories" class="chips" aria-label="Lọc theo ngành hàng"><button type="button" class="chip active" aria-pressed="true">Tất cả</button></div></div>
       <div id="taobaoStatus" class="status" role="status" aria-live="polite">Đang tải sản phẩm…</div>
       <div id="taobaoProducts" class="grid"></div>
       <div class="more-wrap"><button id="taobaoMore" type="button" class="more" hidden>Xem thêm sản phẩm</button></div>
-      <div class="disclaimer"><strong>Lưu ý:</strong> Giá và tình trạng có hàng trên Taobao chỉ được hiển thị khi đã xác minh được giá về Việt Nam, phân loại và phương án giao hàng. Chưa có sản phẩm nào được phép mua chỉ dựa trên dữ liệu quảng bá.</div>
+      <div class="disclaimer"><strong>Lưu ý:</strong> Giá hàng được quy đổi theo tỷ giá tham khảo; chỉ hiển thị phí ship khi có trọng lượng, cước nội địa Trung Quốc và biểu phí vận chuyển đã cấu hình. Tổng tiền chỉ là dự kiến, chưa gồm thuế và phí phát sinh. Chưa có sản phẩm nào được phép mua chỉ dựa trên dữ liệu quảng bá.</div>
+      <p class="fx-attribution">Nguồn tỷ giá tham khảo: <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer">Rates By Exchange Rate API</a>. Tỷ giá thanh toán thực tế có thể khác.</p>
     </section>
   </main>
   <footer><div class="shell footer-inner"><div><a class="logo" href="/"><span class="logo-be">be</span><span class="logo-si">si.</span></a><p>Hệ sinh thái sản phẩm đa nguồn · BESI Việt Nam</p></div><a href="/">Xem sản phẩm đang bán tại BESI →</a></div></footer>
