@@ -4,7 +4,7 @@ const os=require('node:os'),fs=require('node:fs'),path=require('node:path');
 const pricing=require('../services/taobaoPriceShipping');
 const importer=require('../services/sources/taobaoImporter');
 const preview=require('../services/taobaoPublic');
-const now=Date.parse('2026-11-02T08:00:00Z');
+const now=Date.now();
 const rate={
   currency_from:'CNY',currency_to:'VND',rate:3879,as_of:new Date(now-3600000).toISOString(),
   source:'ExchangeRate-API',fetched_at:new Date(now).toISOString()
@@ -93,4 +93,25 @@ test('Feed imports shipping weight and package dimensions, explicitly free China
   assert.equal(raw.china_domestic_shipping_cny,0);
   assert.equal(raw.dimensions_cm.height,10);
   assert.equal(importer.normalize({item_id:'123456789012',title:'商品'},'test').china_domestic_shipping_cny,null);
+});
+
+test('New Taobao price updates existing approved preview and recalculates VND without republishing source',async()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'besi-taobao-reprice-'));
+  const file=path.join(dir,'stage.json');
+  try{
+    const existing=p();
+    importer.save(file,[existing]);
+    await importer.sync(['手机'],{skipPermissionCheck:true,file,pages:1,noDelay:true,
+      fetchPageImpl:async()=>[{item_id:'123456789012',title:'手机充电线',
+        zk_final_price:'22',shipping_weight_kg:0.6,china_domestic_shipping_cny:2,
+        dimensions_cm:{length:30,width:25,height:10}}],
+      translateImpl:async()=>{throw Error('Price-only change must not translate again');}});
+    const updated=importer.read(file).items[0];
+    assert.equal(updated.preview_approved,true);
+    assert.equal(updated.price_cny_reference,22);
+    const result=preview.getPublicCatalog([updated],{region:'hcm'},{rate,tariff});
+    assert.equal(result.data[0].pricing.item_vnd,85338);
+    assert.equal(result.data[0].pricing.total_vnd,167096);
+    assert.equal(result.data[0].can_order,false);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
