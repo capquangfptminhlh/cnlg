@@ -121,3 +121,55 @@ npm run taobao:review -- list
   job hàng đợi, lưu ảnh và thỏa thuận dữ liệu phù hợp.
 - Chạy một tác vụ nhập/duyệt tại một thời điểm vì staging JSON không có
   giao dịch đa tiến trình. Không đăng feed hay thông tin nguồn lên GitHub.
+
+
+## Đồng bộ tỷ giá CNY → VNĐ và phí vận chuyển Taobao (tham khảo)
+
+- Tỷ giá lấy từ [ExchangeRate-API Open Access](https://www.exchangerate-api.com/docs/free),
+  cập nhật **mỗi ngày** (theo nguồn), cache tại data/taobao-fx.json và ghi nguồn
+  cùng thời điểm công bố. Máy chủ tự kiểm tra mỗi 12 giờ; không gọi API ở mỗi
+  lần khách mở trang. Có thể làm mới thủ công bằng lệnh:
+
+  ```powershell
+  npm run taobao:fx
+  ```
+
+  Không dùng tỷ giá cố định/hardcode. Khi nguồn không cập nhật, tỷ giá quá 48h
+  hoặc API lỗi: không hiện ước tính mới. Tỷ giá thị trường có thể khác mức
+  thanh toán của dịch vụ mua hộ, vì vậy đây chỉ là **giá tham khảo**.
+
+- Cần **biểu phí logistics thật** được đối tác cung cấp: lưu riêng ở
+  data/taobao-shipping.json. Sao chép
+  docs/TAOBAO-SHIPPING.template.json vào data/taobao-shipping.json, sau đó
+  điền các giá trị thực tế với timestamp ISO và nhà vận chuyển đã xác minh.
+  Các trường bắt buộc: `international_vnd_per_kg`, `billing_step_kg`,
+  `volumetric_divisor`, `handling_vnd`, ba mức phí giao nội địa VN
+  `domestic_vnd.hcm`, `domestic_vnd.hn`, `domestic_vnd.other`,
+  `provider`, `updated_at`, `route: "CN-VN"`, `currency: "VND"`.
+  Biểu phí quá 90 ngày không được dùng. Chưa có cước do đối tác cung cấp thì
+  **không hiển thị tổng giá/ship**.
+
+- Với mỗi sản phẩm, feed được cấp quyền cần thêm:
+  `shipping_weight_kg` (cân nặng thực tế tính theo kg),
+  `dimensions_cm` là object `{length,width,height}` tính bằng cm, và
+  `china_domestic_shipping_cny` là cước vận chuyển từ shop Trung Quốc tới
+  kho nhận hàng, bằng `0` **chỉ nếu người bán xác nhận miễn phí**.
+  Taobao Affiliate API không được giả định có các dữ liệu này.
+
+- Công thức:
+  `Giá hàng VNĐ = giá Taobao CNY × tỷ giá tham khảo`.
+  `Khối lượng tính cước = làm tròn lên theo billing_step_kg của
+  max(cân nặng thực, Dài×Rộng×Cao/volumetric_divisor)`.
+  `Ship VNĐ = ship nội địa TQ CNY × tỷ giá + khối lượng tính cước × đơn giá
+  vận chuyển CN-VN/kg + giao nội địa Việt Nam theo vùng + phí xử lý`.
+  `Tổng tạm tính = giá hàng quy đổi + ship VNĐ`.
+  Giá vốn thực tế/chiết khấu, thuế nhập khẩu và VAT **không có** nếu chưa
+  được xác minh; kết quả luôn ghi chú chưa gồm thuế/phí phát sinh.
+  Nếu thiếu kích thước, hiển thị cảnh báo sai số do cước thể tích.
+
+- Tab riêng /taobao có lựa chọn giao TP.HCM, Hà Nội hoặc tỉnh khác.
+  API /api/taobao/products trả breakdown VNĐ chỉ cho preview đã được
+  dịch và kiểm duyệt; vẫn không có checkout, thanh toán, giá nguồn CNY hay
+  định danh nhà cung cấp. Không trộn vào TechMall/DropBuy.
+  Đồng bộ giá từ Taobao chỉ thực hiện khi có API/feed được cấp quyền và
+  job sync nhập lại dữ liệu; bộ tỷ giá cập nhật độc lập.
