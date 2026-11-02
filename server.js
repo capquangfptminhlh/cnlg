@@ -34,6 +34,7 @@ const customerMessage = require('./services/customerMessage');
 const catalogImage = require('./services/catalogImage');
 const taobaoPublic = require('./services/taobaoPublic');
 const taobaoPriceShipping = require('./services/taobaoPriceShipping');
+const taobaoAutoSync = require('./services/taobaoAutoSync');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
@@ -2155,6 +2156,7 @@ if (require.main === module) {
     // Once-daily reference exchange-rate refresh; never blocks startup/checkout.
     // Quoting shipping requires a separately verified local freight tariff.
     if(process.env.TAOBAO_FX_AUTO_REFRESH!=='0')taobaoPriceShipping.startRateUpdater();
+    taobaoAutoSync.start(); // only runs when authorized credentials and opt-in keywords exist
     realtimeSync.startRealtimeSync(io);
     sources.start(io, readConfig);
     orderExpiry.startOrderExpiry(io, readConfig);
