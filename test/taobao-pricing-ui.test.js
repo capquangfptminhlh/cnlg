@@ -24,7 +24,7 @@ test('Taobao production origin quotes cannot use fake fee defaults',()=>{
   assert.match(file,/china_domestic_shipping_missing/);
   assert.match(file,/shipping_weight_missing/);
   assert.match(file,/excludes_duty_tax:true/);
-  assert.match(file,/source:'?ExchangeRate-API/);
+  assert.match(file,/RATE_SOURCE='ExchangeRate-API'/);
   assert.match(read('server.js'),/taobaoPriceShipping\.startRateUpdater\(\)/);
   assert.match(read('server.js'),/taobaoAutoSync\.start\(\)/);
 });
