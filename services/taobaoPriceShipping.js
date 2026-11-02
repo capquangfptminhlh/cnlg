@@ -139,7 +139,7 @@ function quote(row,options={}){
     china_domestic_shipping_vnd:domesticChina,
     international_shipping_vnd:intl,domestic_vn_shipping_vnd:lastMile,
     handling_vnd:handling,shipping_vnd:shipping,total_vnd:item_vnd+shipping,
-    billable_weight_kg:Number(billable.toFixed(2)),shipping_provider:tariff.provider,
+    billable_weight_kg:Number(billable.toFixed(2)),shipping_provider:'Đơn vị vận chuyển',
     shipping_tariff_as_of:tariff.updated_at,
     excludes_duty_tax:true};
 }
