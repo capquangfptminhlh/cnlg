@@ -1,0 +1,30 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const read=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
+test('Taobao standalone tab has an explicit shipping region control and sourced FX attribution',()=>{
+  const html=read('public/taobao.html'),js=read('public/taobao.js');
+  assert.match(html,/id="taobaoRegion"/);
+  assert.match(html,/value="hcm"/);
+  assert.match(html,/value="hn"/);
+  assert.match(html,/value="other"/);
+  assert.match(html,/Rates By Exchange Rate API/);
+  assert.match(js,/api\/taobao\/products/);
+  assert.match(js,/total_vnd|shipping_vnd/);
+  assert.match(js,/Giá hàng quy đổi/);
+  assert.match(js,/phí phát sinh/);
+  assert.doesNotMatch(js,/innerHTML|eval\(/);
+  assert.doesNotThrow(()=>new vm.Script(js,{filename:'taobao.js'}));
+  assert.doesNotMatch(html,/id="cartDrawer"|id="checkoutForm"/);
+});
+test('Taobao production origin quotes cannot use fake fee defaults',()=>{
+  const file=read('services/taobaoPriceShipping.js');
+  assert.match(file,/open\.er-api\.com\/v6\/latest\/CNY/);
+  assert.match(file,/shipping_tariff_missing/);
+  assert.match(file,/china_domestic_shipping_missing/);
+  assert.match(file,/shipping_weight_missing/);
+  assert.match(file,/excludes_duty_tax:true/);
+  assert.match(file,/source:'?ExchangeRate-API/);
+  assert.match(read('server.js'),/taobaoPriceShipping\.startRateUpdater\(\)/);
+  assert.match(read('server.js'),/taobaoAutoSync\.start\(\)/);
+});
