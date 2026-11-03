@@ -29,7 +29,7 @@ function publicVariants(row,region,rate,tariff){
     id:safeHash('V',row.id+':'+v.sku),
     label:clean(row.options_vi?.[i]||'',180),
     // Do not silently use one SKU's price/weight for another.
-    pricing:shipping.quote(v,{region,rate,tariff})
+    pricing:shipping.quote({...v,updated_at:row.updated_at},{region,rate,tariff})
   }));
 }
 function getPublicCatalog(rows,query={},options={}){
