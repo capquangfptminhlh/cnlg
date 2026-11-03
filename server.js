@@ -35,6 +35,10 @@ const catalogImage = require('./services/catalogImage');
 const taobaoPublic = require('./services/taobaoPublic');
 const taobaoPriceShipping = require('./services/taobaoPriceShipping');
 const taobaoAutoSync = require('./services/taobaoAutoSync');
+const taobaoReview = require('./services/taobaoPreviewReview');
+const taobaoOps = require('./scripts/taobao-ops');
+const taobaoManualSync = require('./services/taobaoManualSync');
+const taobaoStageLock = require('./services/taobaoStageLock');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
@@ -159,6 +163,75 @@ app.get('/api/taobao/products', rateLimit('taobao-products',60e3,100), (req,res)
     res.status(503).set('Cache-Control','no-store')
       .json({success:false,error:'Danh mục Taobao tạm thời chưa sẵn sàng'});
   }
+});
+
+
+/**
+ * Taobao operations are authenticated ONLY. Public /taobao is a safe preview;
+ * nothing in these routes can create an order or expose supplier API secrets.
+ */
+app.get('/api/admin/taobao/status',requireAdmin,rateLimit('taobao-admin-status',60e3,80),(req,res)=>{
+  try{
+    res.set('Cache-Control','no-store').json({
+      success:true,data:{...taobaoOps.status(),manual_sync:taobaoManualSync.status()}
+    });
+  }catch(e){res.status(503).json({success:false,error:'Không thể đọc tình trạng Taobao'});}
+});
+app.get('/api/admin/taobao/review',requireAdmin,rateLimit('taobao-admin-review',60e3,80),(req,res)=>{
+  try{
+    res.set('Cache-Control','no-store').json({success:true,
+      data:taobaoReview.list({limit:req.query.limit})});
+  }catch(e){res.status(503).json({success:false,error:'Không thể đọc kho Taobao đang chờ duyệt'});}
+});
+app.post('/api/admin/taobao/approve/:id',requireAdmin,rateLimit('taobao-admin-approve',60e3,30),(req,res)=>{
+  try{
+    const result=taobaoReview.approve(req.params.id,{
+      rightsConfirmed:req.body?.rightsConfirmed===true,
+      translationReviewed:req.body?.translationReviewed===true,
+      category:req.body?.category,
+      image:req.body?.image
+    });
+    res.set('Cache-Control','no-store').json({success:true,data:result});
+  }catch(e){
+    res.status(/staging busy/.test(e.message)?409:400)
+      .json({success:false,error:String(e.message).slice(0,200)});
+  }
+});
+app.post('/api/admin/taobao/revoke/:id',requireAdmin,rateLimit('taobao-admin-revoke',60e3,30),(req,res)=>{
+  try{
+    res.set('Cache-Control','no-store').json({success:true,
+      data:taobaoReview.revoke(req.params.id)});
+  }catch(e){
+    res.status(/staging busy/.test(e.message)?409:400)
+      .json({success:false,error:String(e.message).slice(0,200)});
+  }
+});
+app.post('/api/admin/taobao/tariff',requireAdmin,rateLimit('taobao-admin-tariff',60e3,8),(req,res)=>{
+  try{
+    if(req.body?.confirmed!==true)throw Error('Cần xác nhận bảng cước thật từ nhà vận chuyển');
+    const tariff=taobaoPriceShipping.validateTariff(req.body?.tariff);
+    if(!tariff||/REPLACE|DEMO|TEST|EXAMPLE/i.test(tariff.provider))
+      throw Error('Biểu phí không hợp lệ, hết hạn hoặc vẫn là dữ liệu minh họa');
+    taobaoPriceShipping.saveJson(taobaoPriceShipping.SHIPPING_PATH,tariff);
+    res.set('Cache-Control','no-store').json({success:true,
+      data:{route:tariff.route,updated_at:tariff.updated_at,ready:true}});
+  }catch(e){res.status(400).json({success:false,error:String(e.message).slice(0,180)});}
+});
+app.post('/api/admin/taobao/fx-refresh',requireAdmin,rateLimit('taobao-admin-fx',3600e3,4),async(req,res)=>{
+  try{
+    const fx=await taobaoPriceShipping.refreshRate();
+    res.set('Cache-Control','no-store').json({success:true,
+      data:{rate_vnd_per_cny:fx.rate,as_of:fx.as_of,source:fx.source}});
+  }catch(e){res.status(502).json({success:false,error:'Chưa lấy được tỷ giá CNY/VND hợp lệ'});}
+});
+app.post('/api/admin/taobao/sync',requireAdmin,rateLimit('taobao-admin-sync',3600e3,5),(req,res)=>{
+  try{
+    const lock=taobaoStageLock.lockState(path.join(__dirname,'data','taobao-staging.json'));
+    if(lock.busy)return res.status(409).json({success:false,error:'Đang có một lượt nhập hoặc duyệt Taobao'});
+    const result=taobaoManualSync.start();
+    if(!result.started)return res.status(409).json({success:false,error:'Đồng bộ Taobao đã chạy'});
+    res.set('Cache-Control','no-store').json({success:true,data:result});
+  }catch(e){res.status(409).json({success:false,error:String(e.message).slice(0,180)});}
 });
 
 app.get('/sp/:slugId', async (req, res) => {
