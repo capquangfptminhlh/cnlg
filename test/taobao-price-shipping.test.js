@@ -72,7 +72,15 @@ test('No invented shipping if carrier tariff, seller China postage or package we
   assert.equal(pricing.quote({...normal,shipping_weight_kg:null},{now,rate,tariff}).reason,'shipping_weight_missing');
   assert.equal(pricing.quote(normal,{now,rate:null,tariff}).status,'unavailable');
   assert.equal(pricing.quote(normal,{now,rate,tariff,region:'invalid'}).status,'unavailable');
-  assert.equal(pricing.quote({...normal,dimensions_cm:null},{now,rate,tariff}).reason,'dimensions_unverified');
+  const missingVolume=pricing.quote({...normal,dimensions_cm:null},{now,rate,tariff});
+  assert.equal(missingVolume.reason,'dimensions_unverified');
+  assert.equal(missingVolume.status,'partial');
+  assert.equal(missingVolume.item_vnd,77580);
+  assert.equal(missingVolume.shipping_vnd,null);
+  assert.equal(missingVolume.total_vnd,null);
+  assert.equal(missingVolume.can_order,false);
+  const zeroVolume=pricing.quote({...normal,dimensions_cm:{length:0,width:25,height:10}},{now,rate,tariff});
+  assert.equal(zeroVolume.total_vnd,null);
   assert.equal(pricing.validateTariff({...tariff,domestic_vnd:{hcm:0,hn:null,other:0}}),null);
 });
 test('Public Taobao shows only VND estimates, not raw CNY, original IDs or supplier',()=>{
