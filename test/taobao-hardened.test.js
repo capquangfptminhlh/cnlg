@@ -143,3 +143,14 @@ test('Operator status never prints supplier details and rejects unverified/fake 
     assert.equal(pricing.getTariff(cfg).provider,'Real Carrier');
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('Old Taobao product price is not displayed even if the currency rate is current',()=>{
+  const row=importer.normalize({item_id:'123456789012',title:'手机',zk_final_price:20,
+    shipping_weight_kg:1,china_domestic_shipping_cny:0,
+    dimensions_cm:{length:20,width:20,height:20}},'partner-feed');
+  row.updated_at=new Date(Date.now()-8*86400e3).toISOString();
+  const quoted=pricing.quote(row,{rate:priceRate,tariff,region:'hcm'});
+  assert.equal(quoted.status,'unavailable');
+  assert.equal(quoted.reason,'product_price_stale');
+  assert.equal(quoted.can_order,undefined); // unavailable never contains checkout
+});
