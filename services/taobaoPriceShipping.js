@@ -125,6 +125,9 @@ function quote(row,options={}){
   if(weight>200)return {...base,reason:'shipping_weight_invalid'};
   const dims=row.dimensions_cm||{};
   const hasDims=['length','width','height'].every(k=>positive(dims[k]));
+  // Without parcel dimensions, volumetric weight is unknown and a numeric
+  // freight total may materially underquote bulky goods. Fail closed.
+  if(!hasDims)return {...base,reason:'dimensions_unverified'};
   const volumetric=hasDims?Number(dims.length)*Number(dims.width)*Number(dims.height)/
     Number(tariff.volumetric_divisor):0;
   const rawWeight=Math.max(weight,volumetric);
@@ -135,7 +138,7 @@ function quote(row,options={}){
   const lastMile=money(tariff.domestic_vnd[region]);
   const handling=money(tariff.handling_vnd);
   const shipping=domesticChina+intl+lastMile+handling;
-  return {...base,status:'estimate',reason:hasDims?null:'dimensions_unverified',
+  return {...base,status:'estimate',reason:null,
     china_domestic_shipping_vnd:domesticChina,
     international_shipping_vnd:intl,domestic_vn_shipping_vnd:lastMile,
     handling_vnd:handling,shipping_vnd:shipping,total_vnd:item_vnd+shipping,
