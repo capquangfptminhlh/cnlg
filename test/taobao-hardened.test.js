@@ -154,3 +154,23 @@ test('Old Taobao product price is not displayed even if the currency rate is cur
   assert.equal(quoted.reason,'product_price_stale');
   assert.equal(quoted.can_order,undefined); // unavailable never contains checkout
 });
+
+test('Affiliate catalog refresh never refreshes an outdated supplier SKU price timestamp',async()=>{
+  const dir=temp(),file=path.join(dir,'stage.json');
+  try{
+    await importer.importFeed(createFeed(dir,product()),opts(file));approve(file);
+    const stage=importer.read(file);
+    for(const sku of stage.items[0].sku_variants)
+      sku.updated_at=new Date(Date.now()-8*86400e3).toISOString();
+    importer.save(file,stage.items);
+    await importer.sync(['手机数据线'],{file,skipPermissionCheck:true,pages:1,noDelay:true,
+      fetchPageImpl:async()=>[{item_id:'123456789012',title:'手机数据线',zk_final_price:21}],
+      translateImpl:mockTranslate});
+    const result=publicData.catalogFromStage({},()=>importer.read(file),
+      {rate:priceRate,tariff});
+    assert.equal(result.total,1);
+    assert.equal(result.data[0].variants[0].pricing.status,'unavailable');
+    assert.equal(result.data[0].variants[0].pricing.reason,'product_price_stale');
+    assert.equal(result.data[0].can_order,false);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
