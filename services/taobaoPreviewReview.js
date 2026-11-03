@@ -34,9 +34,24 @@ function isFullyTranslated(row){
 }
 function list(options={}){
   const s=importer.read(options.file);
-  return {total:s.items.length,rows:s.items.slice(0,Math.min(200,Math.max(1,Number(options.limit)||30)))
-    .map(row=>({id:String(row.id),title_vi:row.title_vi||'',translation_status:row.translation_status,
-      preview_approved:row.preview_approved===true,rights_verified:row.rights_verified===true}))};
+  const page=Math.max(1,Math.min(100000,parseInt(options.page,10)||1));
+  const limit=Math.max(1,Math.min(100,parseInt(options.limit,10)||30));
+  const q=String(options.q||'').trim().toLocaleLowerCase('vi').slice(0,80);
+  const view=String(options.view||'all');
+  const rows=s.items.filter(row=>{
+    const approved=row.preview_approved===true&&row.rights_verified===true&&row.published===true;
+    if(view==='approved'&&!approved)return false;
+    if(view==='pending'&&row.translation_status==='translated')return false;
+    if(view==='review'&&(approved||row.translation_status!=='translated'))return false;
+    return !q||(String(row.id)+' '+String(row.title_vi||'')).toLocaleLowerCase('vi').includes(q);
+  });
+  return {total:rows.length,page,limit,
+    rows:rows.slice((page-1)*limit,page*limit).map(row=>({
+      id:String(row.id),title_vi:row.title_vi||'',category_vi:row.category_vi||'',
+      translation_status:row.translation_status,
+      preview_approved:row.preview_approved===true,
+      rights_verified:row.rights_verified===true
+    }))};
 }
 function approve(id,request={},options={}){
   if(request.rightsConfirmed!==true||request.translationReviewed!==true)
