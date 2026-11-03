@@ -89,3 +89,29 @@ check backups and run only on the actual origin with its existing watchdog.
 Do not run the updater in CI or restart a second Node server. The site is
 confirmed updated only when `/healthz` matches GitHub main and the separate
 Taobao route and API pass production smoke checks.
+
+
+## One-command diagnostic and recovery (2026-11-03)
+
+For an old installed updater that cannot execute, download the **new**
+diagnostic script on the actual BESI Windows server. **Read it before applying**
+and back up the `data/` directory. No code in this repository can repair an
+offline Windows host without executing something locally:
+
+```powershell
+$recovery = Join-Path $env:TEMP 'besi-diagnose.ps1'
+Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/capquangfptminhlh/cnlg/main/scripts/diagnose-besi-windows.ps1' -OutFile $recovery
+notepad $recovery
+# Read-only: local Git, GitHub main, live Node health, scheduled tasks and last updater log
+powershell -NoProfile -ExecutionPolicy Bypass -File $recovery -RepoRoot 'C:\HoangMinh'
+# Opt in only on the actual Windows origin with an active HoangMinh Store watchdog
+powershell -NoProfile -ExecutionPolicy Bypass -File $recovery -RepoRoot 'C:\HoangMinh' -Apply
+```
+
+The `-Apply` path downloads and parses the fixed updater using Windows
+PowerShell 5.1, runs its backup-conscious fast-forward/test/rollback sequence,
+then verifies the live release against GitHub main. It **does not** change
+Cloudflare Tunnel settings or introduce anonymous deployment endpoints.
+If the watchdog is stopped, the updater refuses to terminate Node. If
+GitHub fetch or health checks fail, inspect `data/update.log` and the
+previous process status; never claim deployment just because GitHub CI passed.
