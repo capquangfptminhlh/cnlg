@@ -57,4 +57,12 @@ jobs:
             foreach ($issue in $parseErrors) { Write-Host ($issue.ToString()) }
             exit 1
           }
-          Write-Host 'BESI Windows updater syntax valid'
+          $diagFile = Join-Path (Get-Location) 'scripts/diagnose-besi-windows.ps1'
+          $diagTokens = $null
+          $diagErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile($diagFile, [ref]$diagTokens, [ref]$diagErrors) | Out-Null
+          if ($diagErrors.Count -gt 0) {
+            foreach ($issue in $diagErrors) { Write-Host ($issue.ToString()) }
+            exit 1
+          }
+          Write-Host 'BESI Windows updater and diagnostic scripts syntax valid'
