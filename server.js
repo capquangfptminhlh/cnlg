@@ -39,6 +39,7 @@ const taobaoReview = require('./services/taobaoPreviewReview');
 const taobaoOps = require('./scripts/taobao-ops');
 const taobaoManualSync = require('./services/taobaoManualSync');
 const taobaoStageLock = require('./services/taobaoStageLock');
+const taobaoMedia = require('./services/taobaoApprovedMedia');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
@@ -182,6 +183,16 @@ app.get('/api/admin/taobao/review',requireAdmin,rateLimit('taobao-admin-review',
     res.set('Cache-Control','no-store').json({success:true,
       data:taobaoReview.list({limit:req.query.limit,page:req.query.page,q:req.query.q,view:req.query.view})});
   }catch(e){res.status(503).json({success:false,error:'Không thể đọc kho Taobao đang chờ duyệt'});}
+});
+app.post('/api/admin/taobao/image',requireAdmin,
+  rateLimit('taobao-admin-media',60e3,20),
+  express.raw({type:['image/jpeg','image/png','image/webp'],limit:'3mb'}),(req,res)=>{
+  try{
+    if(req.get('x-taobao-rights-confirmed')!=='1')
+      return res.status(400).json({success:false,error:'Cần xác nhận quyền sử dụng ảnh sản phẩm'});
+    const result=taobaoMedia.saveImage(req.body,req.get('content-type'));
+    return res.set('Cache-Control','no-store').json({success:true,data:result});
+  }catch(e){return res.status(400).json({success:false,error:String(e.message).slice(0,160)});}
 });
 app.post('/api/admin/taobao/approve/:id',requireAdmin,rateLimit('taobao-admin-approve',60e3,30),(req,res)=>{
   try{
