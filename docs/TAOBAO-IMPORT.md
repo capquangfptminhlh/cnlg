@@ -303,3 +303,57 @@ API đã cấp quyền** có thể hoạt động khi `TAOBAO_AUTO_SYNC=0`. Các
 `TAOBAO_SYNC_INTERVAL_HOURS`. Dù ở chế độ nào, dữ liệu vẫn chỉ nằm
 trong staging chưa mua được, và khóa ghi chung ngăn hai lượt đồng bộ
 ghi đè nhau.
+
+
+## Kiểm tra phí ship theo kiện hàng ngay trong quản trị
+
+Trong `/admin-besi.html#taobao`, mở **Kiểm tra phí ship Trung Quốc →
+Việt Nam**; nhập cân nặng thực (kg), chiều dài/rộng/cao (cm), cước ship
+nội địa TQ (CNY, bằng 0 chỉ khi shop miễn phí), chọn khu vực nhận, rồi
+xác nhận thông tin đã đối chiếu. Nhấn nút kiểm tra sẽ sử dụng:
+
+- Tỷ giá CNY/VND còn hạn từ tệp `data/taobao-fx.json`.
+- Bảng phí CN→VN do admin đã xác nhận trong `data/taobao-shipping.json`.
+- Cân nặng tính cước là mức cao hơn giữa cân nặng thực và thể tích
+  quy đổi theo hệ số của nhà vận chuyển, làm tròn theo bước cước.
+- Ship nội địa TQ (CNY → VND) + cước CN→VN + giao trong nước theo
+  vùng + phí xử lý, với phí tối thiểu/khối lượng tính cước tối thiểu
+  nếu biểu phí của đơn vị vận chuyển có áp dụng.
+
+Không cần giá mua sản phẩm để **chỉ kiểm tra phí ship**: API riêng
+`POST /api/admin/taobao/shipping-check` với phiên quản trị hợp lệ trả
+`shipping_vnd` khi đủ dữ liệu; `item_vnd` và `total_vnd` luôn là
+`null`, không tạo đơn hàng.
+
+### Quy tắc biểu phí mở rộng (tuỳ chọn)
+
+Bảng phí gốc yêu cầu `international_vnd_per_kg`. Nếu hợp đồng áp
+dụng **đơn giá khác nhau theo nơi nhận**, bổ sung vào JSON:
+
+```json
+{
+  "international_vnd_per_kg_by_region": {
+    "hcm": 29000,
+    "hn": 23000,
+    "other": 29000
+  },
+  "minimum_billable_kg": 0.2,
+  "minimum_international_vnd": 7000
+}
+```
+
+**Các số trong ví dụ chỉ minh hoạ cách điền, không được tự động áp dụng
+vào đơn thật.** Phải đối chiếu hợp đồng vận chuyển. Bảng giá công khai
+VMT Global (https://vmtglobal.com/bieu-phi-dat-hang-trung-quoc/)
+có quy tắc cước tối thiểu 7.000đ/kiện và thể tích / 8.000 cho tuyến
+tiêu chuẩn; Ship Trung Việt
+(https://shiptrungviet.vn/bang-gia-order-nhap-hang-trung-quoc.html)
+có biểu phí và điều kiện riêng theo trọng lượng/địa điểm. Không
+suy diễn các bảng đó là giá hợp đồng BESI.
+
+**Giới hạn báo giá:** đây là dự kiến theo biểu phí đã cấu hình, không
+phải phản hồi báo giá trực tiếp/được bảo đảm từ API nhà vận chuyển.
+Chưa tính được thuế/VAT/hải quan, phí mua hộ, hàng cồng kềnh đặc biệt,
+pin/chất lỏng hoặc phụ phí chưa có trong hợp đồng. Các mức theo bậc
+số lượng lớn, gom đơn nhiều kiện hoặc dịch vụ đặc biệt cần bổ sung
+bảng cước hợp đồng riêng (chưa tự áp dụng bậc giảm giá).
