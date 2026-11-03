@@ -17,10 +17,10 @@ try {
   if ($LASTEXITCODE -ne 0 -or $local -notmatch '^[a-f0-9]{40}$') { throw 'Không đọc được mã commit local' }
   Say "Commit local: $($local.Substring(0,12))"
   $remote=(& git.exe ls-remote https://github.com/capquangfptminhlh/cnlg.git refs/heads/main 2>$null | Select-Object -Last 1)
-  if ($LASTEXITCODE -ne 0 -or $remote -notmatch '^([a-f0-9]{40})\s') {
-    throw 'Không kết nối được GitHub HTTPS hoặc không đọc được main'
-  }
-  $expected=$Matches[1]
+  if ($LASTEXITCODE -ne 0) { throw 'Không kết nối được GitHub HTTPS' }
+  if ($remote -match '^([a-f0-9]{40})\s') {
+    $expected=$Matches[1]
+  } else { throw 'Không đọc được commit GitHub main' }
   Say "Commit GitHub main: $($expected.Substring(0,12))"
   $live=$null
   try { $live=Invoke-RestMethod http://127.0.0.1:3000/healthz -TimeoutSec 6 }
