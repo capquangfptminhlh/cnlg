@@ -64,7 +64,8 @@ function normalize(raw,keyword) {
   const skuVariants=[];
   const seenSku=new Set();
   for(const v of variantInput){
-    const sku=clean(v?.sku||v?.id,80);
+    if(!v||typeof v!=='object'||Array.isArray(v))return null;
+    const sku=clean(v.sku||v.id,80);
     const label=clean(v?.label_zh||v?.name_zh,180);
     if(!/^[A-Za-z0-9_.:-]{1,80}$/.test(sku)||!label||seenSku.has(sku))return null;
     seenSku.add(sku);
@@ -87,7 +88,7 @@ function normalize(raw,keyword) {
     options_zh:skuVariants.length?skuVariants.map(x=>x.label_zh):
       (Array.isArray(raw.sku_options)?raw.sku_options.map(x=>clean(x,180)).slice(0,50):[]),
     sku_variants:skuVariants,
-    price_cny_reference:Number.isFinite(cny)&&cny>0?cny:null,
+    price_cny_reference:Number.isFinite(cny)&&cny>0&&cny<=10000000?cny:null,
     shipping_weight_kg:actual!==null&&actual>0&&actual<=200?actual:null,
     china_domestic_shipping_cny:chinaShip!==null&&chinaShip>=0&&chinaShip<=50000?chinaShip:null,
     dimensions_cm,
