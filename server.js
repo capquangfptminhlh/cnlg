@@ -180,7 +180,7 @@ app.get('/api/admin/taobao/status',requireAdmin,rateLimit('taobao-admin-status',
 app.get('/api/admin/taobao/review',requireAdmin,rateLimit('taobao-admin-review',60e3,80),(req,res)=>{
   try{
     res.set('Cache-Control','no-store').json({success:true,
-      data:taobaoReview.list({limit:req.query.limit})});
+      data:taobaoReview.list({limit:req.query.limit,page:req.query.page,q:req.query.q,view:req.query.view})});
   }catch(e){res.status(503).json({success:false,error:'Không thể đọc kho Taobao đang chờ duyệt'});}
 });
 app.post('/api/admin/taobao/approve/:id',requireAdmin,rateLimit('taobao-admin-approve',60e3,30),(req,res)=>{
