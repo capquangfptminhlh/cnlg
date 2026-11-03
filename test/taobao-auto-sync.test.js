@@ -12,6 +12,11 @@ test('Taobao price auto-sync disabled unless permission, credentials, keywords a
   assert.equal(auto.config({...env,TAOBAO_ADZONE_ID:''}),null);
   assert.equal(auto.config({...env,TAOBAO_AUTO_SYNC_KEYWORDS:''}),null);
   assert.deepEqual(auto.config(env),{keywords:['手机线','手机壳'],hours:4,pages:3});
+  // A deliberate manual sync must remain available with authorized access
+  // even when the unattended schedule is disabled.
+  assert.deepEqual(auto.authorizedConfig({...env,TAOBAO_AUTO_SYNC:'0'}),
+    auto.config(env));
+  assert.equal(auto.authorizedConfig({...env,TAOBAO_DATA_PERMISSION:'0'}),null);
 });
 test('Scheduled importer cannot overlap itself and can be stopped',async()=>{
   let resolveFirst,call=0,clear=false,interval=0;

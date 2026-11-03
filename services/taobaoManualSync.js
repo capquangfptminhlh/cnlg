@@ -11,7 +11,7 @@ function status(){
   return {running,started_at,finished_at,last_result,last_error};
 }
 function start(options={}){
-  const config=options.config||auto.config(options.env);
+  const config=options.config||auto.authorizedConfig(options.env);
   if(!config)throw Error('Chưa cấu hình quyền dữ liệu, tài khoản API hoặc từ khóa đồng bộ Taobao');
   if(running)return {started:false,reason:'already_running'};
   running=true;started_at=new Date().toISOString();

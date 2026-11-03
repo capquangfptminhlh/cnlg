@@ -5,8 +5,7 @@
  * Run only one BESI origin worker; local JSON staging has no multi-node locks.
  */
 const importer=require('./sources/taobaoImporter');
-function config(env=process.env){
-  if(env.TAOBAO_AUTO_SYNC!=='1')return null;
+function authorizedConfig(env=process.env){
   if(env.TAOBAO_DATA_PERMISSION!=='1'||!env.TAOBAO_APP_KEY||!env.TAOBAO_APP_SECRET
     ||!/^[0-9]+$/.test(String(env.TAOBAO_ADZONE_ID||'')))return null;
   const keywords=String(env.TAOBAO_AUTO_SYNC_KEYWORDS||'')
@@ -15,6 +14,9 @@ function config(env=process.env){
   const hours=Math.min(72,Math.max(4,Number(env.TAOBAO_SYNC_INTERVAL_HOURS)||12));
   const pages=Math.min(50,Math.max(1,Math.trunc(Number(env.TAOBAO_PAGES_PER_KEYWORD)||2)));
   return {keywords,hours,pages};
+}
+function config(env=process.env){
+  return env.TAOBAO_AUTO_SYNC==='1'?authorizedConfig(env):null;
 }
 function start(options={}){
   const settings=options.settings||config(options.env);
@@ -39,4 +41,4 @@ function start(options={}){
   timer?.unref?.();
   return {runOnce,stop:()=>{stopped=true;(options.clearTimer||clearInterval)(timer);}};
 }
-module.exports={config,start};
+module.exports={config,authorizedConfig,start};
