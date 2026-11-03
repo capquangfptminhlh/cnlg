@@ -29,3 +29,6 @@
 .taobao-admin-filters button{min-height:39px}
 @media(max-width:950px){.taobao-admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.taobao-admin-forms{grid-template-columns:1fr}}
 @media(max-width:550px){.taobao-admin-stats .stat{padding:10px}.taobao-admin-stats strong{font-size:22px}.taobao-admin-forms .form-stack{padding:12px}.taobao-admin-filters,.taobao-admin-filters input,.taobao-admin-filters select{width:100%}}
+
+.taobao-admin-image-preview{max-width:170px;max-height:170px;object-fit:contain;border:1px solid var(--border);border-radius:10px;padding:5px;background:#fff}
+.taobao-admin-image-preview[hidden]{display:none!important}
