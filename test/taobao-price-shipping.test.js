@@ -123,3 +123,40 @@ test('New Taobao price updates existing approved preview and recalculates VND wi
     assert.equal(result.data[0].can_order,false);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+
+test('Freight-only admin checks do not invent a product price, but include regional and minimum charges',()=>{
+  const prices={...tariff,
+    international_vnd_per_kg_by_region:{hcm:29000,hn:23000,other:31000},
+    minimum_billable_kg:0.2,minimum_international_vnd:20000};
+  assert.equal(pricing.validateTariff(prices),prices);
+  const row={shipping_weight_kg:0.1,china_domestic_shipping_cny:0,
+    dimensions_cm:{length:4,width:4,height:4}};
+  const hcm=pricing.quote(row,{freightOnly:true,now,rate,tariff:prices,region:'hcm'});
+  const hn=pricing.quote(row,{freightOnly:true,now,rate,tariff:prices,region:'hn'});
+  assert.equal(hcm.status,'estimate');
+  assert.equal(hcm.item_vnd,null);
+  assert.equal(hcm.total_vnd,null);
+  assert.equal(hcm.can_order,false);
+  assert.equal(hcm.billable_weight_kg,0.5);
+  assert.equal(hcm.international_shipping_vnd,20000);
+  assert.equal(hcm.shipping_vnd,55000); // 20k intl + 30k VN last mile + 5k handling
+  assert.equal(hn.international_shipping_vnd,20000);
+  assert.equal(hn.shipping_vnd,53000);
+  const noTariff=pricing.quote(row,{freightOnly:true,now,rate,tariff:null});
+  assert.equal(noTariff.status,'partial');
+  assert.equal(noTariff.shipping_vnd,null);
+  assert.equal(noTariff.total_vnd,null);
+});
+test('Region-specific carrier rates are applied to volumetric parcels and invalid fee configurations fail closed',()=>{
+  const prices={...tariff,international_vnd_per_kg_by_region:{hcm:29000,hn:23000,other:31000}};
+  const hcm=pricing.quote(p(),{now,rate,tariff:prices,region:'hcm'});
+  const hn=pricing.quote(p(),{now,rate,tariff:prices,region:'hn'});
+  assert.equal(hcm.international_shipping_vnd,43500); // 1.5 kg x 29k/kg
+  assert.equal(hn.international_shipping_vnd,34500); // 1.5 kg x 23k/kg
+  assert.equal(hcm.can_order,false);
+  assert.equal(pricing.validateTariff({...prices,international_vnd_per_kg_by_region:{hcm:29000,hn:-1,other:31000}}),null);
+  assert.equal(pricing.validateTariff({...prices,minimum_international_vnd:-1}),null);
+  assert.equal(pricing.validateTariff({...prices,minimum_billable_kg:-1}),null);
+  assert.equal(pricing.quote({...p(),dimensions_cm:{length:1000,width:10,height:10}},{now,rate,tariff:prices}).total_vnd,null);
+});
