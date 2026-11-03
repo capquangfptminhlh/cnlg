@@ -30,7 +30,7 @@ function status(opt={}){
     if(!preview.approved(row))continue;
     const vars=Array.isArray(row.sku_variants)&&row.sku_variants.length?row.sku_variants:[row];
     for(const v of vars){
-      const q=price.quote(v,{region:'hcm',rate,tariff});
+      const q=price.quote({...v,updated_at:row.updated_at},{region:'hcm',rate,tariff});
       if(q.status==='partial'||q.status==='estimate')counts.price_quotes_ready++;
       if(q.status==='estimate')counts.shipping_quotes_ready++;
     }
