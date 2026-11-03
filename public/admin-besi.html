@@ -154,6 +154,12 @@
             <label>Ảnh BESI đã được cấp quyền (không bắt buộc)
               <input id="taobaoAdminImage" maxlength="250" placeholder="/images/taobao/ten-anh.jpg">
             </label>
+            <label>Chọn ảnh sản phẩm được cấp quyền (JPEG, PNG, WebP, tối đa 3 MB)
+              <input type="file" id="taobaoAdminMediaFile" accept="image/jpeg,image/png,image/webp">
+            </label>
+            <button type="button" class="secondary" id="taobaoAdminMediaUpload">Tải ảnh lên kho BESI (không tự duyệt)</button>
+            <img id="taobaoAdminMediaPreview" class="taobao-admin-image-preview" alt="Xem trước ảnh Taobao đã được cấp quyền" hidden>
+
             <label class="taobao-admin-confirm"><input type="checkbox" id="taobaoAdminRights" required> Tôi đã xác nhận quyền sử dụng thông tin/ảnh của sản phẩm này.</label>
             <label class="taobao-admin-confirm"><input type="checkbox" id="taobaoAdminTranslation" required> Tôi đã kiểm tra bản dịch tiếng Việt, phân loại và thông số.</label>
             <button type="submit" class="primary">Duyệt giới thiệu (không mở bán)</button>
