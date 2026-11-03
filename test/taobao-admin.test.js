@@ -68,6 +68,14 @@ test('Review management can navigate beyond the first 30 products and search unt
 });
 test('Manual sync is opt-in, no credentials means no network activity, duplicate jobs blocked',async()=>{
   assert.throws(()=>manual.start({config:null,env:{TAOBAO_AUTO_SYNC:'0'}}),/Chưa cấu hình/);
+  // Real manual operator workflow: own API access can be enabled without
+  // enabling a 24/7 periodic schedule.
+  const manualAccess={
+    TAOBAO_AUTO_SYNC:'0',TAOBAO_DATA_PERMISSION:'1',
+    TAOBAO_APP_KEY:'mock-key',TAOBAO_APP_SECRET:'mock-secret',
+    TAOBAO_ADZONE_ID:'90001',TAOBAO_AUTO_SYNC_KEYWORDS:'手机壳',
+    TAOBAO_PAGES_PER_KEYWORD:'1'
+  };
   let release,called=0;
   const cfg={keywords:['手机壳'],pages:1};
   const syncImpl=async()=>{called++;return await new Promise(resolve=>{release=resolve;});};
@@ -84,4 +92,22 @@ test('Manual sync is opt-in, no credentials means no network activity, duplicate
   assert.equal(manual.status().last_result.staged,2);
   assert.equal(manual.status().last_result.needs_translation,1);
   assert.equal(manual.status().last_error,null);
+});
+
+test('Manual sync works when scheduled polling is disabled but all source rights exist',async()=>{
+  const env={
+    TAOBAO_AUTO_SYNC:'0',TAOBAO_DATA_PERMISSION:'1',
+    TAOBAO_APP_KEY:'mock-key',TAOBAO_APP_SECRET:'mock-secret',
+    TAOBAO_ADZONE_ID:'90001',TAOBAO_AUTO_SYNC_KEYWORDS:'手机壳',
+    TAOBAO_PAGES_PER_KEYWORD:'1'
+  };
+  let seen=null;
+  const started=manual.start({env,syncImpl:async (keywords,opts)=>{
+    seen={keywords,opts};return {fetched:3,staged:3,translated:0,needs_translation:3};
+  }});
+  assert.equal(started.started,true);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(seen,{keywords:['手机壳'],opts:{pages:1}});
+  assert.equal(manual.status().running,false);
+  assert.equal(manual.status().last_result.fetched,3);
 });
