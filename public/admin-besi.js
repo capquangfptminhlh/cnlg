@@ -373,6 +373,8 @@
       });
       message('Đã duyệt preview Taobao; sản phẩm chưa được phép thanh toán.');
       e.currentTarget.reset();
+      $('taobaoAdminMediaPreview').hidden=true;
+      $('taobaoAdminMediaPreview').removeAttribute('src');
       await refreshTaobao();
     });
   });
@@ -387,6 +389,36 @@
       $('taobaoAdminTariffConfirm').checked=false;
       await refreshTaobaoStatus();
     });
+  });
+
+  $('taobaoAdminMediaUpload')?.addEventListener('click',async e=>{
+    const button=e.currentTarget;
+    try{
+      if(!$('taobaoAdminRights').checked)
+        throw Error('Cần xác nhận quyền sử dụng ảnh trước khi tải lên');
+      const file=$('taobaoAdminMediaFile').files?.[0];
+      if(!file)throw Error('Chưa chọn ảnh JPEG, PNG hoặc WebP');
+      if(!['image/jpeg','image/png','image/webp'].includes(file.type)
+        ||file.size<16||file.size>3*1024*1024)
+        throw Error('Chỉ nhận ảnh JPEG/PNG/WebP có kích thước tối đa 3 MB');
+      button.disabled=true;
+      const response=await fetch('/api/admin/taobao/image',{
+        method:'POST',credentials:'same-origin',
+        headers:{'Content-Type':file.type,'x-taobao-rights-confirmed':'1'},
+        body:file
+      });
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok||result.success!==true)
+        throw Error(result.error||'Không lưu được ảnh sản phẩm');
+      const url=String(result.data?.image||'');
+      if(!/^\\/images\\/taobao\\/[a-f0-9]{64}\\.(?:jpg|png|webp)$/i.test(url))
+        throw Error('Đường dẫn ảnh BESI trả về không hợp lệ');
+      $('taobaoAdminImage').value=url;
+      const preview=$('taobaoAdminMediaPreview');
+      preview.src=url;preview.hidden=false;
+      message('Ảnh đã lưu vào kho BESI. Sản phẩm chỉ hiển thị sau khi được duyệt.');
+    }catch(error){message(error.message,true);}
+    finally{button.disabled=false;}
   });
   refreshTaobao().catch(error=>{
     empty($('taobaoAdminRows'),5,'Chưa tải được hệ thống Taobao: '+error.message);
