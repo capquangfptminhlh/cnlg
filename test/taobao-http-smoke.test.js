@@ -53,6 +53,7 @@ test('Real HTTP rejects anonymous Taobao admin reads/writes including image and 
       {path:'/api/admin/taobao/sync',method:'POST'},
       {path:'/api/admin/taobao/fx-refresh',method:'POST'},
       {path:'/api/admin/taobao/tariff',method:'POST'},
+      {path:'/api/admin/taobao/shipping-check',method:'POST'},
       {path:'/api/admin/taobao/approve/123456789012',method:'POST'},
       {path:'/api/admin/taobao/revoke/123456789012',method:'POST'},
       {path:'/api/admin/taobao/image',method:'POST',
@@ -71,5 +72,33 @@ test('Real HTTP rejects anonymous Taobao admin reads/writes including image and 
     assert.equal(restricted.status,200);
     assert.doesNotMatch(await restricted.text(),/id="taobaoAdminTariffJson"/,
       'Anonymous browsers must never receive the internal Taobao admin form');
+  });
+});
+
+test('Authenticated admin can check per-parcel freight over HTTP without buying or inventing a carrier rate',async()=>{
+  await withServer(async url=>{
+    const request={region:'hcm',shipping_weight_kg:0.6,
+      dimensions_cm:{length:20,width:12,height:10},china_domestic_shipping_cny:0};
+    const r=await fetch(url+'/api/admin/taobao/shipping-check',{
+      method:'POST',
+      headers:{'x-admin-key':process.env.ADMIN_PASSWORD,'Content-Type':'application/json'},
+      body:JSON.stringify(request)
+    });
+    assert.equal(r.status,200);
+    const out=await r.json();
+    assert.equal(out.success,true);
+    assert.equal(out.data.item_vnd??null,null,'Freight-only check must not invent purchase price');
+    assert.equal(out.data.total_vnd??null,null,'Freight-only check must not invent a payable order');
+    assert.notEqual(out.data.can_order,true);
+    assert.ok(['estimate','partial','unavailable'].includes(out.data.status));
+    if(out.data.status==='estimate')assert.ok(out.data.shipping_vnd>0);
+    else assert.equal(out.data.shipping_vnd??null,null);
+
+    const malformed=await fetch(url+'/api/admin/taobao/shipping-check',{
+      method:'POST',
+      headers:{'x-admin-key':process.env.ADMIN_PASSWORD,'Content-Type':'application/json'},
+      body:JSON.stringify({...request,shipping_weight_kg:0})
+    });
+    assert.equal(malformed.status,400);
   });
 });
