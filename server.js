@@ -217,8 +217,7 @@ app.post('/api/admin/taobao/revoke/:id',requireAdmin,rateLimit('taobao-admin-rev
       .json({success:false,error:String(e.message).slice(0,200)});
   }
 });
-app.post('/api/admin/taobao/shipping-check',requireAdmin,
-  rateLimit('taobao-admin-shipping-check',60e3,30),(req,res)=>{
+app.post('/api/admin/taobao/shipping-check',requireAdmin,rateLimit('taobao-admin-shipping-check',60e3,30),(req,res)=>{
   try{
     const b=req.body||{};
     const region=String(b.region||'hcm');
