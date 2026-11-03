@@ -173,7 +173,8 @@ async function mergeBatch(rawRows,keyword,items,seen,opt={}) {
     // a licensed supplier feed has already supplied. Keep the feed's
     // verified data ONLY while the original title remains unchanged.
     // A source title change invalidates prior details and review.
-    if(old&&keyword!=='partner-feed'&&old.detail_source==='licensed_feed'
+    if(old&&keyword!=='partner-feed'
+      &&(old.detail_source==='licensed_feed'||old.keyword==='partner-feed')
       &&old.title_zh===row.title_zh){
       if(!row.description_zh)row.description_zh=old.description_zh||'';
       if(!row.category_zh)row.category_zh=old.category_zh||'';
