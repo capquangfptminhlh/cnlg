@@ -290,3 +290,16 @@ Trong `/admin-besi.html#taobao`, chọn một sản phẩm cần duyệt:
 Phải sao lưu `public/images/taobao/` cùng với `data/` trước khi chuyển
 server hoặc cập nhật cơ sở hạ tầng. Không dùng ảnh nếu chưa có quyền.
 Không nhận SVG, HTML, định dạng lạ hay ảnh từ URL bên ngoài.
+
+
+## Đồng bộ thủ công không bắt buộc bật đồng bộ tự động
+
+Trong quản trị `/admin-besi.html#taobao`, nút **Đồng bộ sản phẩm bằng
+API đã cấp quyền** có thể hoạt động khi `TAOBAO_AUTO_SYNC=0`. Các biến
+`TAOBAO_DATA_PERMISSION=1`, `TAOBAO_APP_KEY`,
+`TAOBAO_APP_SECRET`, `TAOBAO_ADZONE_ID` và
+`TAOBAO_AUTO_SYNC_KEYWORDS` vẫn là bắt buộc. Bật
+`TAOBAO_AUTO_SYNC=1` **chỉ** khi muốn chương trình tự chạy theo chu kỳ
+`TAOBAO_SYNC_INTERVAL_HOURS`. Dù ở chế độ nào, dữ liệu vẫn chỉ nằm
+trong staging chưa mua được, và khóa ghi chung ngăn hai lượt đồng bộ
+ghi đè nhau.
