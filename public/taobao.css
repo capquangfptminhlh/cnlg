@@ -22,3 +22,10 @@
   .price-line{font-size:9px}
   .price-line strong{white-space:normal}
 }
+
+
+/* Taobao approved SKU selector: a price/parcel quote is variant-specific. */
+.variant-selector{display:flex;flex-direction:column;gap:5px;margin-top:10px}
+.variant-label{font-size:10px;font-weight:750;color:#354359}
+.variant-select{width:100%;max-width:100%;padding:9px 10px;color:#22344a;background:#fff;border:1px solid #dce4ed;border-radius:8px;font:inherit;font-size:12px}
+.variant-select:focus-visible{outline:2px solid #f4512c;outline-offset:2px}
