@@ -96,6 +96,19 @@ function validateTariff(config){
   // Treat freight tariffs older than 90 days as unverified.
   if(Date.now()-timestamp(config.updated_at)>90*86400e3||timestamp(config.updated_at)>Date.now()+3600000)
     return null;
+  if(config.international_vnd_per_kg_by_region!==undefined){
+    if(!config.international_vnd_per_kg_by_region||
+      !['hcm','hn','other'].every(region=>
+        positive(config.international_vnd_per_kg_by_region[region]) &&
+        Number(config.international_vnd_per_kg_by_region[region])<=10000000))
+      return null;
+  }
+  if(config.minimum_billable_kg!==undefined &&
+    (!validNonnegative(config.minimum_billable_kg)||Number(config.minimum_billable_kg)>100))
+    return null;
+  if(config.minimum_international_vnd!==undefined &&
+    (!validNonnegative(config.minimum_international_vnd)||Number(config.minimum_international_vnd)>100000000))
+    return null;
   if(config.billing_step_kg>5||config.international_vnd_per_kg>10000000||config.volumetric_divisor<1000
      ||config.volumetric_divisor>20000)return null;
   return config;
@@ -108,16 +121,21 @@ function quote(row,options={}){
   const region=String(options.region||'hcm').toLowerCase();
   if(!Object.hasOwn(regionName,region))return {status:'unavailable',reason:'invalid_region'};
   const rate=currentRate(options.rate||null,options.now||Date.now());
+  const freightOnly=options.freightOnly===true;
   const cny=Number(row?.price_cny_reference);
-  if(!positive(row?.price_cny_reference))return {status:'unavailable',reason:'missing_product_price'};
-  // An old Taobao listing price is not a current quote, even if FX is fresh.
-  const checkedAt=timestamp(row?.updated_at);
-  const now=options.now||Date.now();
-  if(!Number.isFinite(checkedAt)||checkedAt>now+3600000
-    ||now-checkedAt>MAX_PRODUCT_PRICE_AGE_MS)
-    return {status:'unavailable',reason:'product_price_stale'};
+  if(!freightOnly&&!positive(row?.price_cny_reference))
+    return {status:'unavailable',reason:'missing_product_price'};
+  // A product quote must have a freshly verified supplier price.
+  // The admin-only freight checker may intentionally omit product price.
+  if(!freightOnly){
+    const checkedAt=timestamp(row?.updated_at);
+    const now=options.now||Date.now();
+    if(!Number.isFinite(checkedAt)||checkedAt>now+3600000
+      ||now-checkedAt>MAX_PRODUCT_PRICE_AGE_MS)
+      return {status:'unavailable',reason:'product_price_stale'};
+  }
   if(!rate)return {status:'unavailable',reason:'fx_missing_or_stale'};
-  const item_vnd=money(cny*rate.rate);
+  const item_vnd=freightOnly?null:money(cny*rate.rate);
   const base={status:'partial',item_vnd,region,region_name:regionName[region],
     rate_vnd_per_cny:rate.rate,rate_as_of:rate.as_of,rate_source:RATE_SOURCE,
     shipping_vnd:null,total_vnd:null,is_estimate:true,can_order:false};
@@ -131,24 +149,27 @@ function quote(row,options={}){
   const weight=Number(row.shipping_weight_kg);
   if(weight>200)return {...base,reason:'shipping_weight_invalid'};
   const dims=row.dimensions_cm||{};
-  const hasDims=['length','width','height'].every(k=>positive(dims[k]));
+  const hasDims=['length','width','height'].every(k=>positive(dims[k])&&Number(dims[k])<1000);
   // Without parcel dimensions, volumetric weight is unknown and a numeric
   // freight total may materially underquote bulky goods. Fail closed.
   if(!hasDims)return {...base,reason:'dimensions_unverified'};
   const volumetric=hasDims?Number(dims.length)*Number(dims.width)*Number(dims.height)/
     Number(tariff.volumetric_divisor):0;
-  const rawWeight=Math.max(weight,volumetric);
+  const rawWeight=Math.max(weight,volumetric,Number(tariff.minimum_billable_kg||0));
   const step=Number(tariff.billing_step_kg);
   const billable=Math.ceil((rawWeight-1e-10)/step)*step;
   const domesticChina=money(Number(row.china_domestic_shipping_cny)*rate.rate);
-  const intl=money(billable*Number(tariff.international_vnd_per_kg));
+  const unitRate=Number(tariff.international_vnd_per_kg_by_region?.[region]||
+    tariff.international_vnd_per_kg);
+  const intl=Math.max(money(billable*unitRate),
+    money(tariff.minimum_international_vnd||0));
   const lastMile=money(tariff.domestic_vnd[region]);
   const handling=money(tariff.handling_vnd);
   const shipping=domesticChina+intl+lastMile+handling;
   return {...base,status:'estimate',reason:null,
     china_domestic_shipping_vnd:domesticChina,
     international_shipping_vnd:intl,domestic_vn_shipping_vnd:lastMile,
-    handling_vnd:handling,shipping_vnd:shipping,total_vnd:item_vnd+shipping,
+    handling_vnd:handling,shipping_vnd:shipping,total_vnd:freightOnly?null:item_vnd+shipping,
     billable_weight_kg:Number(billable.toFixed(2)),shipping_provider:'Đơn vị vận chuyển',
     shipping_tariff_as_of:tariff.updated_at,
     excludes_duty_tax:true};

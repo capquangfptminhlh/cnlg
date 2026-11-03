@@ -217,6 +217,35 @@ app.post('/api/admin/taobao/revoke/:id',requireAdmin,rateLimit('taobao-admin-rev
       .json({success:false,error:String(e.message).slice(0,200)});
   }
 });
+app.post('/api/admin/taobao/shipping-check',requireAdmin,rateLimit('taobao-admin-shipping-check',60e3,30),(req,res)=>{
+  try{
+    const b=req.body||{};
+    const region=String(b.region||'hcm');
+    const positive=x=>x!==null&&x!==undefined&&String(x).trim()!==''&&
+      Number.isFinite(Number(x))&&Number(x)>0;
+    const nonnegative=x=>x!==null&&x!==undefined&&String(x).trim()!==''&&
+      Number.isFinite(Number(x))&&Number(x)>=0;
+    const dims=b.dimensions_cm||{};
+    if(!['hcm','hn','other'].includes(region)||!positive(b.shipping_weight_kg)
+      ||Number(b.shipping_weight_kg)>200
+      ||!nonnegative(b.china_domestic_shipping_cny)
+      ||Number(b.china_domestic_shipping_cny)>50000
+      ||!['length','width','height'].every(k=>positive(dims[k])&&Number(dims[k])<1000))
+      return res.status(400).json({success:false,
+        error:'Cần cân nặng, kích thước kiện, phí ship nội địa TQ được xác minh'});
+    const quote=taobaoPriceShipping.quote({
+      shipping_weight_kg:Number(b.shipping_weight_kg),
+      dimensions_cm:{length:Number(dims.length),width:Number(dims.width),height:Number(dims.height)},
+      china_domestic_shipping_cny:Number(b.china_domestic_shipping_cny)
+    },{freightOnly:true,region,rate:taobaoPriceShipping.getRate(),
+      tariff:taobaoPriceShipping.getTariff()});
+    return res.set('Cache-Control','no-store').json({
+      success:true,data:quote});
+  }catch(e){
+    console.warn('[Taobao admin freight check]',String(e?.message||'').slice(0,100));
+    return res.status(503).json({success:false,error:'Chưa kiểm tra được biểu phí vận chuyển'});
+  }
+});
 app.post('/api/admin/taobao/tariff',requireAdmin,rateLimit('taobao-admin-tariff',60e3,8),(req,res)=>{
   try{
     if(req.body?.confirmed!==true)throw Error('Cần xác nhận bảng cước thật từ nhà vận chuyển');
