@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline');
+const stageLock = require('../taobaoStageLock');
 const FILE = path.resolve(__dirname, '../../data/taobao-staging.json');
 const MAX_ITEMS = 25000;
 const clean = (x, n = 7000) => String(x ?? '').trim().slice(0, n);
@@ -47,7 +48,7 @@ async function fetchPage(keyword,page,opt={}) {
 function normalize(raw,keyword) {
   const id=clean(raw?.item_id||raw?.num_iid,24),zh=clean(raw?.title,500);
   if(!/^[0-9]{6,20}$/.test(id)||!zh) return null;
-  const cny=Number(raw.zk_final_price||raw.reserve_price);
+  const cny=Number(raw.zk_final_price??raw.reserve_price);
   const images=raw.small_images?.string;
   const n=x=>x!==null&&x!==undefined&&String(x).trim()!==''&&Number.isFinite(Number(x))?Number(x):null;
   const actual=n(raw.shipping_weight_kg??raw.weight_kg);
@@ -58,6 +59,7 @@ function normalize(raw,keyword) {
   const dimensions_cm=Object.values(dims).every(x=>x!==null&&x>0&&x<1000)?dims:null;
   const validUrl=x=>/^https:\/\/[a-z0-9.-]+\/[^<>"']+$/i.test(String(x||''))?clean(x,1500):'';
   return {id,keyword:clean(keyword,100),title_zh:zh,
+    detail_source:keyword==='partner-feed'?'licensed_feed':'taobao_api',
     category_zh:clean(raw.category_zh||raw.category_name||'',160),
     description_zh:clean(raw.item_description||raw.description),
     options_zh:Array.isArray(raw.sku_options)?raw.sku_options.map(x=>clean(x,180)).slice(0,50):[],
@@ -142,6 +144,25 @@ async function mergeBatch(rawRows,keyword,items,seen,opt={}) {
     if(!row||seen.has(row.id)) continue;
     seen.add(row.id);
     const old=items.get(row.id);
+    // Affiliate search often omits the shipping/variant/detail fields that
+    // a licensed supplier feed has already supplied. Keep the feed's
+    // verified data ONLY while the original title remains unchanged.
+    // A source title change invalidates prior details and review.
+    if(old&&keyword!=='partner-feed'&&old.detail_source==='licensed_feed'
+      &&old.title_zh===row.title_zh){
+      if(!row.description_zh)row.description_zh=old.description_zh||'';
+      if(!row.category_zh)row.category_zh=old.category_zh||'';
+      if(!row.options_zh.length&&Array.isArray(old.options_zh))
+        row.options_zh=old.options_zh.slice();
+      if(row.shipping_weight_kg===null)row.shipping_weight_kg=old.shipping_weight_kg??null;
+      if(row.china_domestic_shipping_cny===null)
+        row.china_domestic_shipping_cny=old.china_domestic_shipping_cny??null;
+      if(!row.dimensions_cm)row.dimensions_cm=old.dimensions_cm||null;
+      if(!row.image_reference)row.image_reference=old.image_reference||'';
+      if(!row.gallery_references.length)
+        row.gallery_references=Array.isArray(old.gallery_references)?old.gallery_references.slice():[];
+      row.detail_source='licensed_feed';
+    }
     const sameText=old&&old.title_zh===row.title_zh
       &&old.description_zh===row.description_zh
       &&old.category_zh===row.category_zh
@@ -200,7 +221,9 @@ async function sync(keywords,opt={}) {
   if(!Array.isArray(keywords)||!keywords.length||keywords.length>30)
     throw Error('Provide 1-30 keywords');
   const pages=Math.min(50,Math.max(1,Math.trunc(Number(opt.pages)||2)));
-  const file=opt.file||FILE,items=stagedMap(file),seen=new Set();
+  const file=opt.file||FILE;
+  return stageLock.withLock(file,async()=>{
+  const items=stagedMap(file),seen=new Set();
   let fetched=0,translated=0;
   for(const word of keywords)for(let page=1;page<=pages;page++){
     const found=await (opt.fetchPageImpl||fetchPage)(word,page,opt);
@@ -213,6 +236,7 @@ async function sync(keywords,opt={}) {
     if(!opt.noDelay)await new Promise(resolve=>setTimeout(resolve,700));
   }
   return stats(items,fetched,translated);
+  });
 }
 
 /**
@@ -226,7 +250,9 @@ async function importFeed(feedPath,opt={}) {
   const input=path.resolve(String(feedPath||''));
   if(!feedPath||!fs.existsSync(input)||!fs.statSync(input).isFile())
     throw Error('Feed file not found');
-  const file=opt.file||FILE,items=stagedMap(file),seen=new Set();
+  const file=opt.file||FILE;
+  return stageLock.withLock(file,async()=>{
+  const items=stagedMap(file),seen=new Set();
   let fetched=0,translated=0,lineNo=0,rows=[];
   async function flush(){
     if(!rows.length)return;
@@ -268,6 +294,7 @@ async function importFeed(feedPath,opt={}) {
     await flush();
   }finally{reader.close();}
   return {...stats(items,fetched,translated),lines:lineNo};
+  });
 }
 
 module.exports={timestamp,sign,extract,fetchPage,normalize,hasHan,translate,
