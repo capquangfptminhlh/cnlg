@@ -10,3 +10,22 @@
 .besi-spec-editor .secondary{min-height:38px}
 @media(max-width:860px){.besi-spec-editor .fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.besi-spec-editor{padding:12px}.besi-spec-editor .fields{grid-template-columns:1fr}}
+
+
+/* Taobao admin panel: restrained internal operations, responsive on phones. */
+.taobao-admin-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:15px 0}
+.taobao-admin-stats .stat{padding:14px}
+.taobao-admin-stats strong{font-size:25px}
+.taobao-admin-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin:16px 0}
+.taobao-admin-toolbar .tag{max-width:100%;overflow-wrap:anywhere}
+.taobao-admin-forms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.taobao-admin-forms .form-stack{padding:18px;border:1px solid var(--border);border-radius:12px;background:#fafbfd}
+.taobao-admin-forms h3,.taobao-admin-queue-head h3{font-size:15px;font-weight:800;margin:0 0 5px}
+.taobao-admin-confirm{display:flex;align-items:flex-start;gap:8px;font-size:11px;line-height:1.5;color:#46566d}
+.taobao-admin-confirm input{width:17px;height:17px;flex:0 0 17px;margin:1px 0 0;accent-color:var(--orange)}
+.taobao-admin-queue-head{display:flex;justify-content:space-between;align-items:end;gap:15px;flex-wrap:wrap;margin-top:20px}
+.taobao-admin-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.taobao-admin-filters input,.taobao-admin-filters select{margin-top:0;width:auto;min-width:145px}
+.taobao-admin-filters button{min-height:39px}
+@media(max-width:950px){.taobao-admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.taobao-admin-forms{grid-template-columns:1fr}}
+@media(max-width:550px){.taobao-admin-stats .stat{padding:10px}.taobao-admin-stats strong{font-size:22px}.taobao-admin-forms .form-stack{padding:12px}.taobao-admin-filters,.taobao-admin-filters input,.taobao-admin-filters select{width:100%}}

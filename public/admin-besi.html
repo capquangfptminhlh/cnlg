@@ -21,6 +21,7 @@
     <a href="#catalog"><span>▤</span> Danh mục hợp nhất</a>
     <a href="#pricing"><span>％</span> Chính sách giá</a>
     <a href="#specCoverage"><span>⌕</span> Kiểm tra thông số thiếu</a>
+    <a href="#taobao"><span>淘</span> Taobao · Giá & duyệt hàng</a>
     <a href="#allocation"><span>↗</span> Phân đơn đa kho</a>
     <div class="aside-bottom"><a href="/admin.html">← Quay về quản trị</a><small>Chỉ quản trị viên truy cập · Không tự gửi đơn</small></div>
   </aside>
@@ -123,6 +124,70 @@
           <p class="hint" id="besiReviewAdvice" aria-live="polite"></p>
         </div>
         <p class="hint">Duyệt từng trang 50 sản phẩm để kiểm tra đủ toàn bộ mã cần chuẩn hóa trong danh mục.</p>
+      </section>
+
+      <section class="panel span2" id="taobao">
+        <div class="section-head">
+          <div><small>TAOBAO · KHO DỮ LIỆU ĐỘC LẬP</small><h2>Quản trị hàng Taobao</h2></div>
+          <span class="tag warning">Chỉ giới thiệu · Chưa mở đặt mua</span>
+        </div>
+        <p class="hint">Nguồn Taobao không trộn vào các sản phẩm đang bán. Không hiển thị ID nguồn, giá CNY hay thông tin nhà cung cấp trên trang khách.</p>
+        <div class="taobao-admin-stats">
+          <div class="stat"><small>Kho chờ</small><strong id="taobaoAdminStaged">–</strong></div>
+          <div class="stat"><small>Đã duyệt preview</small><strong id="taobaoAdminApproved">–</strong></div>
+          <div class="stat"><small>SKU đủ giá hàng</small><strong id="taobaoAdminPriced">–</strong></div>
+          <div class="stat"><small>SKU có thể tính phí ship</small><strong id="taobaoAdminShipped">–</strong></div>
+        </div>
+        <div class="taobao-admin-toolbar">
+          <span id="taobaoAdminFxStatus" class="tag warning">Đang kiểm tra tỷ giá…</span>
+          <span id="taobaoAdminFreightStatus" class="tag warning">Đang kiểm tra biểu phí…</span>
+          <span id="taobaoAdminSyncStatus" class="tag warning">Chưa chạy đồng bộ</span>
+          <button class="secondary" type="button" id="taobaoAdminReload">Làm mới trạng thái</button>
+          <button class="secondary" type="button" id="taobaoAdminRefreshFx">Đồng bộ tỷ giá CNY/VND</button>
+          <button class="secondary" type="button" id="taobaoAdminRunSync">Đồng bộ sản phẩm bằng API đã cấp quyền</button>
+        </div>
+        <div class="taobao-admin-forms">
+          <form id="taobaoAdminReviewForm" class="form-stack">
+            <h3>Kiểm duyệt sản phẩm để giới thiệu</h3>
+            <label>Mã sản phẩm nguồn (chỉ nội bộ) <input id="taobaoAdminReviewId" inputmode="numeric" pattern="[0-9]{6,20}" maxlength="20" required></label>
+            <label>Ngành hàng tiếng Việt <input id="taobaoAdminCategory" maxlength="100" required placeholder="Ví dụ: Phụ kiện điện thoại"></label>
+            <label>Ảnh BESI đã được cấp quyền (không bắt buộc)
+              <input id="taobaoAdminImage" maxlength="250" placeholder="/images/taobao/ten-anh.jpg">
+            </label>
+            <label class="taobao-admin-confirm"><input type="checkbox" id="taobaoAdminRights" required> Tôi đã xác nhận quyền sử dụng thông tin/ảnh của sản phẩm này.</label>
+            <label class="taobao-admin-confirm"><input type="checkbox" id="taobaoAdminTranslation" required> Tôi đã kiểm tra bản dịch tiếng Việt, phân loại và thông số.</label>
+            <button type="submit" class="primary">Duyệt giới thiệu (không mở bán)</button>
+          </form>
+          <form id="taobaoAdminTariffForm" class="form-stack">
+            <h3>Cước vận chuyển Trung Quốc → Việt Nam</h3>
+            <p class="hint">Dán JSON theo bảng giá thực tế của đối tác vận chuyển. Không đặt mặc định giá giả; dữ liệu lưu riêng trên máy chủ.</p>
+            <label>Biểu phí JSON từ đối tác
+              <textarea id="taobaoAdminTariffJson" rows="9" required spellcheck="false" placeholder='{"route":"CN-VN","currency":"VND","provider":"Tên đơn vị thực tế","updated_at":"2026-11-03T00:00:00Z","international_vnd_per_kg":null,"billing_step_kg":null,"volumetric_divisor":null,"handling_vnd":null,"domestic_vnd":{"hcm":null,"hn":null,"other":null}}'></textarea>
+            </label>
+            <label class="taobao-admin-confirm"><input type="checkbox" id="taobaoAdminTariffConfirm" required> Tôi xác nhận đây là biểu phí thật đã nhận từ đối tác, chưa hết hạn.</label>
+            <button type="submit" class="primary">Lưu biểu phí đã xác minh</button>
+          </form>
+        </div>
+        <div class="taobao-admin-queue-head">
+          <div><h3>Sản phẩm Taobao chờ duyệt</h3><p class="hint">Có tìm kiếm và phân trang, không bị giới hạn ở 30 mã đầu tiên.</p></div>
+          <form id="taobaoAdminFilterForm" class="taobao-admin-filters">
+            <input id="taobaoAdminQuery" placeholder="Tìm mã hoặc tên tiếng Việt" maxlength="80" aria-label="Tìm sản phẩm Taobao">
+            <select id="taobaoAdminView" aria-label="Trạng thái duyệt">
+              <option value="review">Chờ duyệt (đã dịch)</option>
+              <option value="pending">Chưa dịch xong</option>
+              <option value="approved">Đã duyệt</option>
+              <option value="all">Tất cả</option>
+            </select>
+            <button class="secondary" type="submit">Lọc</button>
+          </form>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Mã nội bộ</th><th>Tên tiếng Việt</th><th>Ngành hàng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+          <tbody id="taobaoAdminRows"><tr><td colspan="5">Đang tải dữ liệu Taobao…</td></tr></tbody></table></div>
+        <div class="taobao-admin-toolbar">
+          <span id="taobaoAdminPage">Trang 1</span>
+          <button type="button" class="secondary" id="taobaoAdminPrev">Trang trước</button>
+          <button type="button" class="secondary" id="taobaoAdminNext">Trang sau</button>
+        </div>
       </section>
       <section class="panel span2" id="allocation">
         <div class="section-head"><div><small>05 / SMART SOURCING</small><h2>Lập phương án chia đơn đa tổng kho</h2></div><span class="tag warning">DRAFT · Chưa đặt hàng thật</span></div>

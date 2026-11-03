@@ -248,3 +248,25 @@ hay giá mua hộ/thuế quan khi đối tác không cung cấp. Tính giá prev
 đồng nghĩa hệ thống thanh toán/đặt hàng Taobao đã được phép hoạt động. Kho
 staging JSON hiện giới hạn 25.000 item; đồng bộ hàng triệu item cần DB có chỉ
 mục và phân trang server trước khi mở rộng.
+
+
+## Quản trị Taobao ngay trong BESI Supplier Hub
+
+Đăng nhập BESI admin, sau đó mở `/admin-besi.html#taobao`:
+
+- Xem số hàng Taobao đã nhập, đã duyệt, SKU đủ giá và có thể báo cước,
+  trạng thái tỷ giá và biểu phí. Không tiết lộ API key qua trình duyệt.
+- Tìm kiếm và phân trang danh sách hàng chờ dịch / chờ duyệt / đã duyệt.
+  Chỉ cho phép **duyệt giới thiệu** khi đánh dấu cả quyền sử dụng nội dung
+  và xác nhận đã kiểm tra bản dịch tiếng Việt.
+- Thu hồi ngay preview không phù hợp (không ảnh hưởng hàng BESI/TechMall/DropBuy).
+- Làm mới tỷ giá, lưu biểu phí JSON có ngày hiệu lực và xác nhận từ đối tác,
+  hoặc kích hoạt đồng bộ API Taobao đã cấp quyền. Nếu thiếu quyền, API key,
+  từ khóa, bộ xử lý sẽ từ chối và nút tương ứng bị vô hiệu.
+- Không có nút mua hàng, thanh toán hay tự gửi đơn Taobao trên giao diện quản trị
+  này. Chỉ API có `requireAdmin` và giới hạn tần suất mới cho phép thay đổi.
+- Các thao tác nhập số lượng lớn qua JSONL vẫn dùng terminal nội bộ
+  `npm run taobao:feed`, không upload hàng loạt dữ liệu nguồn lên browser.
+- Ảnh sản phẩm vẫn phải là tài sản BESI được cấp quyền nằm trong
+  `public/images/taobao/`; có thể chọn ảnh này khi duyệt. Không hotlink
+  ảnh/sao chép nội dung từ người bán khi chưa có quyền tái sử dụng.

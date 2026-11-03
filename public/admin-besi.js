@@ -247,4 +247,149 @@
   refreshCoverage().catch(e=>{
     empty($('specCoverageRows'),4,'Chưa tải được báo cáo: '+e.message);
   });
+
+  // Taobao operations: every API below requires the existing BESI admin session.
+  // Only textContent is used for IDs, translated names and error text.
+  const taobaoQueue={page:1,limit:20,q:'',view:'review',total:0};
+  async function refreshTaobaoStatus(){
+    const response=await request('/api/admin/taobao/status');
+    const s=response.data,counts=s.counts||{};
+    $('taobaoAdminStaged').textContent=String(counts.staged??0);
+    $('taobaoAdminApproved').textContent=String(counts.approved_previews??0);
+    $('taobaoAdminPriced').textContent=String(counts.price_quotes_ready??0);
+    $('taobaoAdminShipped').textContent=String(counts.shipping_quotes_ready??0);
+    $('taobaoAdminFxStatus').textContent=s.fx?.ready
+      ?'FX CNY/VND: '+Math.round(s.fx.rate_vnd_per_cny).toLocaleString('vi-VN')+' đ · '+String(s.fx.as_of).slice(0,10)
+      :'Chưa có tỷ giá CNY/VND còn hiệu lực';
+    $('taobaoAdminFreightStatus').textContent=s.freight_tariff?.ready
+      ?'Biểu phí còn hạn: '+String(s.freight_tariff.updated_at).slice(0,10)
+      :'Chưa có biểu phí vận chuyển hợp lệ';
+    $('taobaoAdminSyncStatus').textContent=s.manual_sync?.running
+      ?'Đang đồng bộ danh mục…':s.staging_lock?.busy
+        ?'Kho chờ đang được xử lý'
+        :s.manual_sync?.last_error?'Lỗi: '+s.manual_sync.last_error
+        :s.manual_sync?.finished_at?'Đã hoàn tất lượt đồng bộ':'Chưa chạy đồng bộ thủ công';
+    $('taobaoAdminRunSync').disabled=!s.data_permission||!s.api_credentials_configured
+      ||s.manual_sync?.running===true||s.staging_lock?.busy===true;
+    return s;
+  }
+  async function refreshTaobaoQueue(){
+    const params=new URLSearchParams({page:String(taobaoQueue.page),
+      limit:String(taobaoQueue.limit),q:taobaoQueue.q,view:taobaoQueue.view});
+    const response=await request('/api/admin/taobao/review?'+params);
+    const data=response.data||{},rows=Array.isArray(data.rows)?data.rows:[];
+    taobaoQueue.total=Number(data.total)||0;
+    const tbody=$('taobaoAdminRows');tbody.replaceChildren();
+    if(!rows.length)empty(tbody,5,'Không tìm thấy sản phẩm phù hợp ở trạng thái này.');
+    for(const entry of rows){
+      const tr=document.createElement('tr');
+      cell(tr,entry.id);
+      cell(tr,entry.title_vi||'Chưa có bản dịch',true);
+      cell(tr,entry.category_vi||'Chưa phân loại');
+      cell(tr,entry.preview_approved?'Đã duyệt':entry.translation_status==='translated'?'Chờ duyệt':'Chưa dịch xong');
+      const action=cell(tr,''),button=document.createElement('button');
+      button.type='button';button.className='secondary';
+      button.textContent=entry.preview_approved?'Thu hồi':'Chọn để duyệt';
+      button.disabled=!entry.preview_approved&&entry.translation_status!=='translated';
+      button.addEventListener('click',async()=>{
+        if(entry.preview_approved){
+          if(!confirm('Thu hồi ngay sản phẩm khỏi tab Taobao?'))return;
+          button.disabled=true;
+          try{
+            await request('/api/admin/taobao/revoke/'+encodeURIComponent(entry.id),'POST',{});
+            message('Đã thu hồi preview Taobao; không ảnh hưởng hàng đang bán.');
+            await Promise.all([refreshTaobaoStatus(),refreshTaobaoQueue()]);
+          }catch(e){message(e.message,true);}
+          finally{button.disabled=false;}
+        }else{
+          $('taobaoAdminReviewId').value=entry.id;
+          $('taobaoAdminCategory').value=entry.category_vi||'';
+          $('taobaoAdminImage').value='';
+          $('taobaoAdminRights').checked=false;
+          $('taobaoAdminTranslation').checked=false;
+          $('taobaoAdminReviewForm').scrollIntoView({behavior:'smooth',block:'center'});
+          message('Kiểm tra bản dịch, quyền sử dụng và hình ảnh trước khi duyệt.');
+        }
+      });
+      action.append(button);tbody.append(tr);
+    }
+    const pages=Math.max(1,Math.ceil(taobaoQueue.total/taobaoQueue.limit));
+    $('taobaoAdminPage').textContent='Trang '+taobaoQueue.page+'/'+pages+' · '+taobaoQueue.total+' kết quả';
+    $('taobaoAdminPrev').disabled=taobaoQueue.page<=1;
+    $('taobaoAdminNext').disabled=taobaoQueue.page>=pages;
+  }
+  async function refreshTaobao(){
+    await Promise.all([refreshTaobaoStatus(),refreshTaobaoQueue()]);
+  }
+  $('taobaoAdminReload')?.addEventListener('click',()=>{
+    refreshTaobao().catch(e=>message('Taobao: '+e.message,true));
+  });
+  $('taobaoAdminRefreshFx')?.addEventListener('click',async e=>{
+    e.currentTarget.disabled=true;
+    try{
+      const result=await request('/api/admin/taobao/fx-refresh','POST',{});
+      message('Đã cập nhật tỷ giá CNY/VND tham khảo: '+Math.round(result.data.rate_vnd_per_cny).toLocaleString('vi-VN')+' đ');
+      await refreshTaobaoStatus();
+    }catch(err){message(err.message,true);}
+    finally{e.currentTarget.disabled=false;}
+  });
+  $('taobaoAdminRunSync')?.addEventListener('click',async e=>{
+    if(!confirm('Đồng bộ dữ liệu qua API Taobao đã được cấp quyền? Không tự mở bán.'))return;
+    e.currentTarget.disabled=true;
+    try{
+      await request('/api/admin/taobao/sync','POST',{});
+      message('Đã khởi chạy đồng bộ dữ liệu Taobao vào kho chờ riêng.');
+      await refreshTaobaoStatus();
+    }catch(err){message(err.message,true);}
+  });
+  $('taobaoAdminFilterForm')?.addEventListener('submit',e=>{
+    e.preventDefault();
+    taobaoQueue.q=$('taobaoAdminQuery').value.trim().slice(0,80);
+    taobaoQueue.view=$('taobaoAdminView').value;
+    taobaoQueue.page=1;
+    refreshTaobaoQueue().catch(error=>message(error.message,true));
+  });
+  $('taobaoAdminPrev')?.addEventListener('click',()=>{
+    if(taobaoQueue.page<=1)return;
+    taobaoQueue.page--;
+    refreshTaobaoQueue().catch(error=>message(error.message,true));
+  });
+  $('taobaoAdminNext')?.addEventListener('click',()=>{
+    if(taobaoQueue.page*taobaoQueue.limit>=taobaoQueue.total)return;
+    taobaoQueue.page++;
+    refreshTaobaoQueue().catch(error=>message(error.message,true));
+  });
+  $('taobaoAdminReviewForm')?.addEventListener('submit',e=>{
+    e.preventDefault();
+    submit(e.currentTarget,async()=>{
+      const id=$('taobaoAdminReviewId').value.trim();
+      if(!/^[0-9]{6,20}$/.test(id))throw Error('Mã Taobao không hợp lệ');
+      if(!$('taobaoAdminRights').checked||!$('taobaoAdminTranslation').checked)
+        throw Error('Cần xác nhận quyền dữ liệu và bản dịch đã được kiểm duyệt');
+      await request('/api/admin/taobao/approve/'+encodeURIComponent(id),'POST',{
+        rightsConfirmed:true,translationReviewed:true,
+        category:$('taobaoAdminCategory').value.trim(),
+        image:$('taobaoAdminImage').value.trim()
+      });
+      message('Đã duyệt preview Taobao; sản phẩm chưa được phép thanh toán.');
+      e.currentTarget.reset();
+      await refreshTaobao();
+    });
+  });
+  $('taobaoAdminTariffForm')?.addEventListener('submit',e=>{
+    e.preventDefault();
+    submit(e.currentTarget,async()=>{
+      if(!$('taobaoAdminTariffConfirm').checked)
+        throw Error('Cần xác nhận biểu phí từ đối tác vận chuyển');
+      const tariff=JSON.parse($('taobaoAdminTariffJson').value);
+      await request('/api/admin/taobao/tariff','POST',{tariff,confirmed:true});
+      message('Đã lưu biểu phí thực tế cho Taobao, sẽ tự áp dụng vào báo giá preview.');
+      $('taobaoAdminTariffConfirm').checked=false;
+      await refreshTaobaoStatus();
+    });
+  });
+  refreshTaobao().catch(error=>{
+    empty($('taobaoAdminRows'),5,'Chưa tải được hệ thống Taobao: '+error.message);
+  });
+
 })();
