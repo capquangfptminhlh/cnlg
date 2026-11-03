@@ -165,7 +165,7 @@ npm run taobao:review -- list
   `Tổng tạm tính = giá hàng quy đổi + ship VNĐ`.
   Giá vốn thực tế/chiết khấu, thuế nhập khẩu và VAT **không có** nếu chưa
   được xác minh; kết quả luôn ghi chú chưa gồm thuế/phí phát sinh.
-  Nếu thiếu kích thước, hiển thị cảnh báo sai số do cước thể tích.
+  Nếu thiếu kích thước kiện hàng, KHÔNG hiển thị tổng phí ship vì cước thể tích có thể làm chi phí tăng.
 
 - Tab riêng /taobao có lựa chọn giao TP.HCM, Hà Nội hoặc tỉnh khác.
   API /api/taobao/products trả breakdown VNĐ chỉ cho preview đã được
@@ -205,3 +205,46 @@ TAOBAO_FX_AUTO_REFRESH=1
 - Để tự cập nhật từ nguồn dữ liệu đối tác khác, cần tích hợp đúng API/feed
   được quyền sử dụng; command `npm run taobao:feed -- ... --confirm-rights`
   hiện chỉ nhận file, chưa chạy theo lịch tự động.
+
+
+## Hoàn thiện code vận hành: SKU, đồng bộ an toàn, trạng thái & thời hạn giá
+
+Đường nhập dữ liệu được cấp quyền hỗ trợ tùy chọn `sku_variants` cho giá và
+đóng gói **từng biến thể**, không lấy giá ưu đãi thấp nhất làm giá mọi SKU.
+Ví dụ một dòng JSONL (dữ liệu minh họa, KHÔNG phải hàng thật):
+
+```json
+{"item_id":"123456789012","title_zh":"手机数据线","description_zh":"快充 数据线","category_zh":"手机配件","sku_variants":[{"sku":"SKU-RED-1M","label_zh":"红色 1米","price_cny":18.5,"shipping_weight_kg":0.2,"china_domestic_shipping_cny":0,"dimensions_cm":{"length":20,"width":15,"height":8}},{"sku":"SKU-BLUE-2M","label_zh":"蓝色 2米","price_cny":23,"shipping_weight_kg":0.3,"china_domestic_shipping_cny":2,"dimensions_cm":{"length":24,"width":20,"height":8}}]}
+```
+
+- Nếu có SKU, model Ollama dịch `label_zh` qua `options_vi`; chỉ hiển thị
+  biến thể sau khi kiểm duyệt bằng `taobao:review`. Mỗi biến thể có giá VNĐ
+  và tổng phí vận chuyển tính riêng, chỉ hiện thông tin đã đủ cơ sở.
+- Lượt làm mới API affiliate chỉ chứa giá sản phẩm và thiếu mô tả, cân nặng,
+  cước TQ hay biến thể sẽ **không xóa dữ liệu được cấp quyền từ feed** nếu
+  tiêu đề nguồn không đổi. Nếu tên nguồn thay đổi, phần duyệt bị hủy.
+- Giá sản phẩm trong kho chờ quá **7 ngày** mà không được làm mới sẽ không
+  được báo giá, dù tỷ giá CNY/VND còn mới.
+- Chạy một quy trình ghi vào `data/taobao-staging.json` tại một thời điểm.
+  Khoá `*.write.lock` ngăn đồng bộ, nhập file và duyệt hàng ghi đè nhau.
+  Nếu tác vụ bị crash khiến khoá còn lại, **chỉ xóa thủ công sau khi đã
+  xác minh không còn tác vụ nhập/duyệt nào chạy**. Không tự phá khóa.
+- Lệnh quản trị chỉ chạy trong terminal nội bộ, không có API public:
+
+```powershell
+npm run taobao:ops -- status
+npm run taobao:ops -- fx:refresh
+npm run taobao:ops -- tariff:set .\private\carrier.json --confirm-carrier
+```
+
+  `status` chỉ trả về số lượng, trạng thái FX/tariff và số SKU đủ dữ liệu,
+  không in token API hay mã nguồn hàng. `tariff:set` chỉ chấp nhận biểu phí
+  thật có nguồn và ngày cập nhật còn hạn theo schema từ
+  `docs/TAOBAO-SHIPPING.template.json`. Dữ liệu runtime nằm trong `data/`,
+  tuyệt đối không commit.
+
+**Giới hạn vận hành còn lại:** không thể tự tạo API keys, tự biết cân nặng
+hay giá mua hộ/thuế quan khi đối tác không cung cấp. Tính giá preview không
+đồng nghĩa hệ thống thanh toán/đặt hàng Taobao đã được phép hoạt động. Kho
+staging JSON hiện giới hạn 25.000 item; đồng bộ hàng triệu item cần DB có chỉ
+mục và phân trang server trước khi mở rộng.

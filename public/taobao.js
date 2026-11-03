@@ -70,7 +70,29 @@ function productCard(p){
   const body=elem('div','item-body');
   body.append(elem('span','item-cat',p.category||'Taobao'),elem('h3','',p.name||'Sản phẩm'));
   if(p.description)body.append(elem('p','',p.description.slice(0,150)));
-  body.append(quoteBlock(p.pricing));
+  const pricingHost=elem('div','item-price-host');
+  const variants=Array.isArray(p.variants)?p.variants:[];
+  if(variants.length){
+    const label=elem('label','variant-label','Chọn phân loại');
+    const select=elem('select','variant-select');
+    const labelId='variant-'+String(p.id||'').replace(/[^a-zA-Z0-9_-]/g,'');
+    select.id=labelId;
+    label.htmlFor=labelId;
+    for(const v of variants){
+      const option=elem('option','',v.label||'Phân loại');
+      option.value=v.id;
+      select.append(option);
+    }
+    select.addEventListener('change',()=>{
+      const selected=variants.find(v=>v.id===select.value);
+      pricingHost.replaceChildren(quoteBlock(selected?.pricing));
+    });
+    const selector=elem('div','variant-selector');
+    selector.append(label,select);
+    body.append(selector);
+  }
+  pricingHost.append(quoteBlock(variants.length?variants[0].pricing:p.pricing));
+  body.append(pricingHost);
   body.append(elem('span','item-state','Đang xác minh đặt hàng'));
   card.append(art,body);return card;
 }

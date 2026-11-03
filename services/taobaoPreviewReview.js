@@ -7,6 +7,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const importer = require('./sources/taobaoImporter');
+const stageLock = require('./taobaoStageLock');
 
 const validId = value => /^[0-9]{6,20}$/.test(String(value||''));
 const allowedImage = image => !image || /^\/images\/taobao\/[a-z0-9/_-]+\.(?:jpg|jpeg|png|webp)$/i.test(image);
@@ -40,7 +41,9 @@ function list(options={}){
 function approve(id,request={},options={}){
   if(request.rightsConfirmed!==true||request.translationReviewed!==true)
     throw Error('Phải xác nhận quyền sử dụng dữ liệu và đã kiểm tra bản dịch');
-  const s=importer.read(options.file);
+  const file=options.file||path.resolve(__dirname,'../data/taobao-staging.json');
+  return stageLock.withLockSync(file,()=>{
+  const s=importer.read(file);
   const row=findRow(s.items,id);
   if(!isFullyTranslated(row))throw Error('Tiêu đề, mô tả hoặc phân loại vẫn chưa được dịch đầy đủ');
   const category=cleanVi(request.category,100);
@@ -56,16 +59,20 @@ function approve(id,request={},options={}){
   row.category_vi=category; row.besi_image=image;
   row.rights_verified=true;row.preview_approved=true;row.published=true;
   row.purchasable=false;row.preview_reviewed_at=new Date().toISOString();
-  importer.save(options.file||path.resolve(__dirname,'../data/taobao-staging.json'),s.items);
+  importer.save(file,s.items);
   return {id:String(row.id),title_vi:row.title_vi,category_vi:category,
     approved_for_preview:true,can_order:false};
+  });
 }
 function revoke(id,options={}){
-  const s=importer.read(options.file);
+  const file=options.file||path.resolve(__dirname,'../data/taobao-staging.json');
+  return stageLock.withLockSync(file,()=>{
+  const s=importer.read(file);
   const row=findRow(s.items,id);
   row.rights_verified=false;row.preview_approved=false;row.published=false;
   row.purchasable=false;
-  importer.save(options.file||path.resolve(__dirname,'../data/taobao-staging.json'),s.items);
+  importer.save(file,s.items);
   return {id:String(row.id),approved_for_preview:false,can_order:false};
+  });
 }
 module.exports={isFullyTranslated,list,approve,revoke};

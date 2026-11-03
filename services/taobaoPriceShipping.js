@@ -12,6 +12,7 @@ const SHIPPING_PATH=path.resolve(__dirname,'../data/taobao-shipping.json');
 const RATE_URL='https://open.er-api.com/v6/latest/CNY';
 const RATE_SOURCE='ExchangeRate-API';
 const MAX_AGE_MS=48*3600*1000;
+const MAX_PRODUCT_PRICE_AGE_MS=7*24*3600*1000;
 const validNonnegative=x=>x!==null&&x!==undefined&&String(x).trim()!==''&&Number.isFinite(Number(x))&&Number(x)>=0;
 const positive=x=>validNonnegative(x)&&Number(x)>0;
 const money=x=>Math.round(Number(x));
@@ -109,6 +110,12 @@ function quote(row,options={}){
   const rate=currentRate(options.rate||null,options.now||Date.now());
   const cny=Number(row?.price_cny_reference);
   if(!positive(row?.price_cny_reference))return {status:'unavailable',reason:'missing_product_price'};
+  // An old Taobao listing price is not a current quote, even if FX is fresh.
+  const checkedAt=timestamp(row?.updated_at);
+  const now=options.now||Date.now();
+  if(!Number.isFinite(checkedAt)||checkedAt>now+3600000
+    ||now-checkedAt>MAX_PRODUCT_PRICE_AGE_MS)
+    return {status:'unavailable',reason:'product_price_stale'};
   if(!rate)return {status:'unavailable',reason:'fx_missing_or_stale'};
   const item_vnd=money(cny*rate.rate);
   const base={status:'partial',item_vnd,region,region_name:regionName[region],
