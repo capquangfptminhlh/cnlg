@@ -378,6 +378,51 @@
       await refreshTaobao();
     });
   });
+  $('taobaoAdminShippingCheckForm')?.addEventListener('submit',event=>{
+    event.preventDefault();
+    submit(event.currentTarget,async()=>{
+      if(!$('taobaoAdminShippingConfirm').checked)
+        throw Error('Cần xác minh thông số kiện và cước ship nội địa TQ');
+      const dimensions_cm={
+        length:Number($('taobaoAdminShippingLength').value),
+        width:Number($('taobaoAdminShippingWidth').value),
+        height:Number($('taobaoAdminShippingHeight').value)
+      };
+      const data=await request('/api/admin/taobao/shipping-check','POST',{
+        region:$('taobaoAdminShippingRegion').value,
+        shipping_weight_kg:Number($('taobaoAdminShippingWeight').value),
+        china_domestic_shipping_cny:Number($('taobaoAdminShippingChinaDomestic').value),
+        dimensions_cm
+      });
+      const quote=data.data||{},output=$('taobaoAdminShippingResult');
+      output.hidden=false;
+      if(quote.status!=='estimate'){
+        const causes={
+          fx_missing_or_stale:'Chưa có tỷ giá CNY/VND hợp lệ.',
+          shipping_tariff_missing:'Chưa cấu hình biểu phí vận chuyển còn hạn.',
+          china_domestic_shipping_missing:'Chưa xác minh ship nội địa Trung Quốc.',
+          shipping_weight_missing:'Thiếu cân nặng kiện.',
+          dimensions_unverified:'Thiếu kích thước kiện hàng.'
+        };
+        output.textContent='CHƯA BÁO ĐƯỢC PHÍ SHIP: '+
+          (causes[quote.reason]||'Thông tin vận chuyển chưa đủ hoặc chưa được xác minh.');
+        return;
+      }
+      const fmt=v=>Math.round(Number(v||0)).toLocaleString('vi-VN')+' đ';
+      output.textContent=[
+        'KẾT QUẢ PHÍ SHIP THAM KHẢO · '+quote.region_name,
+        'Ship nội địa Trung Quốc: '+fmt(quote.china_domestic_shipping_vnd),
+        'Vận chuyển Trung Quốc → Việt Nam: '+fmt(quote.international_shipping_vnd),
+        'Giao nội địa Việt Nam: '+fmt(quote.domestic_vn_shipping_vnd),
+        'Phí xử lý: '+fmt(quote.handling_vnd),
+        'Cân nặng tính cước: '+quote.billable_weight_kg+' kg',
+        'TỔNG PHÍ SHIP DỰ KIẾN: '+fmt(quote.shipping_vnd),
+        'Tỷ giá tham khảo: 1 CNY ≈ '+fmt(quote.rate_vnd_per_cny),
+        'Biểu phí cập nhật: '+String(quote.shipping_tariff_as_of||'').slice(0,10),
+        'Chưa gồm thuế, phí nhập khẩu và phụ phí phát sinh. Không phải báo giá chính thức.'
+      ].join('\n');
+    });
+  });
   $('taobaoAdminTariffForm')?.addEventListener('submit',e=>{
     e.preventDefault();
     submit(e.currentTarget,async()=>{
