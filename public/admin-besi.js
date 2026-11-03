@@ -411,7 +411,7 @@
       if(!response.ok||result.success!==true)
         throw Error(result.error||'Không lưu được ảnh sản phẩm');
       const url=String(result.data?.image||'');
-      if(!/^\\/images\\/taobao\\/[a-f0-9]{64}\\.(?:jpg|png|webp)$/i.test(url))
+      if(!new RegExp('^/images/taobao/[a-f0-9]{64}[.](?:jpg|png|webp)$','i').test(url))
         throw Error('Đường dẫn ảnh BESI trả về không hợp lệ');
       $('taobaoAdminImage').value=url;
       const preview=$('taobaoAdminMediaPreview');
