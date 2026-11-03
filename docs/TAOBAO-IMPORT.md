@@ -270,3 +270,23 @@ mục và phân trang server trước khi mở rộng.
 - Ảnh sản phẩm vẫn phải là tài sản BESI được cấp quyền nằm trong
   `public/images/taobao/`; có thể chọn ảnh này khi duyệt. Không hotlink
   ảnh/sao chép nội dung từ người bán khi chưa có quyền tái sử dụng.
+
+
+## Tải ảnh được cấp quyền lên BESI (không hotlink)
+
+Trong `/admin-besi.html#taobao`, chọn một sản phẩm cần duyệt:
+
+1. Đánh dấu đã có **quyền sử dụng nội dung và ảnh**.
+2. Chọn file ảnh JPEG, PNG hoặc WebP hợp lệ **tối đa 3 MB** ngay trên máy
+   quản trị, nhấn **Tải ảnh lên kho BESI**.
+3. Backend đòi phiên admin hợp lệ + quyền đã xác nhận, kiểm tra chữ ký
+   định dạng file, tạo tên SHA-256 thay vì lưu tên file nhà cung cấp và ghi
+   ảnh vào `public/images/taobao/` trên máy chủ. Không lấy URL nguồn.
+4. Đường dẫn ảnh được điền vào form duyệt. Duyệt lại nội dung tiếng Việt
+   trước khi bấm "Duyệt giới thiệu". Ảnh không tự công khai trong danh mục
+   chờ hay biến mặt hàng thành hàng có thể mua.
+
+Ảnh này là **tài sản runtime riêng của máy chủ**, được `.gitignore` bỏ qua.
+Phải sao lưu `public/images/taobao/` cùng với `data/` trước khi chuyển
+server hoặc cập nhật cơ sở hạ tầng. Không dùng ảnh nếu chưa có quyền.
+Không nhận SVG, HTML, định dạng lạ hay ảnh từ URL bên ngoài.
