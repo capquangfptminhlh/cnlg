@@ -14,3 +14,6 @@ data/*
 
 # Bản sao cloudflared cho tunnel của hàng (~60 MB, không đưa lên git)
 tools/*.exe
+
+# Taobao licensed media copied by admin at runtime (not source-controlled)
+public/images/taobao/*
