@@ -59,6 +59,7 @@ function normalize(raw,keyword) {
   const dimensions_cm=Object.values(dims).every(x=>x!==null&&x>0&&x<1000)?dims:null;
   // Optional variant-level prices from a permitted supplier feed.
   // A search listing's lowest promotional price is NOT the price of every SKU.
+  if(raw.sku_variants!==undefined&&!Array.isArray(raw.sku_variants))return null;
   const variantInput=Array.isArray(raw.sku_variants)?raw.sku_variants:[];
   if(variantInput.length>50)return null;
   const skuVariants=[];
@@ -75,6 +76,9 @@ function normalize(raw,keyword) {
     const vd=v.dimensions_cm||{};
     const vdims={length:n(vd.length),width:n(vd.width),height:n(vd.height)};
     skuVariants.push({sku,label_zh:label,
+      // Only a licensed SKU feed can refresh the variant price timestamp.
+      // An unrelated affiliate product-level price update must not renew it.
+      updated_at:new Date().toISOString(),
       price_cny_reference:price!==null&&price>0&&price<=10000000?price:null,
       shipping_weight_kg:weight!==null&&weight>0&&weight<=200?weight:null,
       china_domestic_shipping_cny:chinaDomestic!==null&&chinaDomestic>=0&&chinaDomestic<=50000?chinaDomestic:null,
