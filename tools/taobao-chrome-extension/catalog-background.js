@@ -34,6 +34,7 @@ async function capture(items,sender,force=false){
     .map(x=>String(x.item_id)+':'+String(x.price_cny)+':'+String(x.stock_status)).join('|');
   const last=recent.get(fingerprint)||0;
   if(!force&&Date.now()-last<INTERVAL)return {sent:false,reason:'already_seen'};
+  recent.set(fingerprint,Date.now()); // suppress overlapping page-load sends
   // Do not forward account cookies, Taobao bearer tokens, DOM HTML or full
   // customer address even when the source site includes those fields.
   const payload={rightsConfirmed:true,items:items.map(x=>({
@@ -47,6 +48,7 @@ async function capture(items,sender,force=false){
     body:JSON.stringify(payload)});
   const result=await res.json().catch(()=>({}));
   if(!res.ok||result.success!==true){
+    recent.delete(fingerprint);
     if(res.status===401||res.status===403)await stop();
     return {sent:false,reason:result.error||'Capture rejected by BESI',status:res.status};
   }
