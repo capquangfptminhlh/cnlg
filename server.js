@@ -40,6 +40,8 @@ const taobaoOps = require('./scripts/taobao-ops');
 const taobaoManualSync = require('./services/taobaoManualSync');
 const taobaoStageLock = require('./services/taobaoStageLock');
 const taobaoMedia = require('./services/taobaoApprovedMedia');
+const taobaoOfficialShipping = require('./services/taobaoOfficialShipping');
+const taobaoStageImporter = require('./services/sources/taobaoImporter');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
@@ -215,6 +217,25 @@ app.post('/api/admin/taobao/revoke/:id',requireAdmin,rateLimit('taobao-admin-rev
   }catch(e){
     res.status(/staging busy/.test(e.message)?409:400)
       .json({success:false,error:String(e.message).slice(0,200)});
+  }
+});
+// Only an authorized human can enter a real Taobao checkout quote. This is
+// NOT an API call to Taobao/Cainiao and never creates a payable order.
+app.post('/api/admin/taobao/official-shipping',requireAdmin,rateLimit('taobao-official-ship',60e3,20),(req,res)=>{
+  try{
+    const b=req.body||{},staged=taobaoStageImporter.read().items||[];
+    const product=staged.find(x=>String(x.id)===String(b.item_id));
+    if(!product)throw Error('Sản phẩm chưa được nhập vào kho chờ Taobao');
+    const variants=Array.isArray(product.sku_variants)?product.sku_variants:[];
+    const sku=String(b.sku||'');
+    if(variants.length&&!variants.some(v=>v.sku===sku))
+      throw Error('Phải chọn đúng SKU có trong dữ liệu đã được cấp quyền');
+    if(!variants.length&&sku)throw Error('Sản phẩm không có SKU được xác minh');
+    const result=taobaoOfficialShipping.save(b);
+    res.set('Cache-Control','no-store').json({success:true,data:result});
+  }catch(error){
+    res.status(/staging busy/.test(String(error.message))?409:400).json({
+      success:false,error:String(error.message).slice(0,180)});
   }
 });
 app.post('/api/admin/taobao/shipping-check',requireAdmin,rateLimit('taobao-admin-shipping-check',60e3,30),(req,res)=>{
