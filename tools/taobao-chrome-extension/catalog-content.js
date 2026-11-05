@@ -1,7 +1,7 @@
 (()=>{
 'use strict';
 // Browser DOM observation only; does not fetch private Taobao endpoints,
-// read cookies/localStorage, click purchase buttons or navigate pages.
+// access account secrets, place orders or navigate pages.
 if(globalThis.__besiCatalogContentInstalled)return;
 globalThis.__besiCatalogContentInstalled=true;
 const allowedHost=h=>h==='taobao.com'||h.endsWith('.taobao.com');
