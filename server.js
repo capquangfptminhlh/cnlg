@@ -42,6 +42,7 @@ const taobaoStageLock = require('./services/taobaoStageLock');
 const taobaoMedia = require('./services/taobaoApprovedMedia');
 const taobaoOfficialShipping = require('./services/taobaoOfficialShipping');
 const taobaoStageImporter = require('./services/sources/taobaoImporter');
+const taobaoBrowserPairing = require('./services/taobaoBrowserPairing');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
@@ -221,6 +222,48 @@ app.post('/api/admin/taobao/revoke/:id',requireAdmin,rateLimit('taobao-admin-rev
 });
 // Only an authorized human can enter a real Taobao checkout quote. This is
 // NOT an API call to Taobao/Cainiao and never creates a payable order.
+// Pair a browser extension running locally on the operator's Windows PC.
+// The Taobao login/session is kept by Chrome; BESI never receives cookies.
+app.post('/api/admin/taobao/browser-pairing',requireAdmin,rateLimit('taobao-browser-pair',15*60e3,8),(req,res)=>{
+  res.set('Cache-Control','no-store').json({
+    success:true,data:taobaoBrowserPairing.issue()
+  });
+});
+app.get('/api/admin/taobao/browser-pairing',requireAdmin,rateLimit('taobao-browser-pair-read',60e3,60),(req,res)=>{
+  res.set('Cache-Control','no-store').json({success:true,
+    data:taobaoBrowserPairing.status()});
+});
+// One-use bridge endpoint, deliberately NOT admin-cookie-authenticated.
+// A paired extension sends only the confirmed quote; no Taobao credentials,
+// cookies, browser document/screenshot or customer street address.
+app.post('/api/taobao/browser-quote',rateLimit('taobao-browser-quote',60e3,16),(req,res)=>{
+  const origin=String(req.get('origin')||'');
+  if(!/^chrome-extension:\/\/[a-p]{32}$/.test(origin))
+    return res.status(403).json({success:false,error:'Chỉ nhận tiện ích Chrome được ghép nối'});
+  const bearer=/^Bearer ([A-Za-z0-9_-]{32,100})$/.exec(String(req.get('authorization')||''));
+  if(!bearer||!taobaoBrowserPairing.verify(bearer[1]))
+    return res.status(401).json({success:false,error:'Mã kết nối hết hạn hoặc không hợp lệ'});
+  try{
+    const quote=req.body||{};
+    const products=taobaoStageImporter.read().items||[];
+    const product=products.find(p=>String(p.id)===String(quote.item_id));
+    if(!product)throw Error('Sản phẩm chưa được nhập vào kho Taobao');
+    const variants=Array.isArray(product.sku_variants)?product.sku_variants:[];
+    const sku=String(quote.sku||'');
+    if(variants.length&&!variants.some(v=>v.sku===sku))
+      throw Error('SKU không tồn tại trong kho Taobao');
+    if(!variants.length&&sku)throw Error('Sản phẩm không có SKU được xác minh');
+    // Validate first so failed attempts do not consume one-time codes.
+    taobaoOfficialShipping.validate(quote);
+    if(!taobaoBrowserPairing.consume(bearer[1]))
+      return res.status(401).json({success:false,error:'Mã kết nối đã được sử dụng'});
+    const saved=taobaoOfficialShipping.save(quote);
+    return res.set('Cache-Control','no-store').json({success:true,
+      data:{saved:saved.saved,state:saved.state,expires_at:saved.expires_at}});
+  }catch(error){
+    return res.status(400).json({success:false,error:String(error.message).slice(0,170)});
+  }
+});
 app.post('/api/admin/taobao/official-shipping',requireAdmin,rateLimit('taobao-official-ship',60e3,20),(req,res)=>{
   try{
     const b=req.body||{},staged=taobaoStageImporter.read().items||[];
