@@ -148,6 +148,20 @@ if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PRO
 app.disable('x-powered-by');
 app.use(forceHttps);
 app.use(securityHeaders);
+// Narrow CORS exception for the explicitly paired Chrome helper. Requests
+// still need a valid one-time bearer token and a real staged Taobao product.
+app.use('/api/taobao/browser-quote',(req,res,next)=>{
+  const origin=String(req.get('origin')||'');
+  if(/^chrome-extension:\/\/[a-p]{32}$/.test(origin)){
+    res.set('Access-Control-Allow-Origin',origin);
+    res.vary('Origin');
+    res.set('Access-Control-Allow-Headers','content-type,authorization');
+    res.set('Access-Control-Allow-Methods','POST, OPTIONS');
+    res.set('Access-Control-Max-Age','300');
+    if(req.method==='OPTIONS')return res.status(204).end();
+  }
+  next();
+});
 app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
 app.use(express.json({ limit: '100kb' }));
 // --- Trang có SEO (render phía server) – đặt trước static để "/" không trả index.html trần ---
