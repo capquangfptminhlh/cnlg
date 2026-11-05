@@ -423,6 +423,63 @@
       ].join('\n');
     });
   });
+  // Taobao account remains logged in ONLY in the operator's own Chrome.
+  // BESI pairs a locally installed extension with a one-use token, never a cookie.
+  $('taobaoAdminNewPair')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;
+    button.disabled=true;
+    try{
+      const result=await request('/api/admin/taobao/browser-pairing','POST',{});
+      $('taobaoAdminPairCode').value=result.data.token||'';
+      $('taobaoAdminPairStatus').textContent=
+        'Mã kết nối một lần, hiệu lực đến '+new Date(result.data.expires_at).toLocaleString('vi-VN')+
+        '. Dán vào tiện ích Chrome trên tab Taobao, không gửi cho người khác.';
+      message('Đã tạo mã ghép nối với tiện ích Chrome; không cần nhập mật khẩu Taobao.');
+    }catch(error){message(error.message,true);}
+    finally{button.disabled=false;}
+  });
+  $('taobaoAdminCopyPair')?.addEventListener('click',async()=>{
+    const code=$('taobaoAdminPairCode').value.trim();
+    if(!code){message('Chưa có mã kết nối mới.',true);return;}
+    try{
+      await navigator.clipboard.writeText(code);
+      message('Đã sao chép mã kết nối Chrome (mã chỉ dùng một lần).');
+    }catch(error){
+      $('taobaoAdminPairCode').focus();
+      $('taobaoAdminPairCode').select();
+      message('Trình duyệt không cho tự sao chép. Hãy dùng Ctrl+C tại ô mã.');
+    }
+  });
+  $('taobaoAdminOfficialQuoteForm')?.addEventListener('submit',event=>{
+    event.preventDefault();
+    submit(event.currentTarget,async()=>{
+      if(!$('taobaoAdminOfficialConfirmed').checked)
+        throw Error('Cần xác minh giá vận chuyển trọn gói Taobao về Việt Nam');
+      const method=$('taobaoAdminOfficialMethod').value;
+      const quote_state=$('taobaoAdminOfficialState').value;
+      const value=$('taobaoAdminOfficialAmount').value.trim();
+      const timestamp=$('taobaoAdminOfficialTime').value;
+      if(!timestamp)throw Error('Thiếu thời gian kiểm tra cước Taobao');
+      const shipping_amount=quote_state==='quoted'?(value===''?null:Number(value)):null;
+      if(quote_state==='quoted'&&(shipping_amount===null||!Number.isFinite(shipping_amount)))
+        throw Error('Cần số tiền ship do checkout Taobao hiển thị');
+      const quote={
+        item_id:$('taobaoAdminOfficialItemId').value.trim(),
+        sku:$('taobaoAdminOfficialSku').value.trim(),
+        region:$('taobaoAdminOfficialRegion').value,method,quote_state,
+        shipping_amount,currency:quote_state==='quoted'?$('taobaoAdminOfficialCurrency').value:null,
+        checked_at:new Date(timestamp).toISOString(),
+        source:'taobao_checkout',confirmedFromCheckout:true,
+        destination_country:'VN',quantity:1,
+        covers:quote_state==='quoted'?'door_to_door':null,
+        weighed_at_warehouse:$('taobaoAdminOfficialWeighed').checked,
+        free_shipping_confirmed:$('taobaoAdminOfficialFree').checked
+      };
+      await request('/api/admin/taobao/official-shipping','POST',quote);
+      message('Đã lưu cước Taobao tham khảo 24 giờ. Không tạo đơn mua hoặc thanh toán.');
+      event.currentTarget.reset();
+    });
+  });
   $('taobaoAdminTariffForm')?.addEventListener('submit',e=>{
     e.preventDefault();
     submit(e.currentTarget,async()=>{
