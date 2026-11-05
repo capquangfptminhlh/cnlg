@@ -132,3 +132,46 @@ $('send').addEventListener('click',async()=>{
   }catch(e){notify(e.message,true);}
   finally{button.disabled=false;}
 });
+
+/* Catalog capture is independent from the one-time shipping quote flow. */
+async function updateCatalogStatus(){
+  const state=await chrome.runtime.sendMessage({type:'BESI_CAPTURE_STATUS'});
+  if(state?.error)throw Error(state.error);
+  const text=state?.enabled
+    ?'Đang đồng bộ những trang Taobao anh mở. Đã ghi nhận: '+(state.sent||0)
+      +' sản phẩm. Kết thúc lúc '+new Date(state.expires_at).toLocaleTimeString('vi-VN')
+    :'Đã dừng hoặc mã kết nối đồng bộ hết hạn.';
+  notify(text,false,'catalogStatus');
+  $('catalogScan').disabled=!state?.enabled;
+}
+$('catalogStart').addEventListener('click',async()=>{
+  try{
+    const code=$('catalogPairCode').value.trim();
+    if(!$('catalogRights').checked)throw Error('Cần xác nhận quyền thu thập dữ liệu hợp lệ.');
+    if(!/^[A-Za-z0-9_-]{32,100}$/.test(code))
+      throw Error('Hãy lấy mã kết nối đồng bộ từ quản trị BESI.');
+    const r=await chrome.runtime.sendMessage({
+      type:'BESI_CAPTURE_START',token:code,rightsConfirmed:true
+    });
+    if(r?.error)throw Error(r.error);
+    $('catalogPairCode').value='';
+    notify('Đã bật đồng bộ. Hãy mở trang tìm kiếm/sản phẩm Taobao và duyệt các trang bằng tay.',false,'catalogStatus');
+    await updateCatalogStatus();
+  }catch(e){notify(e.message,true,'catalogStatus');}
+});
+$('catalogStop').addEventListener('click',async()=>{
+  try{
+    const r=await chrome.runtime.sendMessage({type:'BESI_CAPTURE_STOP'});
+    if(r?.error)throw Error(r.error);
+    $('catalogPairCode').value='';
+    await updateCatalogStatus();
+  }catch(e){notify(e.message,true,'catalogStatus');}
+});
+$('catalogScan').addEventListener('click',async()=>{
+  try{
+    const r=await chrome.runtime.sendMessage({type:'BESI_CAPTURE_SCAN_NOW'});
+    if(r?.error)throw Error(r.error);
+    notify('Đã quét '+(r?.count||0)+' sản phẩm từ trang hiện tại. Kết quả được đưa vào kho chờ sau khi server kiểm tra.',false,'catalogStatus');
+  }catch(e){notify(e.message,true,'catalogStatus');}
+});
+updateCatalogStatus().catch(error=>notify(error.message,true,'catalogStatus'));

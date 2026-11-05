@@ -186,6 +186,20 @@
             <pre id="taobaoAdminShippingResult" class="output" aria-live="polite" hidden></pre>
           </form>
           <div class="form-stack taobao-browser-pair">
+            <h3>Đồng bộ sản phẩm và tồn kho Taobao bằng Chrome</h3>
+            <p class="hint">Mở Taobao trên Chrome Windows và đăng nhập trực tiếp. Khi bật đồng bộ trong tiện ích, BESI đọc những trang anh chủ động truy cập, không cần APP KEY; không tự phân trang, tự mua hàng hoặc sao chép cookie.</p>
+            <label>Mã đồng bộ danh mục (chỉ xem trong quản trị, hiệu lực tối đa 20 phút)
+              <input id="taobaoCatalogCode" type="text" readonly spellcheck="false" autocomplete="off">
+            </label>
+            <div class="taobao-admin-toolbar">
+              <button id="taobaoCatalogNewPair" type="button" class="secondary">Tạo mã đồng bộ</button>
+              <button id="taobaoCatalogCopyPair" type="button" class="secondary">Sao chép mã</button>
+              <button id="taobaoCatalogRevokePair" type="button" class="secondary">Thu hồi mã</button>
+            </div>
+            <p id="taobaoCatalogPairStatus" class="hint" aria-live="polite">Chưa kết nối Chrome. Dữ liệu tải về nằm trong kho chờ, phải được dịch và duyệt trước khi công khai.</p>
+            <p class="hint">Mỗi lần mở trang Taobao, tiện ích tối đa 30 sản phẩm; số lượng tồn kho chỉ hiển thị khi Taobao công bố số cụ thể. Trạng thái tồn quan sát quá 2 giờ trở thành chưa xác minh.</p>
+          </div>
+          <div class="form-stack taobao-browser-pair">
             <h3>Đăng nhập Taobao & kiểm tra phí ship bằng Chrome</h3>
             <p class="hint">Đăng nhập bằng QR/mật khẩu ngay trên Taobao. Phiên đăng nhập được giữ tại Chrome Windows, BESI không lưu cookie hay mật khẩu Taobao.</p>
             <a class="secondary taobao-admin-open-taobao" href="https://www.taobao.com/" target="_blank" rel="noopener noreferrer">Mở Taobao để đăng nhập</a>

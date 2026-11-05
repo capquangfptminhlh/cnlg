@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const importer = require('./sources/taobaoImporter');
 const stageLock = require('./taobaoStageLock');
+const taobaoBrowserCatalog = require('./taobaoBrowserCatalog');
 
 const validId = value => /^[0-9]{6,20}$/.test(String(value||''));
 const allowedImage = image => !image || /^\/images\/taobao\/[a-z0-9/_-]+\.(?:jpg|jpeg|png|webp)$/i.test(image);
@@ -50,7 +51,8 @@ function list(options={}){
       id:String(row.id),title_vi:row.title_vi||'',category_vi:row.category_vi||'',
       translation_status:row.translation_status,
       preview_approved:row.preview_approved===true,
-      rights_verified:row.rights_verified===true
+      rights_verified:row.rights_verified===true,
+      availability:taobaoBrowserCatalog.availability(row)
     }))};
 }
 function approve(id,request={},options={}){

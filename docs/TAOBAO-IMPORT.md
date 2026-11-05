@@ -422,3 +422,53 @@ hiển thị trên trang thanh toán.
 - Hỗ trợ cửa hàng qua tiện ích Chrome **không phải hỗ trợ/ủy quyền API
   chính thức của Taobao/Cainiao**. Cần nghiệm thu trực tiếp với tài khoản
   thật, địa chỉ VN thật và cấu trúc checkout hiện tại.
+
+
+## Đồng bộ danh mục Taobao bằng phiên Chrome đã đăng nhập — không cần App Key
+
+BESI có thêm connector **operator-browser** riêng với API affiliate. Đây là
+cách thu thập dữ liệu mà tài khoản Taobao của quản trị viên **thực sự nhìn
+thấy trên những trang họ mở trong Chrome/Edge**, không phải API xuất toàn
+sàn hoặc công cụ vượt đăng nhập/CAPTCHA.
+
+**Các bước:** mở `/admin-besi.html#taobao` khi đã đăng nhập admin BESI →
+bấm **Tạo mã đồng bộ** (hiệu lực 20 phút) → cài/nạp lại tiện ích Chrome
+`tools/taobao-chrome-extension` v0.2+ → đăng nhập Taobao *trực tiếp*
+tại website Taobao → dán mã vào **Đồng bộ danh mục & tồn kho** trong
+tiện ích và xác nhận quyền sử dụng dữ liệu → **Bật đồng bộ**.
+
+Sau đó quản trị viên **tự duyệt trang tìm kiếm/danh mục/chi tiết sản phẩm**
+trên Taobao. Tiện ích cố đọc thông tin sản phẩm hiển thị (tối đa 30 mục
+mỗi trang), chỉ gửi ID/tiêu đề/giá tham khảo CNY, trạng thái hàng,
+thời điểm quan sát và URL sản phẩm về BESI. Không gửi cookie/mật khẩu,
+token phiên Taobao, địa chỉ giao, DOM HTML đầy đủ hoặc thông tin giỏ hàng.
+Trong tiện ích luôn có nút **Quét ngay** và **Dừng đồng bộ**; quản trị BESI
+có nút **Thu hồi mã**. Không tự chuyển trang, không gọi endpoint Taobao
+ẩn, không tự đặt hàng hoặc thanh toán.
+
+- Sản phẩm nhập từ Chrome có `catalog_observation_source=operator_browser`,
+  dùng cùng staging/lock với importer hiện có, **không trộn hàng DropBuy /
+  TechMall và không tự đưa lên danh mục bán**.
+- Chỉ ghi số lượng tồn nếu trang chi tiết thực sự có nhãn số
+  `库存 / 剩余` rõ ràng. Trang chỉ ghi còn hàng/hết hàng thì dùng
+  `in_stock/out_of_stock` với `stock_quantity=null`. Không thấy nhãn
+  thì `unknown`. Sau 2 giờ chưa được xác nhận lại, trạng thái hiển thị
+  trong quản trị trở thành **chưa xác minh**.
+- Giá sản phẩm **không hiển thị trên trang** thì giữ giá quan sát cũ
+  *kèm timestamp cũ*, tuyệt đối không tự làm mới hạn của giá.
+- Tên/mô tả/nhóm biến thể giữ được khi một trang list Taobao không cung cấp
+  các trường đầy đủ. Nếu nội dung nguồn thay đổi, quyền duyệt preview bị
+  huỷ và phải kiểm tra lại bản dịch + quyền sử dụng nội dung.
+- Dữ liệu vào kho chờ cần dịch qua Ollama hoặc con đường bản dịch đã kiểm
+  chứng trước khi người quản trị cấp quyền giới thiệu công khai. Nếu chưa
+  có Ollama thì mục đó vẫn nằm ở trạng thái **chờ dịch**.
+- Các trang Taobao đổi layout có thể không thu được ID/giá/tồn kho;
+  không được coi trang trắng là tình trạng hết hàng.
+- Staging JSON vẫn giới hạn **25.000 sản phẩm**. Muốn xử lý hàng triệu
+  sản phẩm cần database có chỉ mục, job queue, checkpoint, tái kiểm tra tồn
+  theo SKU và quyền dùng dữ liệu phù hợp; đăng nhập tài khoản người mua
+  **không đồng nghĩa có quyền sao chép toàn bộ Taobao**.
+
+Kiểm thử tự động xác minh bảo mật token và HTTP, logic dữ liệu, giá không
+bị làm mới giả và cờ tồn kho; cần thử **trên tài khoản Taobao thật / Chrome
+Windows thật** để nghiệm thu độ chính xác selector của từng layout.

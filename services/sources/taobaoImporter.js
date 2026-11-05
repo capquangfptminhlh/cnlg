@@ -178,7 +178,7 @@ async function mergeBatch(rawRows,keyword,items,seen,opt={}) {
     // verified data ONLY while the original title remains unchanged.
     // A source title change invalidates prior details and review.
     if(old&&keyword!=='partner-feed'
-      &&(old.detail_source==='licensed_feed'||old.keyword==='partner-feed')
+      &&(keyword==='operator-browser'||old.detail_source==='licensed_feed'||old.keyword==='partner-feed')
       &&old.title_zh===row.title_zh){
       if(!row.description_zh)row.description_zh=old.description_zh||'';
       if(!row.category_zh)row.category_zh=old.category_zh||'';
@@ -193,7 +193,8 @@ async function mergeBatch(rawRows,keyword,items,seen,opt={}) {
       if(!row.image_reference)row.image_reference=old.image_reference||'';
       if(!row.gallery_references.length)
         row.gallery_references=Array.isArray(old.gallery_references)?old.gallery_references.slice():[];
-      row.detail_source='licensed_feed';
+      row.detail_source=old.detail_source==='licensed_feed'?'licensed_feed':
+        (keyword==='operator-browser'?(old.detail_source||'operator_browser'):'licensed_feed');
     }
     const sameText=old&&old.title_zh===row.title_zh
       &&old.description_zh===row.description_zh

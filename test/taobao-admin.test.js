@@ -12,7 +12,8 @@ test('All Taobao dashboard operations are authenticated and rate-limited, never 
   const server=read('server.js');
   for(const [method,url] of [
     ['get','status'],['get','review'],['post','approve/:id'],
-    ['post','revoke/:id'],['post','tariff'],['post','shipping-check'],['post','fx-refresh'],['post','sync']]){
+    ['post','revoke/:id'],['post','tariff'],['post','shipping-check'],['post','fx-refresh'],['post','sync'],
+    ['get','catalog-pairing'],['post','catalog-pairing'],['delete','catalog-pairing']]){
     const route='/api/admin/taobao/'+url;
     const re=new RegExp("app\\."+method+"\\('"+route.replace(/\//g,'\\/').replace(':id',':id')+"',requireAdmin,rateLimit\\(");
     assert.match(server,re,'Taobao admin route needs auth and per-IP rate limit: '+route);
@@ -33,6 +34,8 @@ test('Taobao dashboard is behind the existing admin-besi asset gate and uses saf
   assert.match(html,/id="taobaoAdminReviewForm"/);
   assert.match(html,/id="taobaoAdminTariffForm"/);
   assert.match(html,/id="taobaoAdminPairCode"/);
+  assert.match(html,/id="taobaoCatalogCode"/);
+  assert.match(html,/id="taobaoCatalogRevokePair"/);
   assert.match(html,/id="taobaoAdminNewPair"/);
   assert.match(html,/id="taobaoAdminOfficialQuoteForm"/);
   assert.match(html,/id="taobaoAdminShippingCheckForm"/);

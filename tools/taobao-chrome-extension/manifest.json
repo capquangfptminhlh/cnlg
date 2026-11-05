@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BESI Taobao · Kiểm tra phí ship",
-  "version": "0.1.0",
-  "description": "Đọc phí ship hiển thị trên checkout Taobao sau khi bạn tự đăng nhập, gửi số tiền đã xác nhận về quản trị BESI bằng mã ghép nối một lần.",
+  "version": "0.2.0",
+  "description": "Read confirmed shipping from Taobao and, with explicit operator permission, sync visible Taobao catalog/stock observations to BESI staging while browsing.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -15,5 +15,19 @@
   "action": {
     "default_title": "BESI · Taobao Shipping",
     "default_popup": "popup.html"
-  }
+  },
+  "background": {
+    "service_worker": "catalog-background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.taobao.com/*"
+      ],
+      "js": [
+        "catalog-content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
 }
