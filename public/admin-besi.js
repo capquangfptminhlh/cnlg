@@ -291,7 +291,14 @@
       cell(tr,entry.id);
       cell(tr,entry.title_vi||'Chưa có bản dịch',true);
       cell(tr,entry.category_vi||'Chưa phân loại');
-      cell(tr,entry.preview_approved?'Đã duyệt':entry.translation_status==='translated'?'Chờ duyệt':'Chưa dịch xong');
+      const approval=entry.preview_approved?'Đã duyệt':entry.translation_status==='translated'
+        ?'Chờ duyệt':'Chưa dịch xong';
+      const stock=entry.availability||{};
+      const stockText=stock.verified
+        ?stock.status==='out_of_stock'?'Hết hàng (đã thấy)'
+          :'Có hàng'+(stock.quantity===null||stock.quantity===undefined?'':': '+stock.quantity)
+        :'Tồn kho chưa xác minh';
+      cell(tr,approval+' · '+stockText);
       const action=cell(tr,''),button=document.createElement('button');
       button.type='button';button.className='secondary';
       button.textContent=entry.preview_approved?'Thu hồi':'Chọn để duyệt';
