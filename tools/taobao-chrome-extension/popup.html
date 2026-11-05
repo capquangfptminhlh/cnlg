@@ -51,6 +51,19 @@
   <button id="send" type="button">Lưu cước đã kiểm tra về BESI</button>
   <p id="result" class="hint" aria-live="polite"></p>
 </section>
+<section id="catalogPanel">
+  <h2>4. Đồng bộ danh mục & tồn kho Taobao</h2>
+  <p>Anh có thể đồng bộ sản phẩm từ <b>những trang Taobao anh chủ động mở</b> sau khi đăng nhập. Không cần API key. Không tự quét toàn sàn hoặc vượt xác minh.</p>
+  <label>Mã kết nối đồng bộ (tạo trong quản trị BESI)
+    <input id="catalogPairCode" type="password" autocomplete="off" spellcheck="false" placeholder="Mã riêng, dùng tối đa 20 phút">
+  </label>
+  <label class="checkbox"><input id="catalogRights" type="checkbox"> Tôi có quyền sử dụng dữ liệu được thu thập cho hoạt động nội bộ BESI; chỉ quét các trang được phép.</label>
+  <button type="button" id="catalogStart">Bật đồng bộ trong 20 phút</button>
+  <button type="button" class="secondary" id="catalogScan">Quét ngay trang Taobao đang mở</button>
+  <button type="button" class="secondary" id="catalogStop">Dừng đồng bộ</button>
+  <p id="catalogStatus" class="hint" aria-live="polite">Chưa bật đồng bộ.</p>
+  <p class="hint">Khi bật, tiện ích đọc sản phẩm ở trang anh tự mở và gửi tối đa 30 mục/lần vào <b>kho chờ</b>. Chuyển trang thủ công để tiếp tục. Nếu Taobao không công bố số tồn, BESI sẽ ghi “chưa xác minh”, không tạo số lượng giả. Không tự xuất bản hay đặt hàng.</p>
+</section>
 <footer><small>Chỉ đọc trên tab Taobao đang mở. Không xuất mật khẩu, cookie, địa chỉ cụ thể hoặc nội dung trang. Không đặt hàng hay thanh toán.</small></footer>
 </main>
 <script src="popup.js"></script>
