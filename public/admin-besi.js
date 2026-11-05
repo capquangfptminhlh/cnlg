@@ -269,6 +269,11 @@
         ?'Kho chờ đang được xử lý'
         :s.manual_sync?.last_error?'Lỗi: '+s.manual_sync.last_error
         :s.manual_sync?.finished_at?'Đã hoàn tất lượt đồng bộ':'Chưa chạy đồng bộ thủ công';
+    const capture=s.browser_catalog||{};
+    $('taobaoCatalogPairStatus').textContent=capture.active
+      ?'Chrome đã được cấp quyền đồng bộ tạm thời. Sản phẩm nhận được: '+(capture.accepted||0)
+        +'. Mã hết hạn: '+new Date(capture.expires_at).toLocaleString('vi-VN')
+      :'Chưa có phiên đồng bộ Taobao đang hoạt động. Tạo mã mới để kết nối Chrome.';
     $('taobaoAdminRunSync').disabled=!s.data_permission||!s.api_credentials_configured
       ||s.manual_sync?.running===true||s.staging_lock?.busy===true;
     return s;
@@ -425,6 +430,40 @@
   });
   // Taobao account remains logged in ONLY in the operator's own Chrome.
   // BESI pairs a locally installed extension with a one-use token, never a cookie.
+  $('taobaoCatalogNewPair')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;
+    button.disabled=true;
+    try{
+      const result=await request('/api/admin/taobao/catalog-pairing','POST',{});
+      $('taobaoCatalogCode').value=String(result.data?.token||'');
+      $('taobaoCatalogPairStatus').textContent='Mã đồng bộ chỉ có hiệu lực đến '+
+        new Date(result.data.expires_at).toLocaleString('vi-VN')+
+        '. Dán vào mục “Đồng bộ danh mục” của tiện ích Chrome.';
+      message('Đã tạo mã đồng bộ Taobao riêng; không gửi mật khẩu hay cookie lên server.');
+    }catch(error){message(error.message,true);}
+    finally{button.disabled=false;}
+  });
+  $('taobaoCatalogCopyPair')?.addEventListener('click',async()=>{
+    const value=$('taobaoCatalogCode').value.trim();
+    if(!value){message('Chưa có mã đồng bộ Taobao.',true);return;}
+    try{
+      await navigator.clipboard.writeText(value);
+      message('Đã sao chép mã đồng bộ Taobao tạm thời.');
+    }catch{
+      $('taobaoCatalogCode').focus();$('taobaoCatalogCode').select();
+      message('Hãy dùng Ctrl+C để sao chép mã.');
+    }
+  });
+  $('taobaoCatalogRevokePair')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;button.disabled=true;
+    try{
+      await request('/api/admin/taobao/catalog-pairing','DELETE');
+      $('taobaoCatalogCode').value='';
+      message('Đã thu hồi quyền gửi dữ liệu danh mục từ Chrome.');
+      await refreshTaobaoStatus();
+    }catch(error){message(error.message,true);}
+    finally{button.disabled=false;}
+  });
   $('taobaoAdminNewPair')?.addEventListener('click',async event=>{
     const button=event.currentTarget;
     button.disabled=true;
