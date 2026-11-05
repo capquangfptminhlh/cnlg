@@ -1,0 +1,23 @@
+*{box-sizing:border-box}
+body{width:420px;min-height:400px;margin:0;background:#f4f6fa;color:#1d2b3e;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:12px}
+header{background:#152b49;color:#f8fbff;padding:17px 18px}
+.brand{font-size:18px;font-weight:900;letter-spacing:-.5px}.brand span{color:#ff9c6b}
+header p{font-size:11px;color:#aabbd2;margin:7px 0 0}
+main{padding:12px 14px}
+section{background:white;border:1px solid #dce4ed;border-radius:12px;padding:15px;margin-bottom:12px;box-shadow:0 2px 14px #0d2a4a08}
+h2{font-size:13px;letter-spacing:-.2px;margin:0 0 7px}
+section p{margin:0 0 10px;line-height:1.55;color:#5b6a81}
+label{display:block;margin:9px 0 0;color:#39495f;font-size:11px;font-weight:650;line-height:1.5}
+input:not([type=checkbox]),select{margin-top:5px;display:block;width:100%;height:36px;padding:7px 9px;border:1px solid #cbd6e4;border-radius:7px;color:#233850;background:#fff;font:inherit}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid #ff7448;outline-offset:2px}
+button{border:0;border-radius:8px;padding:10px 13px;background:#f4512c;color:#fff;font:inherit;font-weight:800;cursor:pointer;margin-top:6px;width:100%}
+button.secondary{color:#234065;background:#ecf2fa;border:1px solid #d6e4f2}
+button:disabled{cursor:wait;opacity:.65}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.fields label:first-child,.fields label:nth-child(2),.fields label:nth-child(7),.fields .checkbox{grid-column:1/-1}
+.checkbox{display:flex;align-items:start;gap:7px;font-weight:500}
+.checkbox input{flex:0 0 16px;width:16px;height:16px;margin:1px 0 0;accent-color:#ef633a}
+.hint{border-radius:7px;background:#f4f7fb;padding:9px;font-size:11px;white-space:pre-wrap}
+.hint.error{color:#a33025;background:#fff3f1}
+.hint.success{color:#17623d;background:#eff9f2}
+footer{color:#8491a1;line-height:1.55;margin:12px 4px}
