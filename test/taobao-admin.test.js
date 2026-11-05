@@ -20,8 +20,11 @@ test('All Taobao dashboard operations are authenticated and rate-limited, never 
   assert.match(server,/taobaoReview\.approve\(req\.params\.id/);
   assert.match(server,/taobaoReview\.revoke\(req\.params\.id/);
   assert.match(server,/taobaoPriceShipping\.validateTariff\(req\.body\?\.tariff\)/);
+  assert.match(server,/app\.post\('\/api\/admin\/taobao\/browser-pairing',requireAdmin/);
+  assert.match(server,/app\.post\('\/api\/admin\/taobao\/official-shipping',requireAdmin/);
+  assert.match(server,/app\.post\('\/api\/taobao\/browser-quote',rateLimit/);
   assert.doesNotMatch(server.slice(server.indexOf("app.get('/api/admin/taobao/status'"),
-    server.indexOf("app.get('/sp/:slugId'")),/createOrder|checkout|confirmPayment|purchase|source_url/);
+    server.indexOf("app.get('/sp/:slugId'")),/\b(?:createOrder|confirmPayment|purchase)\s*\(|source_url/);
 });
 test('Taobao dashboard is behind the existing admin-besi asset gate and uses safe text operations',()=>{
   const server=read('server.js'),html=read('public/admin-besi.html'),js=read('public/admin-besi.js');
@@ -29,6 +32,9 @@ test('Taobao dashboard is behind the existing admin-besi asset gate and uses saf
   assert.match(html,/id="taobao"/);
   assert.match(html,/id="taobaoAdminReviewForm"/);
   assert.match(html,/id="taobaoAdminTariffForm"/);
+  assert.match(html,/id="taobaoAdminPairCode"/);
+  assert.match(html,/id="taobaoAdminNewPair"/);
+  assert.match(html,/id="taobaoAdminOfficialQuoteForm"/);
   assert.match(html,/id="taobaoAdminShippingCheckForm"/);
   assert.match(html,/id="taobaoAdminRows"/);
   assert.match(html,/id="taobaoAdminView"/);

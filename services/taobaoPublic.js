@@ -6,6 +6,7 @@
 const {read,hasHan}=require('./sources/taobaoImporter');
 const crypto=require('node:crypto');
 const shipping=require('./taobaoPriceShipping');
+const officialShipping=require('./taobaoOfficialShipping');
 const clean=(x,max=500)=>String(x??'').trim().slice(0,max);
 const imagePath=x=>/^\/images\/taobao\/[a-z0-9/_-]+\.(?:jpg|jpeg|png|webp)$/i.test(String(x||''))?x:null;
 const safeHash=(prefix,id)=>prefix+crypto.createHash('sha256').update('besi-taobao-public:'+id).digest('hex').slice(0,18);
@@ -23,18 +24,30 @@ function approved(row){
     &&(!Array.isArray(row.sku_variants)||!row.sku_variants.length
       ||row.sku_variants.length===translated.length);
 }
-function publicVariants(row,region,rate,tariff){
+function vWithSource(variant,id){
+  return {...variant,id};
+}
+function priceFor(row,sku,region,rate,tariff,officialQuotes,now){
+  const reference=officialShipping.lookup(row.id,sku,region,{quotes:officialQuotes,now});
+  return reference?
+    officialShipping.apply(row,reference,{region,rate,now}):
+    shipping.quote(row,{region,rate,tariff,now});
+}
+function publicVariants(row,region,rate,tariff,officialQuotes,now){
   const vars=Array.isArray(row.sku_variants)?row.sku_variants:[];
   return vars.slice(0,50).map((v,i)=>({
     id:safeHash('V',row.id+':'+v.sku),
     label:clean(row.options_vi?.[i]||'',180),
     // Do not silently use one SKU's price/weight for another.
-    pricing:shipping.quote(v,{region,rate,tariff})
+    pricing:priceFor(vWithSource(v,row.id),v.sku,region,rate,tariff,officialQuotes,now)
   }));
 }
 function getPublicCatalog(rows,query={},options={}){
   const rate=Object.hasOwn(options,'rate')?options.rate:shipping.getRate();
   const tariff=Object.hasOwn(options,'tariff')?options.tariff:shipping.getTariff();
+  const officialQuotes=Object.hasOwn(options,'officialQuotes')?
+    options.officialQuotes:officialShipping.read();
+  const now=options.now||Date.now();
   const region=String(query.region||'hcm').toLowerCase();
   const q=clean(query.q,80).toLocaleLowerCase('vi');
   const category=clean(query.category,80).toLocaleLowerCase('vi');
@@ -47,7 +60,7 @@ function getPublicCatalog(rows,query={},options={}){
       +' '+(row.options_vi||[]).join(' ')).toLocaleLowerCase('vi').includes(q))
     &&(!category||clean(row.category_vi||'Sản phẩm Taobao',100).toLocaleLowerCase('vi')===category));
   const data=matches.slice((page-1)*limit,page*limit).map(row=>{
-    const variants=publicVariants(row,region,rate,tariff);
+    const variants=publicVariants(row,region,rate,tariff,officialQuotes,now);
     return {
       id:safeHash('T',row.id),name:clean(row.title_vi,250),
       description:clean(row.description_vi,1200),
@@ -55,7 +68,8 @@ function getPublicCatalog(rows,query={},options={}){
       image:imagePath(row.besi_image),
       status:'Đang xác minh đặt hàng',can_order:false,
       variants,
-      pricing:variants.length?variants[0].pricing:shipping.quote(row,{region,rate,tariff})
+      pricing:variants.length?variants[0].pricing:
+        priceFor(row,'',region,rate,tariff,officialQuotes,now)
     };
   });
   return {success:true,total:matches.length,page,limit,categories,data};

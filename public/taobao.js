@@ -26,7 +26,7 @@ function categories(values){
   }
 }
 function vnd(amount){
-  return Number.isFinite(Number(amount))?Math.round(Number(amount)).toLocaleString('vi-VN')+' đ':'Đang xác minh';
+  return amount!==null&&amount!==undefined&&Number.isFinite(Number(amount))?Math.round(Number(amount)).toLocaleString('vi-VN')+' đ':'Đang xác minh';
 }
 function priceLine(label,amount,cls){
   const row=elem('div','price-line'+(cls?' '+cls:''));
@@ -40,7 +40,14 @@ function quoteBlock(quote){
     return outer;
   }
   outer.append(priceLine('Giá hàng quy đổi',quote.item_vnd));
-  if(quote.status==='estimate'){
+  if(quote.status==='estimate'&&quote.shipping_source==='taobao_checkout_reference'){
+    outer.append(priceLine('Taobao/Cainiao · giao quốc tế và nội địa',quote.official_shipping_vnd));
+    outer.append(priceLine('Tổng tham khảo',quote.total_vnd,'total'));
+    outer.append(elem('p','price-warning','Cước đối chiếu từ checkout Taobao cho một địa chỉ mẫu cùng khu vực, 1 sản phẩm; không phải phí chốt cho địa chỉ của bạn.'));
+    outer.append(elem('p','price-ship-source','Kiểu giao: '+
+      (quote.shipping_method==='direct'?'Taobao giao trực tiếp':'Taobao gom hàng')+
+      ' · Đối chiếu lúc '+String(quote.quote_checked_at||'').slice(0,16).replace('T',' ')+'.'));
+  }else if(quote.status==='estimate'){
     outer.append(priceLine('Ship nội địa Trung Quốc',quote.china_domestic_shipping_vnd));
     outer.append(priceLine('Vận chuyển Trung Quốc → Việt Nam',quote.international_shipping_vnd));
     outer.append(priceLine('Giao nội địa Việt Nam',quote.domestic_vn_shipping_vnd));
@@ -51,7 +58,12 @@ function quoteBlock(quote){
     outer.append(elem('p','price-ship-source','Cước dự kiến theo biểu phí '+(quote.shipping_provider||'đối tác')
       +' · Khối lượng tính cước '+quote.billable_weight_kg+' kg.'));
   }else{
-    outer.append(elem('p','price-warning','Chưa đủ thông tin vận chuyển để tính tổng tiền. Đây mới là giá hàng quy đổi.'));
+    const note=quote.reason==='taobao_consolidation_pending'
+      ?'Taobao gom hàng: cần kho nhận, cân đo và báo lại cước quốc tế trước khi tính tổng.'
+      :quote.reason==='taobao_shipping_unavailable'
+      ?'Chưa có phương án giao chính thức Taobao tới địa chỉ Việt Nam đã kiểm tra.'
+      :'Chưa đủ thông tin vận chuyển để tính tổng tiền. Đây mới là giá hàng quy đổi.';
+    outer.append(elem('p','price-warning',note));
   }
   if(quote.rate_vnd_per_cny){
     const line=elem('p','price-fx','Tỷ giá tham khảo: 1 CNY ≈ '+vnd(quote.rate_vnd_per_cny));

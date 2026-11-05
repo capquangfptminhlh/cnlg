@@ -54,6 +54,9 @@ test('Real HTTP rejects anonymous Taobao admin reads/writes including image and 
       {path:'/api/admin/taobao/fx-refresh',method:'POST'},
       {path:'/api/admin/taobao/tariff',method:'POST'},
       {path:'/api/admin/taobao/shipping-check',method:'POST'},
+      {path:'/api/admin/taobao/browser-pairing',method:'POST'},
+      {path:'/api/admin/taobao/browser-pairing',method:'GET'},
+      {path:'/api/admin/taobao/official-shipping',method:'POST'},
       {path:'/api/admin/taobao/approve/123456789012',method:'POST'},
       {path:'/api/admin/taobao/revoke/123456789012',method:'POST'},
       {path:'/api/admin/taobao/image',method:'POST',
@@ -100,5 +103,37 @@ test('Authenticated admin can check per-parcel freight over HTTP without buying 
       body:JSON.stringify({...request,shipping_weight_kg:0})
     });
     assert.equal(malformed.status,400);
+  });
+});
+
+
+test('Chrome Taobao bridge CORS allows only extension-origin preflight; anonymous submissions remain blocked',async()=>{
+  await withServer(async url=>{
+    const origin='chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const preflight=await fetch(url+'/api/taobao/browser-quote',{
+      method:'OPTIONS',headers:{Origin:origin,
+        'Access-Control-Request-Method':'POST',
+        'Access-Control-Request-Headers':'authorization,content-type'}
+    });
+    assert.equal(preflight.status,204);
+    assert.equal(preflight.headers.get('access-control-allow-origin'),origin);
+    assert.match(preflight.headers.get('access-control-allow-headers')||'',/authorization/);
+    const noToken=await fetch(url+'/api/taobao/browser-quote',{
+      method:'POST',
+      headers:{Origin:origin,'Content-Type':'application/json'},
+      body:'{}'
+    });
+    assert.equal(noToken.status,401);
+    const unauthorizedOrigin=await fetch(url+'/api/taobao/browser-quote',{
+      method:'POST',headers:{Origin:'https://not-taobao.example',
+        'Content-Type':'application/json'},
+      body:'{}'
+    });
+    assert.equal(unauthorizedOrigin.status,403);
+    const badOptions=await fetch(url+'/api/taobao/browser-quote',{
+      method:'OPTIONS',headers:{Origin:'https://evil.example',
+        'Access-Control-Request-Method':'POST'}
+    });
+    assert.equal(badOptions.headers.get('access-control-allow-origin'),null);
   });
 });

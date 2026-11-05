@@ -32,3 +32,12 @@
 
 .taobao-admin-image-preview{max-width:170px;max-height:170px;object-fit:contain;border:1px solid var(--border);border-radius:10px;padding:5px;background:#fff}
 .taobao-admin-image-preview[hidden]{display:none!important}
+
+
+/* Taobao login with operator-controlled Chrome, one-time bridge pairing. */
+.taobao-browser-pair{padding:18px;border:1px solid var(--border);border-radius:12px;background:#f5f9ff}
+.taobao-browser-pair h3{font-size:15px;margin:0 0 7px}
+.taobao-admin-open-taobao{display:inline-flex;align-items:center;text-decoration:none;padding:10px 14px;border:1px solid #cad7e8;border-radius:9px;color:#2e4864;background:#eaf1fa;font-size:12px;font-weight:800}
+.taobao-browser-pair #taobaoAdminPairCode{font-family:ui-monospace,Consolas,monospace}
+.taobao-browser-pair .taobao-admin-toolbar{margin:12px 0}
+@media(max-width:640px){.taobao-browser-pair{padding:13px}.taobao-browser-pair .taobao-admin-toolbar button{flex:1}}

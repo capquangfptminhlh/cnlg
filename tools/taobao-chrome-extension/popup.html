@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BESI Taobao Shipping</title>
+<link rel="stylesheet" href="popup.css"></head>
+<body>
+<header><div class="brand">BESI <span>Taobao</span></div>
+<p>Kiểm tra phí vận chuyển từ tài khoản Taobao của anh</p></header>
+<main>
+<section>
+  <h2>1. Đăng nhập Taobao</h2>
+  <p>Đăng nhập thủ công trên trang Taobao. Không nhập tài khoản hoặc mật khẩu vào BESI.</p>
+  <button id="openTaobao" type="button" class="secondary">Mở Taobao để đăng nhập</button>
+</section>
+<section>
+  <h2>2. Xác nhận cước checkout</h2>
+  <p>Trên Taobao, chọn <b>một sản phẩm / SKU</b>, địa chỉ Việt Nam, rồi mở trang hiển thị phí ship. Không bấm đặt hàng.</p>
+  <button id="scan" type="button" class="secondary">Đọc cước đang hiển thị trong tab Taobao</button>
+  <p id="scanResult" class="hint" aria-live="polite">Chưa đọc dữ liệu cước.</p>
+  <div class="fields">
+    <label>Mã sản phẩm Taobao trong kho BESI <input id="itemId" pattern="[0-9]{6,20}" inputmode="numeric" required></label>
+    <label>SKU (để trống nếu sản phẩm không có biến thể) <input id="sku" maxlength="80"></label>
+    <label>Khu vực địa chỉ Việt Nam đã kiểm tra
+      <select id="region"><option value="hcm">TP. Hồ Chí Minh</option>
+      <option value="hn">Hà Nội</option><option value="other">Tỉnh/thành khác</option></select>
+    </label>
+    <label>Phương thức vận chuyển Taobao
+      <select id="method"><option value="direct">官方直送 – Giao trực tiếp</option>
+      <option value="consolidated">官方集运 – Gom hàng qua kho</option></select>
+    </label>
+    <label>Trạng thái phí vận chuyển
+      <select id="state"><option value="quoted">Đã báo trọn gói đến địa chỉ</option>
+      <option value="pending_consolidation">Chưa chốt: kho chưa cân đo</option>
+      <option value="unavailable">Không hỗ trợ địa chỉ đã chọn</option></select>
+    </label>
+    <label>Phí vận chuyển trọn gói được Taobao hiển thị
+      <input id="amount" inputmode="decimal" type="number" step="0.01" min="0" placeholder="Không bao gồm giá sản phẩm">
+    </label>
+    <label>Đơn vị tiền
+      <select id="currency"><option value="CNY">CNY (¥)</option><option value="VND">VNĐ</option></select>
+    </label>
+    <label class="checkbox"><input type="checkbox" id="weighed"> Gom hàng: kho đã cân và chốt phí quốc tế</label>
+    <label class="checkbox"><input type="checkbox" id="free"> Taobao xác nhận miễn phí ship (0)</label>
+    <label class="checkbox"><input type="checkbox" id="confirmed"> Tôi đã kiểm tra phí giao đến địa chỉ Việt Nam của **một** sản phẩm; không lấy phí nội địa Trung Quốc làm phí quốc tế.</label>
+  </div>
+</section>
+<section>
+  <h2>3. Ghép nối BESI</h2>
+  <p>Trong quản trị BESI, bấm <b>Tạo mã kết nối Chrome</b>, rồi dán vào đây. Mã dùng 1 lần trong 5 phút.</p>
+  <label>Mã kết nối <input id="pairCode" type="password" autocomplete="off" spellcheck="false" placeholder="Dán mã từ BESI"></label>
+  <button id="send" type="button">Lưu cước đã kiểm tra về BESI</button>
+  <p id="result" class="hint" aria-live="polite"></p>
+</section>
+<footer><small>Chỉ đọc trên tab Taobao đang mở. Không xuất mật khẩu, cookie, địa chỉ cụ thể hoặc nội dung trang. Không đặt hàng hay thanh toán.</small></footer>
+</main>
+<script src="popup.js"></script>
+</body></html>

@@ -185,6 +185,37 @@
             <button type="submit" class="primary">Kiểm tra cước vận chuyển dự kiến</button>
             <pre id="taobaoAdminShippingResult" class="output" aria-live="polite" hidden></pre>
           </form>
+          <div class="form-stack taobao-browser-pair">
+            <h3>Đăng nhập Taobao & kiểm tra phí ship bằng Chrome</h3>
+            <p class="hint">Đăng nhập bằng QR/mật khẩu ngay trên Taobao. Phiên đăng nhập được giữ tại Chrome Windows, BESI không lưu cookie hay mật khẩu Taobao.</p>
+            <a class="secondary taobao-admin-open-taobao" href="https://www.taobao.com/" target="_blank" rel="noopener noreferrer">Mở Taobao để đăng nhập</a>
+            <p class="hint">Cài tiện ích Chrome tại <code>tools/taobao-chrome-extension</code>, mở trang Taobao đang hiển thị phí ship, rồi bấm “Đọc cước” trong tiện ích. Tiện ích không tự đặt hàng.</p>
+            <label>Mã kết nối Chrome (một lần, hiệu lực 5 phút)
+              <input id="taobaoAdminPairCode" type="text" readonly spellcheck="false" autocomplete="off" aria-label="Mã kết nối Chrome dùng một lần">
+            </label>
+            <div class="taobao-admin-toolbar">
+              <button id="taobaoAdminNewPair" type="button" class="secondary">Tạo mã kết nối</button>
+              <button id="taobaoAdminCopyPair" type="button" class="secondary">Sao chép mã</button>
+            </div>
+            <p id="taobaoAdminPairStatus" class="hint" aria-live="polite">Chỉ chuyển phí vận chuyển đã xác nhận, không chuyển thông tin tài khoản Taobao.</p>
+          </div>
+          <form id="taobaoAdminOfficialQuoteForm" class="form-stack">
+            <h3>Cước Taobao/Cainiao đã xác minh (phương án nhập thủ công)</h3>
+            <p class="hint">Chỉ nhập cước thật trên checkout của một sản phẩm và một địa chỉ mẫu Việt Nam; không tự tính cước rồi ghi là “cước chính thức”.</p>
+            <label>Mã sản phẩm nguồn <input id="taobaoAdminOfficialItemId" inputmode="numeric" pattern="[0-9]{6,20}" required></label>
+            <label>SKU (để trống nếu không có biến thể) <input id="taobaoAdminOfficialSku" maxlength="80"></label>
+            <label>Khu vực đã kiểm tra <select id="taobaoAdminOfficialRegion"><option value="hcm">TP.HCM</option><option value="hn">Hà Nội</option><option value="other">Tỉnh khác</option></select></label>
+            <label>Phương thức <select id="taobaoAdminOfficialMethod"><option value="direct">官方直送 – giao trực tiếp</option><option value="consolidated">官方集运 – gom qua kho</option></select></label>
+            <label>Trạng thái cước <select id="taobaoAdminOfficialState"><option value="quoted">Đã báo trọn gói tới địa chỉ</option><option value="pending_consolidation">Chờ kho cân / báo phí</option><option value="unavailable">Không hỗ trợ địa chỉ đã chọn</option></select></label>
+            <label>Tiền ship (0 chỉ khi miễn phí xác nhận) <input type="number" id="taobaoAdminOfficialAmount" min="0" step="0.01"></label>
+            <label>Đơn vị <select id="taobaoAdminOfficialCurrency"><option value="CNY">CNY</option><option value="VND">VNĐ</option></select></label>
+            <label>Thời gian nhìn thấy cước (giờ Việt Nam) <input type="datetime-local" id="taobaoAdminOfficialTime" required></label>
+            <label class="taobao-admin-confirm"><input type="checkbox" id="taobaoAdminOfficialWeighed"> Đã cân tại kho gom (nếu là 集运).</label>
+            <label class="taobao-admin-confirm"><input type="checkbox" id="taobaoAdminOfficialFree"> Taobao xác nhận miễn phí ship.</label>
+            <label class="taobao-admin-confirm"><input type="checkbox" id="taobaoAdminOfficialConfirmed" required> Tôi đã kiểm tra phí trọn gói đến địa chỉ Việt Nam, cho đúng một sản phẩm, không tính trùng ship.</label>
+            <button class="primary" type="submit">Lưu cước Taobao đã đối chiếu</button>
+            <p class="hint">Cước này là tham khảo theo địa chỉ mẫu, tự hết hạn sau 24 giờ; không phải báo giá đảm bảo cho mọi khách.</p>
+          </form>
           <form id="taobaoAdminTariffForm" class="form-stack">
             <h3>Cước vận chuyển Trung Quốc → Việt Nam</h3>
             <p class="hint">Dán JSON theo bảng giá thực tế của đối tác vận chuyển. Không đặt mặc định giá giả; dữ liệu lưu riêng trên máy chủ.</p>

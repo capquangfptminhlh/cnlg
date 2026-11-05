@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "BESI Taobao · Kiểm tra phí ship",
+  "version": "0.1.0",
+  "description": "Đọc phí ship hiển thị trên checkout Taobao sau khi bạn tự đăng nhập, gửi số tiền đã xác nhận về quản trị BESI bằng mã ghép nối một lần.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.taobao.com/*",
+    "https://besi.com.vn/*"
+  ],
+  "action": {
+    "default_title": "BESI · Taobao Shipping",
+    "default_popup": "popup.html"
+  }
+}
