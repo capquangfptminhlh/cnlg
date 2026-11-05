@@ -43,6 +43,8 @@ const taobaoMedia = require('./services/taobaoApprovedMedia');
 const taobaoOfficialShipping = require('./services/taobaoOfficialShipping');
 const taobaoStageImporter = require('./services/sources/taobaoImporter');
 const taobaoBrowserPairing = require('./services/taobaoBrowserPairing');
+const taobaoCatalogCaptureSession = require('./services/taobaoCatalogCaptureSession');
+const taobaoBrowserCatalog = require('./services/taobaoBrowserCatalog');
 const storeCatalog = require('./services/catalog');   // DropBuy + các nguồn sỉ khác, chỉ đọc cho trang khách
 const sources = require('./services/sources');
 const besiMarketplace = require('./services/besi/routes');
@@ -150,7 +152,7 @@ app.use(forceHttps);
 app.use(securityHeaders);
 // Narrow CORS exception for the explicitly paired Chrome helper. Requests
 // still need a valid one-time bearer token and a real staged Taobao product.
-app.use('/api/taobao/browser-quote',(req,res,next)=>{
+app.use(['/api/taobao/browser-quote','/api/taobao/browser-products'],(req,res,next)=>{
   const origin=String(req.get('origin')||'');
   if(/^chrome-extension:\/\/[a-p]{32}$/.test(origin)){
     res.set('Access-Control-Allow-Origin',origin);
@@ -191,7 +193,8 @@ app.get('/api/taobao/products', rateLimit('taobao-products',60e3,100), (req,res)
 app.get('/api/admin/taobao/status',requireAdmin,rateLimit('taobao-admin-status',60e3,80),(req,res)=>{
   try{
     res.set('Cache-Control','no-store').json({
-      success:true,data:{...taobaoOps.status(),manual_sync:taobaoManualSync.status()}
+      success:true,data:{...taobaoOps.status(),manual_sync:taobaoManualSync.status(),
+        browser_catalog:taobaoCatalogCaptureSession.status()}
     });
   }catch(e){res.status(503).json({success:false,error:'Không thể đọc tình trạng Taobao'});}
 });
@@ -238,6 +241,43 @@ app.post('/api/admin/taobao/revoke/:id',requireAdmin,rateLimit('taobao-admin-rev
 // NOT an API call to Taobao/Cainiao and never creates a payable order.
 // Pair a browser extension running locally on the operator's Windows PC.
 // The Taobao login/session is kept by Chrome; BESI never receives cookies.
+// Separate opt-in catalog capture session; checkout quote pairing stays
+// one-time and cannot be used to import products.
+app.post('/api/admin/taobao/catalog-pairing',requireAdmin,rateLimit('taobao-catalog-pair',15*60e3,6),(req,res)=>{
+  return res.set('Cache-Control','no-store').json({success:true,
+    data:taobaoCatalogCaptureSession.issue()});
+});
+app.get('/api/admin/taobao/catalog-pairing',requireAdmin,rateLimit('taobao-catalog-status',60e3,60),(req,res)=>{
+  return res.set('Cache-Control','no-store').json({success:true,
+    data:taobaoCatalogCaptureSession.status()});
+});
+app.delete('/api/admin/taobao/catalog-pairing',requireAdmin,rateLimit('taobao-catalog-revoke',60e3,12),(req,res)=>{
+  return res.set('Cache-Control','no-store').json({success:true,
+    data:taobaoCatalogCaptureSession.revoke()});
+});
+// The browser keeps its Taobao authentication. Only 1-30 limited, validated
+// product observations travel over this endpoint. Never accept raw HTML,
+// cookies, authentication headers from Taobao, cart details or customer address.
+app.post('/api/taobao/browser-products',rateLimit('taobao-browser-products',60e3,20),async(req,res)=>{
+  const origin=String(req.get('origin')||'');
+  if(!/^chrome-extension:\/\/[a-p]{32}$/.test(origin))
+    return res.status(403).json({success:false,error:'Only the paired Chrome extension is permitted'});
+  const match=/^Bearer ([A-Za-z0-9_-]{32,100})$/.exec(String(req.get('authorization')||''));
+  if(!match||!taobaoCatalogCaptureSession.verify(match[1]))
+    return res.status(401).json({success:false,error:'Capture pairing expired or unauthorized'});
+  try{
+    const data=await taobaoBrowserCatalog.ingest(req.body?.items,{
+      rightsConfirmed:req.body?.rightsConfirmed===true
+    });
+    taobaoCatalogCaptureSession.recorded(data.fetched);
+    return res.set('Cache-Control','no-store').json({success:true,data});
+  }catch(error){
+    const busy=/staging busy/.test(String(error.message));
+    return res.status(busy?409:400).json({success:false,
+      error:busy?'Another import/review is writing the Taobao stage':
+        String(error.message).slice(0,160)});
+  }
+});
 app.post('/api/admin/taobao/browser-pairing',requireAdmin,rateLimit('taobao-browser-pair',15*60e3,8),(req,res)=>{
   res.set('Cache-Control','no-store').json({
     success:true,data:taobaoBrowserPairing.issue()
