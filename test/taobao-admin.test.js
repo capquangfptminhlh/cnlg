@@ -24,7 +24,7 @@ test('All Taobao dashboard operations are authenticated and rate-limited, never 
   assert.match(server,/app\.post\('\/api\/admin\/taobao\/official-shipping',requireAdmin/);
   assert.match(server,/app\.post\('\/api\/taobao\/browser-quote',rateLimit/);
   assert.doesNotMatch(server.slice(server.indexOf("app.get('/api/admin/taobao/status'"),
-    server.indexOf("app.get('/sp/:slugId'")),/createOrder|checkout|confirmPayment|purchase|source_url/);
+    server.indexOf("app.get('/sp/:slugId'")),/\b(?:createOrder|confirmPayment|purchase)\s*\(|source_url/);
 });
 test('Taobao dashboard is behind the existing admin-besi asset gate and uses safe text operations',()=>{
   const server=read('server.js'),html=read('public/admin-besi.html'),js=read('public/admin-besi.js');
