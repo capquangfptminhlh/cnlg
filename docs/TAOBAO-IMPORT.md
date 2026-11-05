@@ -357,3 +357,68 @@ Chưa tính được thuế/VAT/hải quan, phí mua hộ, hàng cồng kềnh �
 pin/chất lỏng hoặc phụ phí chưa có trong hợp đồng. Các mức theo bậc
 số lượng lớn, gom đơn nhiều kiện hoặc dịch vụ đặc biệt cần bổ sung
 bảng cước hợp đồng riêng (chưa tự áp dụng bậc giảm giá).
+
+
+## Đăng nhập Taobao bằng Chrome Windows và đọc phí ship Taobao/Cainiao
+
+**Không nhập mật khẩu Taobao vào BESI, không sao chép cookie/session lên
+server.** Taobao không cung cấp API checkout ship cho sản phẩm affiliate
+được xác thực trong dự án này. Vì vậy luồng tích hợp *không giả lập API*;
+nó sử dụng tiện ích Chrome cài trên **máy tính Windows của người quản trị**,
+tự đăng nhập trên website Taobao, rồi xác nhận số tiền Taobao thực sự
+hiển thị trên trang thanh toán.
+
+### Cài tiện ích BESI Taobao
+
+1. Triển khai bản mới của repo lên Windows BESI trước, đảm bảo
+   `https://besi.com.vn/taobao` và các API mới phản hồi (không còn 404).
+2. Trên Chrome/Edge Windows nơi anh đang làm việc, tải mã nguồn repo và mở
+   `chrome://extensions` / `edge://extensions`. Bật **Developer mode**,
+   chọn **Load unpacked** (Tải tiện ích đã giải nén) rồi chỉ đến
+   `tools/taobao-chrome-extension`.
+3. Trong `/admin-besi.html#taobao`, đăng nhập quản trị BESI, bấm
+   **Tạo mã kết nối** và sao chép. Mã ghép nối chỉ hiệu lực 5 phút và
+   sử dụng một lần; không lưu vào file cấu hình hoặc URL.
+4. Mở `https://www.taobao.com`, tự đăng nhập Taobao theo QR/mật khẩu
+   trực tiếp trên Taobao. Không gửi mật khẩu/OTP vào BESI.
+5. Trong Taobao, chọn **đúng một sản phẩm** và SKU, địa chỉ nhận
+   **tại Việt Nam**; đến bước xác nhận vận chuyển mà chưa đặt hàng.
+   Mở tiện ích, nhấn **Đọc cước đang hiển thị trong tab Taobao**.
+   Tiện ích cố tìm dòng phí vận chuyển đã hiển thị; nếu không chắc chắn
+   phải đọc và điền tay. Cước nội địa TQ không phải cước trọn gói VN.
+6. Nhập mã sản phẩm/SKU *đã có trong kho chờ Taobao*, khu vực giao hàng,
+   cách giao (官方直送 hoặc 官方集运), trạng thái và số tiền CNY/VND, rồi
+   **tích xác nhận** phí giao đến địa chỉ VN cho đúng một món. Dán mã
+   ghép nối BESI và bấm **Lưu cước đã kiểm tra về BESI**.
+7. Trang `/taobao` ưu tiên cước Taobao/Cainiao được đối chiếu còn hạn;
+   nếu hết 24 giờ quay lại biểu phí đối tác BESI khi có đủ cân nặng
+   và hợp đồng. Không tính lại phí nội địa hai lần khi Taobao đã báo phí
+   giao trọn gói. Nếu chỉ báo trạng thái chờ gom hàng, không hiển thị
+   phí chính thức giả.
+
+### Quy tắc quan trọng
+
+- **Không tự nhấn đặt hàng, mua hàng, thanh toán, xác nhận đơn, CAPTCHA
+  hoặc đăng nhập thay người dùng.** Tiện ích chỉ thao tác khi người
+  quản trị bấm quét/cập nhật.
+- **Không hỗ trợ tự lấy phí ship hàng loạt qua API checkout Taobao.**
+  Website Taobao có thể thay đổi giao diện, yêu cầu xác minh thêm hoặc
+  không cung cấp phương án giao chính thức tới Việt Nam; tiện ích khi
+  đó bắt buộc yêu cầu xác minh thủ công thay vì ghi số tiền giả.
+- Với gom hàng (官方集运), **chỉ báo cước sau khi kho cân đo và xác nhận**
+  `weighed_at_warehouse=true`. Trước đó lưu
+  `pending_consolidation`; không tự gán phí ship/kg của đối tác thành
+  phí chính thức Cainiao.
+- Cước kiểm tra cho **một địa chỉ mẫu** trong khu vực chỉ mang tính
+  tham khảo, không phải phí cam kết cho mọi địa chỉ trong cùng tỉnh.
+  Không lưu thông tin địa chỉ cụ thể, cookie, phiên, giá trị đơn hàng
+  hay dữ liệu DOM đầy đủ vào máy chủ.
+- `POST /api/taobao/browser-quote` chỉ nhận mã dùng một lần, nguồn
+  Chrome extension, dữ liệu báo cước được xác nhận, đúng mã sản phẩm/SKU
+  trong kho chờ; không thể tự mở bán.
+- Lệnh quản trị có thể nhập tay một báo cước đã đọc bằng
+  `POST /api/admin/taobao/official-shipping`, dùng chung kiểm tra dữ
+  liệu và thời hạn 24 giờ.
+- Hỗ trợ cửa hàng qua tiện ích Chrome **không phải hỗ trợ/ủy quyền API
+  chính thức của Taobao/Cainiao**. Cần nghiệm thu trực tiếp với tài khoản
+  thật, địa chỉ VN thật và cấu trúc checkout hiện tại.
