@@ -54,6 +54,9 @@ test('Real HTTP rejects anonymous Taobao admin reads/writes including image and 
       {path:'/api/admin/taobao/fx-refresh',method:'POST'},
       {path:'/api/admin/taobao/tariff',method:'POST'},
       {path:'/api/admin/taobao/shipping-check',method:'POST'},
+      {path:'/api/admin/taobao/catalog-pairing',method:'POST'},
+      {path:'/api/admin/taobao/catalog-pairing',method:'GET'},
+      {path:'/api/admin/taobao/catalog-pairing',method:'DELETE'},
       {path:'/api/admin/taobao/browser-pairing',method:'POST'},
       {path:'/api/admin/taobao/browser-pairing',method:'GET'},
       {path:'/api/admin/taobao/official-shipping',method:'POST'},
@@ -135,5 +138,44 @@ test('Chrome Taobao bridge CORS allows only extension-origin preflight; anonymou
         'Access-Control-Request-Method':'POST'}
     });
     assert.equal(badOptions.headers.get('access-control-allow-origin'),null);
+  });
+});
+
+
+test('Browser catalog pairing requires BESI admin and only extension-origin requests can write',async()=>{
+  await withServer(async url=>{
+    const origin='chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const endpoint=url+'/api/taobao/browser-products';
+    const preflight=await fetch(endpoint,{method:'OPTIONS',headers:{
+      Origin:origin,'Access-Control-Request-Method':'POST',
+      'Access-Control-Request-Headers':'content-type,authorization'
+    }});
+    assert.equal(preflight.status,204);
+    assert.equal(preflight.headers.get('access-control-allow-origin'),origin);
+    const noToken=await fetch(endpoint,{method:'POST',headers:{
+      Origin:origin,'Content-Type':'application/json'},body:'{}'});
+    assert.equal(noToken.status,401);
+    const notExtension=await fetch(endpoint,{method:'POST',headers:{
+      Origin:'https://evil.example','Content-Type':'application/json'},body:'{}'});
+    assert.equal(notExtension.status,403);
+    const adminHeaders={'x-admin-key':process.env.ADMIN_PASSWORD,'Content-Type':'application/json'};
+    const pairRes=await fetch(url+'/api/admin/taobao/catalog-pairing',{
+      method:'POST',headers:adminHeaders,body:'{}'});
+    assert.equal(pairRes.status,200);
+    const pair=await pairRes.json();
+    assert.match(pair.data.token,/^[A-Za-z0-9_-]{32,100}$/);
+    const invalidBatch=await fetch(endpoint,{method:'POST',headers:{
+      Origin:origin,'Content-Type':'application/json',
+      Authorization:'Bearer '+pair.data.token
+    },body:JSON.stringify({rightsConfirmed:true,items:[]})});
+    assert.equal(invalidBatch.status,400,'Empty product scans must never write');
+    const revoked=await fetch(url+'/api/admin/taobao/catalog-pairing',{
+      method:'DELETE',headers:adminHeaders});
+    assert.equal(revoked.status,200);
+    const expired=await fetch(endpoint,{method:'POST',headers:{
+      Origin:origin,'Content-Type':'application/json',
+      Authorization:'Bearer '+pair.data.token
+    },body:'{}'});
+    assert.equal(expired.status,401);
   });
 });
