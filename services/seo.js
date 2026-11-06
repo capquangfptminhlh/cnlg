@@ -79,7 +79,7 @@ function renderProductPage(req, product, detail, config) {
   const chosenImg = product.image || product.image_hd;
   const maskedImg = maskMediaUrl(chosenImg);
   const image = maskedImg && maskedImg.startsWith('/') ? base + maskedImg : maskedImg;
-  const mimeType = /\.jpe?g$/i.test(image) ? 'image/jpeg' : 'image/png';
+  const mimeType = /\.(jpe?g|jfif)$/i.test(image) ? 'image/jpeg' : /\.webp$/i.test(image) ? 'image/webp' : /\.gif$/i.test(image) ? 'image/gif' : 'image/png';
 
   const jsonLd = {
     '@context': 'https://schema.org',

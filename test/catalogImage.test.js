@@ -40,3 +40,29 @@ test('concurrent requests coalesce, expose only image bytes and are cached',asyn
     assert.deepEqual(repeat.buffer,PNG);
   } finally {global.fetch=saved;}
 });
+
+test('sniffMime and mediaFromCdnPath correctly recognize JFIF images with application/octet-stream', async () => {
+  const { mediaFromCdnPath, sniffMime } = require('../services/catalogImage');
+  const JPEG = Buffer.concat([
+    Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]),
+    Buffer.alloc(150, 0)
+  ]);
+  assert.equal(sniffMime(JPEG, 'application/octet-stream', 'https://r6i.pen.dropbuy.vn/md/s-1/p-142065/photo.jfif'), 'image/jpeg');
+
+  const saved = global.fetch;
+  try {
+    global.fetch = async (url) => {
+      assert.match(url, /\/md\/s-11004\/p-142065\//);
+      return new Response(JPEG, {
+        status: 200,
+        headers: { 'content-type': 'application/octet-stream' }
+      });
+    };
+    const res = await mediaFromCdnPath('md/s-11004/p-142065/1793876671195-q_256x256.jfif');
+    assert.ok(res);
+    assert.equal(res.mime, 'image/jpeg');
+    assert.deepEqual(res.buffer, JPEG);
+  } finally {
+    global.fetch = saved;
+  }
+});

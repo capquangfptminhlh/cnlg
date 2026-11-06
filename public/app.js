@@ -581,7 +581,7 @@ function renderDetailModal(prod) {
                 ${item.is_video ? `
                   <video src="${esc(item.url)}" controls autoplay muted loop playsinline></video>
                 ` : `
-                  <img src="${esc(item.url)}" alt="${esc(prod.name)} - Ảnh ${idx + 1}" ${idx === activeIndex ? 'id="mainPreviewImg"' : ''} loading="${idx === 0 ? 'eager' : 'lazy'}">
+                  <img src="${esc(item.url)}" alt="${esc(prod.name)} - Ảnh ${idx + 1}" ${idx === activeIndex ? 'id="mainPreviewImg"' : ''} loading="${idx === 0 ? 'eager' : 'lazy'}" onerror="this.onerror=null; this.src='/besi-logo.svg';">
                 `}
               </div>
             `).join('')}
@@ -603,7 +603,7 @@ function renderDetailModal(prod) {
         <div class="thumbs-strip">
           ${gallery.map((item, idx) => `
             <button type="button" class="thumb-item ${idx === activeIndex ? 'active' : ''}" aria-label="Xem ${item.is_video ? 'video' : 'ảnh'} ${idx + 1}" aria-pressed="${idx === activeIndex}" onclick="switchDetailMedia(${idx})">
-              <img src="${esc(item.thumb || item.url)}" alt="Ảnh ${idx + 1}">
+              <img src="${esc(item.thumb || item.url)}" alt="Ảnh ${idx + 1}" onerror="this.onerror=null; this.src='/besi-logo.svg';">
               ${item.is_video ? `<div class="thumb-video-badge"><i class="fa-solid fa-play"></i></div>` : ''}
             </button>
           `).join('')}
