@@ -1746,3 +1746,30 @@ input, textarea, select { font-family: var(--font); }
     padding: 4px 10px;
   }
 }
+
+/* --- Nhãn trạng thái tồn kho thẻ sản phẩm --- */
+.stock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 12px;
+  white-space: nowrap;
+  margin-left: auto;
+}
+.stock-pill.is-in {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+.stock-pill.is-in b {
+  color: #047857;
+  font-weight: 800;
+}
+.stock-pill.is-out {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}

@@ -398,11 +398,20 @@ app.get('/sp/:slugId', async (req, res) => {
     if (!Number.isFinite(id) || id <= 0) return res.redirect(302, '/');
     const product = storeCatalog.findProduct(id);
     if (!product) return res.redirect(302, '/');
-    // Sai slug (tên SP đổi) → chuyển về URL chuẩn
+
+    // Kiểm tra nếu là Bot (ZaloBot, Facebook, Telegram, Google, etc.)
+    const userAgent = String(req.get('user-agent') || '').toLowerCase();
+    const isBot = /zalo|facebook|twitter|telegram|bot|crawl|spider|slack|whatsapp|curl/i.test(userAgent);
     const canonical = seo.productPath(product);
     let decodedPath = req.path;
     try { decodedPath = decodeURIComponent(req.path); } catch {}
-    if (decodedPath !== canonical) return res.redirect(301, canonical);
+
+    // Nếu không phải Bot và đường dẫn chưa đúng chuẩn SEO canonical thì chuyển hướng tuyệt đối
+    // Nếu là Bot thì TRẢ LUÔN HTML Open Graph để Zalo/Facebook đọc được ngay mà không bị nuốt mất redirect
+    if (!isBot && decodedPath !== canonical && !req.query.noredir) {
+      return res.redirect(301, `${seo.baseUrl(req)}${canonical}`);
+    }
+
     // Chỉ dùng chi tiết đã cache (không gọi DropBuy cho mỗi lượt bot Google/Facebook)
     let detail = null;
     const src = storeCatalog.sourceOf(id);

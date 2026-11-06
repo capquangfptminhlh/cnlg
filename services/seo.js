@@ -46,12 +46,12 @@ const stripHtml = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/
 
 function baseUrl(req) {
   if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/+$/, '');
-  // Qua Cloudflare Tunnel: cloudflared nói chuyện với máy chủ bằng http, nhưng khách vào bằng https →
-  // link chuẩn / sitemap / link tra cứu phải là https (chỉ tin header khi kết nối đến từ chính máy này)
+  const isBesi = isBesiHost(req);
   const peer = String(req.socket?.remoteAddress || '');
   const local = peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1';
-  const viaHttps = local && (/"scheme"\s*:\s*"https"/.test(String(req.get('cf-visitor') || '')) || String(req.get('x-forwarded-proto') || '').split(',')[0].trim() === 'https');
-  return `${viaHttps ? 'https' : req.protocol}://${req.get('host')}`;
+  const viaHttps = isBesi || (local && (/"scheme"\s*:\s*"https"/.test(String(req.get('cf-visitor') || '')) || String(req.get('x-forwarded-proto') || '').split(',')[0].trim() === 'https'));
+  const host = isBesi ? 'besi.com.vn' : (req.get('host') || 'localhost:3000');
+  return `${viaHttps ? 'https' : req.protocol}://${host}`;
 }
 
 function productPath(p) {
@@ -67,15 +67,20 @@ function storeName(config, req) {
   return isBesiHost(req) ? 'BESI' : (config.store?.name || 'Hoàng Minh Store');
 }
 
-/** HTML trang sản phẩm (index.html + thẻ SEO) */
+/** HTML trang sản phẩm (index.html + thẻ SEO / OpenGraph tối ưu cho Zalo, Facebook, Messenger) */
 function renderProductPage(req, product, detail, config) {
   const base = baseUrl(req);
   const url = base + productPath(product);
   const name = storeName(config, req);
   const priceText = `${Number(product.price).toLocaleString('vi-VN')} đ`;
-  const desc = stripSupplierText(stripHtml(detail?.description).slice(0, 155) || `${product.name} – ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, thanh toán khi nhận hàng.'}`);
-  const maskedImg = maskMediaUrl(product.image_hd || product.image);
+  const desc = stripSupplierText(stripHtml(detail?.description).slice(0, 160) || `${product.name} – Giá sỉ: ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, kiểm tra trước khi thanh toán.'}`);
+  
+  // Ưu tiên ảnh chuẩn 256x256 / 500px (< 150KB) để Zalo/Facebook bot tải ngay lập tức không bị timeout
+  const chosenImg = product.image || product.image_hd;
+  const maskedImg = maskMediaUrl(chosenImg);
   const image = maskedImg && maskedImg.startsWith('/') ? base + maskedImg : maskedImg;
+  const mimeType = /\.jpe?g$/i.test(image) ? 'image/jpeg' : 'image/png';
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -98,15 +103,28 @@ function renderProductPage(req, product, detail, config) {
   <title>${escAttr(product.name)} | ${escAttr(name)}</title>
   <meta name="description" content="${escAttr(desc)}">
   <link rel="canonical" href="${escAttr(url)}">
-  <meta property="og:type" content="product">
+  
+  <!-- Open Graph / Zalo / Facebook -->
+  <meta property="og:type" content="website">
   <meta property="og:site_name" content="${escAttr(name)}">
+  <meta property="og:url" content="${escAttr(url)}">
   <meta property="og:title" content="${escAttr(product.name)}">
   <meta property="og:description" content="${escAttr(`${priceText} – ${desc}`)}">
   <meta property="og:image" content="${escAttr(image)}">
-  <meta property="og:url" content="${escAttr(url)}">
+  <meta property="og:image:secure_url" content="${escAttr(image)}">
+  <meta property="og:image:type" content="${escAttr(mimeType)}">
+  <meta property="og:image:width" content="600">
+  <meta property="og:image:height" content="600">
+  <meta property="og:image:alt" content="${escAttr(product.name)}">
   <meta property="product:price:amount" content="${product.price}">
   <meta property="product:price:currency" content="VND">
+
+  <!-- Twitter Card / Telegram -->
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escAttr(product.name)}">
+  <meta name="twitter:description" content="${escAttr(`${priceText} – ${desc}`)}">
+  <meta name="twitter:image" content="${escAttr(image)}">
+
   <script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>
   <script>window.__INITIAL_PRODUCT_ID__ = ${Number(product.id)};</script>`;
   return getTemplate()
