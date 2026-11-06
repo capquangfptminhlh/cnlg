@@ -76,6 +76,40 @@ function allowedBytes(buffer, mime) {
   return false;
 }
 
+async function fetchOneMedia(urlStr, maxBytes = MAX_MEDIA_BYTES) {
+  try {
+    const response = await fetch(urlStr, {
+      method: 'GET', redirect: 'error', signal: AbortSignal.timeout(12000),
+      headers: {
+        accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif,video/mp4,video/webm,*/*',
+        'user-agent': 'HoangMinhStore/1.0'
+      }
+    });
+    if (!response.ok) return null;
+    const declaredMime = String(response.headers.get('content-type') || '').split(';')[0].toLowerCase().trim();
+    if (declaredMime === 'text/html' || declaredMime === 'text/plain' || declaredMime === 'application/json') {
+      return null;
+    }
+    const declared = Number(response.headers.get('content-length'));
+    if (declared > maxBytes) return null;
+    let bytes = 0; const chunks = [];
+    for await (const chunk of response.body) {
+      bytes += chunk.byteLength;
+      if (bytes > maxBytes) return null;
+      chunks.push(Buffer.from(chunk));
+    }
+    const buffer = Buffer.concat(chunks, bytes);
+    if (buffer.length < 100 && buffer.toString('ascii').toLowerCase().includes('<html')) {
+      return null;
+    }
+    const mime = sniffMime(buffer, declaredMime, urlStr);
+    if (!mime || !ALLOWED_MEDIA_MIMES.has(mime)) return null;
+    return { buffer, mime };
+  } catch {
+    return null;
+  }
+}
+
 async function boundedFetch(url) {
   if (active >= MAX_INFLIGHT) {
     if (waiters.length >= MAX_WAITING) throw new Error('Ảnh đang được tải quá nhiều');
@@ -83,29 +117,17 @@ async function boundedFetch(url) {
   }
   active++;
   try {
-    const response = await fetch(url.href, {
-      method: 'GET', redirect: 'error', signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif,*/*', 'user-agent': 'HoangMinhStore/1.0' }
-    });
-    if (!response.ok) throw new Error('CDN ' + response.status);
-    const declaredMime = String(response.headers.get('content-type') || '').split(';')[0].toLowerCase().trim();
-    if (declaredMime && !ALLOWED_MEDIA_MIMES.has(declaredMime) &&
-        declaredMime !== 'application/octet-stream' && declaredMime !== 'binary/octet-stream' &&
-        declaredMime !== 'image/jfif' && declaredMime !== 'image/pjpeg' && declaredMime !== 'image/jpg') {
-      throw new Error('Không phải ảnh hợp lệ');
+    let result = await fetchOneMedia(url.href, MAX_BYTES);
+    if (!result && /_(?:1024x1024|512x512|256x256)\./.test(url.href)) {
+      const rawUrl = url.href.replace(/_(?:1024x1024|512x512|256x256)\./, '.');
+      result = await fetchOneMedia(rawUrl, MAX_BYTES);
+      if (!result && !url.href.includes('_256x256')) {
+        const thumbUrl = url.href.replace(/_(?:1024x1024|512x512)\./, '_256x256.');
+        result = await fetchOneMedia(thumbUrl, MAX_BYTES);
+      }
     }
-    const declared = Number(response.headers.get('content-length'));
-    if (declared > MAX_BYTES) throw new Error('Ảnh quá lớn');
-    let bytes = 0; const chunks = [];
-    for await (const chunk of response.body) {
-      bytes += chunk.byteLength;
-      if (bytes > MAX_BYTES) throw new Error('Ảnh quá lớn');
-      chunks.push(Buffer.from(chunk));
-    }
-    const buffer = Buffer.concat(chunks, bytes);
-    const mime = sniffMime(buffer, declaredMime, url.href);
-    if (!mime || !allowedBytes(buffer, mime)) throw new Error('Định dạng ảnh không hợp lệ');
-    return { buffer, mime };
+    if (!result || !allowedBytes(result.buffer, result.mime)) throw new Error('Định dạng ảnh không hợp lệ');
+    return result;
   } finally {
     active--;
     waiters.shift()?.();
@@ -186,33 +208,17 @@ async function mediaFromCdnPath(relPath) {
   }
   if (pending.has(fullUrl)) return pending.get(fullUrl);
   const task = (async () => {
-    const response = await fetch(fullUrl, {
-      method: 'GET', redirect: 'error', signal: AbortSignal.timeout(12000),
-      headers: {
-        accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif,video/mp4,video/webm,*/*',
-        'user-agent': 'HoangMinhStore/1.0'
+    let result = await fetchOneMedia(fullUrl, MAX_MEDIA_BYTES);
+    if (!result && /_(?:1024x1024|512x512|256x256)\./.test(fullUrl)) {
+      const rawUrl = fullUrl.replace(/_(?:1024x1024|512x512|256x256)\./, '.');
+      result = await fetchOneMedia(rawUrl, MAX_MEDIA_BYTES);
+      if (!result && !fullUrl.includes('_256x256')) {
+        const thumbUrl = fullUrl.replace(/_(?:1024x1024|512x512)\./, '_256x256.');
+        result = await fetchOneMedia(thumbUrl, MAX_MEDIA_BYTES);
       }
-    });
-    if (!response.ok) throw new Error('CDN ' + response.status);
-    const declaredMime = String(response.headers.get('content-type') || '').split(';')[0].toLowerCase().trim();
-    if (declaredMime && !ALLOWED_MEDIA_MIMES.has(declaredMime) &&
-        declaredMime !== 'application/octet-stream' && declaredMime !== 'binary/octet-stream' &&
-        declaredMime !== 'image/jfif' && declaredMime !== 'image/pjpeg' && declaredMime !== 'image/jpg') {
-      throw new Error('Không phải media hợp lệ');
     }
-    const declared = Number(response.headers.get('content-length'));
-    if (declared > MAX_MEDIA_BYTES) throw new Error('Media quá lớn');
-    let bytes = 0; const chunks = [];
-    for await (const chunk of response.body) {
-      bytes += chunk.byteLength;
-      if (bytes > MAX_MEDIA_BYTES) throw new Error('Media quá lớn');
-      chunks.push(Buffer.from(chunk));
-    }
-    const buffer = Buffer.concat(chunks, bytes);
-    const mime = sniffMime(buffer, declaredMime, fullUrl);
-    if (!mime || !ALLOWED_MEDIA_MIMES.has(mime)) throw new Error('Không phải media hợp lệ');
-    const result = { buffer, mime };
-    if (bytes <= MAX_BYTES) {
+    if (!result) throw new Error('Không phải media hợp lệ');
+    if (result.buffer.length <= MAX_BYTES) {
       cache.set(fullUrl, { at: Date.now(), result });
       while (cache.size > MAX_ITEMS) cache.delete(cache.keys().next().value);
     }
