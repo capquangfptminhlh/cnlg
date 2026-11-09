@@ -297,9 +297,10 @@ function productStockBadge(p) {
   if (p.in_stock === false) {
     return `<span class="stock-pill is-out" title="Sản phẩm tạm hết hàng"><i class="fa-solid fa-circle-xmark"></i> Hết hàng</span>`;
   }
-  const seed = ((Number(p.id) || 1) * 37) >>> 0;
-  const stockCount = p.stock != null && p.stock > 0 ? p.stock : (12 + (seed % 28));
-  return `<span class="stock-pill is-in" title="Sẵn kho sẵn sàng giao toàn quốc"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <b>${stockCount}</b></span>`;
+  if (p.stock != null && Number(p.stock) > 0) {
+    return `<span class="stock-pill is-in" title="Sẵn kho sẵn sàng giao toàn quốc"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <b>${p.stock}</b></span>`;
+  }
+  return `<span class="stock-pill is-in" title="Hàng sẵn tại kho, sẵn sàng giao toàn quốc"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <b>Còn hàng</b></span>`;
 }
 function productBadges(p) {
   if (p.in_stock === false) return `<span class="card-tag tag-out">Hết hàng</span>`;
@@ -626,7 +627,7 @@ function renderDetailModal(prod) {
             ? `<span class="stock-status-pill is-out" style="background: rgba(239,68,68,.15); color: #ef4444;"><i class="fa-solid fa-xmark"></i> Tạm hết hàng</span>`
             : needsChoice && v && !v.in_stock
               ? `<span class="stock-status-pill is-out" style="background: rgba(239,68,68,.15); color: #ef4444;"><i class="fa-solid fa-xmark"></i> Phân loại này hết hàng</span>`
-              : `<span class="stock-status-pill is-in" style="background: rgba(16,185,129,.15); color: #059669; font-weight: 700;"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <strong style="color: #047857;">${(v && v.stock != null) ? v.stock : (prod.stock != null ? prod.stock : urg.left + 15)}</strong> sản phẩm (Giao ngay)</span>`}
+              : `<span class="stock-status-pill is-in" style="background: rgba(16,185,129,.15); color: #059669; font-weight: 700;"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <strong style="color: #047857;">${(v && v.stock != null && Number(v.stock) > 0) ? `${v.stock} sản phẩm (Giao ngay)` : (prod.stock != null && Number(prod.stock) > 0) ? `${prod.stock} sản phẩm (Giao ngay)` : 'Còn hàng (Giao ngay toàn quốc)'}</strong></span>`}
         </div>
 
         ${!soldOut ? `<div class="detail-si-banner${prod.is_flash_sale ? ' is-flash' : ''}"><div class="detail-si-left"><i class="fa-solid ${prod.is_flash_sale ? 'fa-bolt' : 'fa-tags'}"></i> <strong>${prod.is_flash_sale ? 'FLASH SALE GIÁ SỈ TẬN KHO' : 'CAM KẾT GIÁ SỈ TỪ 1 SẢN PHẨM'}</strong></div>${original && original > price ? `<span class="detail-si-save">Rẻ hơn lẻ ${formatPrice(original - price)}</span>` : `<span class="detail-si-save">Lẻ = Giá buôn</span>`}</div>` : ''}
