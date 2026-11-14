@@ -234,6 +234,10 @@ function mapItem(item, { ctx = getPricingContext(), priceMap, previous, keepWhol
   const wholesale = live ? live.cost : (keepWholesale && prevWholesale ? prevWholesale : (prevWholesale || null));
   const fsCode = live ? (live.fs_program_code || null) : (keepWholesale && previous?.fs_program_code ? previous.fs_program_code : null);
   const isFlashSale = item.is_flash_sale === 'T' || item.is_flash_sale === true || live?.source === 'FS';
+  const activeFs = Array.isArray(item.flash_sale_programs) ? item.flash_sale_programs.find(f => f.status === 'A' && Number(f.available_stock) > 0) : null;
+  const stockQty = activeFs ? Number(activeFs.available_stock) : (previous?.stock_qty ?? null);
+  const soldQty = activeFs ? Number(activeFs.sold_stock || 0) : (previous?.sold_qty ?? null);
+  const maxStock = activeFs ? Number(activeFs.max_stock || 0) : (previous?.max_stock ?? null);
   const base = {
     id: pid,
     dropbuy_id: pid,
@@ -249,6 +253,10 @@ function mapItem(item, { ctx = getPricingContext(), priceMap, previous, keepWhol
     image: formatImageUrl(item.res_thumbnail_url, '256x256'),
     image_hd: formatImageUrl(item.res_thumbnail_url, '1024x1024'),
     in_stock: item.in_stock !== false,
+    stock: stockQty,
+    stock_qty: stockQty,
+    sold_qty: soldQty,
+    max_stock: maxStock,
     warranty_type: item.warranty_type || null,
     warranty_duration: Number(item.warranty_duration) || 0,
     warranty: formatWarranty(item.warranty_type, item.warranty_duration),

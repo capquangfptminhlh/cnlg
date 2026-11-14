@@ -49,7 +49,8 @@ function publicPatch(p) {
   const rawDiscount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
   const discount = rawDiscount > 70 ? 0 : rawDiscount;
   const original = rawDiscount > 70 ? null : p.original_price;
-  return { id: p.id, name: stripSupplierText(p.name), price: p.price, original_price: original, discount_percent: discount, in_stock: p.in_stock !== false, image: catalogImage.maskMediaUrl(p.image), category_id: p.category_id, variant_count: p.variant_count, warranty: stripSupplierText(p.warranty || '') };
+  const stockVal = p.stock ?? p.stock_qty ?? null;
+  return { id: p.id, name: stripSupplierText(p.name), price: p.price, original_price: original, discount_percent: discount, in_stock: p.in_stock !== false, stock: stockVal, stock_qty: stockVal, image: catalogImage.maskMediaUrl(p.image), category_id: p.category_id, variant_count: p.variant_count, warranty: stripSupplierText(p.warranty || '') };
 }
 
 function emitChanges(changed, meta = {}) {
@@ -115,7 +116,6 @@ async function runPriceSync() {
       // in_stock do vòng tồn kho quyết định (API in-stock chuẩn hơn cờ trong kết quả tìm kiếm)
       const keepStock = cur.in_stock;
       Object.assign(cur, fresh, { in_stock: keepStock, updated_at: priceDiff || infoDiff ? fresh.updated_at : cur.updated_at });
-      delete cur.stock_qty;
       delete cur.removed_from_dropbuy;
       if (priceDiff || infoDiff) changed.push(cur);
     }

@@ -510,8 +510,11 @@ function publicProduct(p) {
   if (rest.description) rest.description = stripSupplierText(rest.description);
 
   const discount = p.original_price && p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
+  const stockVal = p.stock ?? p.stock_qty ?? null;
   const out = {
     ...rest,
+    stock: stockVal,
+    stock_qty: stockVal,
     original_price: discount > 70 ? null : (p.original_price || null),
     discount_percent: discount > 70 ? 0 : discount
   };
@@ -1313,7 +1316,9 @@ app.get('/api/products/:id', async (req, res) => {
     delete merged.shop_name;
     delete merged.fs_program_code;
     delete merged.removed_from_dropbuy;
-    delete merged.stock_qty;
+    const stockVal = freshProduct.stock ?? freshProduct.stock_qty ?? null;
+    merged.stock = stockVal;
+    merged.stock_qty = stockVal;
     delete merged.cache_version;
     delete merged.cached_at;
     delete merged.fetch_failed;

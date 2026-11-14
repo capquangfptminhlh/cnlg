@@ -297,8 +297,9 @@ function productStockBadge(p) {
   if (p.in_stock === false) {
     return `<span class="stock-pill is-out" title="Sản phẩm tạm hết hàng"><i class="fa-solid fa-circle-xmark"></i> Hết hàng</span>`;
   }
-  if (p.stock != null && Number(p.stock) > 0) {
-    return `<span class="stock-pill is-in" title="Sẵn kho sẵn sàng giao toàn quốc"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <b>${p.stock}</b></span>`;
+  const qty = p.stock != null ? p.stock : (p.stock_qty != null ? p.stock_qty : null);
+  if (qty != null && Number(qty) > 0) {
+    return `<span class="stock-pill is-in" title="Sẵn kho hàng, sẵn sàng giao toàn quốc"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <b>${qty} sp</b></span>`;
   }
   return `<span class="stock-pill is-in" title="Hàng sẵn tại kho, sẵn sàng giao toàn quốc"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <b>Còn hàng</b></span>`;
 }
