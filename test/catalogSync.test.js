@@ -38,3 +38,15 @@ test('Quét thiếu trang → không gỡ SP nào', async () => {
   await realtimeSync.runPriceSync();
   assert.equal(catalog.filter(p => p.removed_from_dropbuy).length, 0);
 });
+
+test('liveCheck: searchBySku không thấy và stock = false → tự động đánh dấu removed_from_dropbuy', async () => {
+  catalog = [product(1), product(2)];
+  scraper.fetchStockMap = async () => new Map([[1, false], [2, true]]);
+  scraper.searchBySku = async sku => (sku === 'DB-2' ? { unique_id: 'v2', price_public: 100000 } : null);
+  const res = await realtimeSync.liveCheck([1, 2]);
+  assert.ok(res.ok);
+  assert.equal(catalog.find(p => p.id === 1).removed_from_dropbuy, true);
+  assert.equal(catalog.find(p => p.id === 1).in_stock, false);
+  assert.equal(catalog.find(p => p.id === 2).removed_from_dropbuy, undefined);
+  assert.equal(catalog.find(p => p.id === 2).in_stock, true);
+});

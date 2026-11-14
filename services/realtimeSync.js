@@ -227,6 +227,18 @@ async function liveCheck(productIds) {
             Object.assign(cur, { price: fresh.price, original_price: fresh.original_price, dropbuy_cost: fresh.dropbuy_cost, public_price: fresh.public_price, wholesale_price: fresh.wholesale_price, is_flash_sale: fresh.is_flash_sale, fs_program_code: fresh.fs_program_code, profit_margin: fresh.profit_margin, is_wholesale_price: fresh.is_wholesale_price, pricing_rule: fresh.pricing_rule, warranty: fresh.warranty, warranty_type: fresh.warranty_type, warranty_duration: fresh.warranty_duration, updated_at: fresh.updated_at });
             changed.push(cur);
           }
+          if (cur.removed_from_dropbuy) {
+            delete cur.removed_from_dropbuy;
+            if (!changed.includes(cur)) changed.push(cur);
+          }
+        } else if (!item && (!stock.has(cur.id) || stock.get(cur.id) === false)) {
+          // searchBySku không thấy và tồn kho báo false/không còn -> DropBuy đã ẩn/gỡ sản phẩm này
+          if (!cur.removed_from_dropbuy) {
+            cur.removed_from_dropbuy = true;
+            cur.in_stock = false;
+            cur.updated_at = new Date().toISOString();
+            if (!changed.includes(cur)) changed.push(cur);
+          }
         }
         if (stock.has(cur.id) && (cur.in_stock !== false) !== stock.get(cur.id)) {
           cur.in_stock = stock.get(cur.id);

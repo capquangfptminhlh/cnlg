@@ -397,7 +397,7 @@ app.get('/sp/:slugId', async (req, res) => {
     const id = parseInt(String(req.params.slugId), 10);
     if (!Number.isFinite(id) || id <= 0) return res.redirect(302, '/');
     const product = storeCatalog.findProduct(id);
-    if (!product) return res.redirect(302, '/');
+    if (!product || product.removed_from_dropbuy) return res.redirect(302, '/');
 
     // Kiểm tra nếu là Bot (ZaloBot, Facebook, Telegram, Google, etc.)
     const userAgent = String(req.get('user-agent') || '').toLowerCase();
@@ -1233,8 +1233,8 @@ app.get('/api/products/:id', async (req, res) => {
     }
 
     const product = storeCatalog.findProduct(id);
-    if (!product) {
-      return res.status(404).json({ success: false, error: 'Product not found' });
+    if (!product || product.removed_from_dropbuy) {
+      return res.status(404).json({ success: false, error: 'Sản phẩm không tồn tại hoặc đã ngừng kinh doanh' });
     }
     const src = storeCatalog.sourceOf(id);
     if (src) {
@@ -1442,9 +1442,9 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       }
       if (!known.has(id)) {
         const found = storeCatalog.findProduct(id);
-        if (found) known.set(id, found);
+        if (found && !found.removed_from_dropbuy) known.set(id, found);
       }
-      if (!known.has(id)) return res.status(400).json({ success: false, error: `Sản phẩm #${it?.id} không còn tồn tại.` });
+      if (!known.has(id)) return res.status(400).json({ success: false, error: `Sản phẩm #${it?.id} không còn tồn tại hoặc đã ngừng kinh doanh.` });
       const vid = it?.variation_id ? String(it.variation_id) : null;
       const key = `${id}:${vid || ''}`;
       const cur = merged.get(key) || { id, variation_id: vid, quantity: 0, expected: null };
