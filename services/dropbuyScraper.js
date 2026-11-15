@@ -36,9 +36,17 @@ function getMarkup(config = getConfig()) {
 function dropbuyHeaders(config = getConfig()) {
   const headers = {
     'Content-Type': 'application/json',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
     'Origin': 'https://dropbuy.vn',
-    'Referer': 'https://dropbuy.vn/'
+    'Referer': 'https://dropbuy.vn/',
+    'sec-ch-ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Dest': 'empty'
   };
   if (config.dropbuy?.cookieHeader) headers['Cookie'] = config.dropbuy.cookieHeader;
   // BFF xác thực bằng sid của phiên (cookie không đủ)
@@ -71,7 +79,10 @@ function cleanCategoryName(name) {
 async function syncCategories() {
   try {
     const res = await fetch(DROPBUY_CATEGORIES_URL, {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+      }
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -147,6 +158,8 @@ async function fetchAllSearchItems(config = getConfig(), { maxPages = 200, pageS
     else raw.push(...d.items);
     done++;
     if (onProgress) onProgress({ current: raw.length, total: totalRecords, page: done });
+    // Khoảng đệm vi mô ngẫu nhiên (25-50ms) giữa các trang để không dồn dập vào DropBuy
+    await new Promise(r => setTimeout(r, 25 + Math.random() * 25));
   });
   // Trùng SP giữa các trang (DropBuy xếp lại khi có SP mới) → giữ 1 bản
   const seen = new Set();
@@ -209,6 +222,8 @@ async function fetchWholesalePrices(items, config = getConfig()) {
     } catch (e) {
       console.warn('[Scraper] Lỗi lấy giá sỉ:', e.message);
     }
+    // Nghỉ vi mô ngẫu nhiên (20-40ms) giữa các lô giá sỉ để giảm áp lực lên DropBuy
+    await new Promise(r => setTimeout(r, 20 + Math.random() * 20));
   });
   return map;
 }
@@ -353,6 +368,8 @@ async function fetchStockMap(ids, config = getConfig(), batchSize = 700, { retri
         const json = await res.json();
         if (!json.success || !Array.isArray(json.data)) throw new Error(`in-stock: ${json.message || 'dữ liệu không hợp lệ'}`);
         for (const r of json.data) map.set(r.product_id, !!r.in_stock);
+        // Nghỉ vi mô ngẫu nhiên (10-25ms) giữa các lô tồn kho
+        await new Promise(r => setTimeout(r, 10 + Math.random() * 15));
         return;
       } catch (e) {
         if (attempt >= retries) { errors.push(e); return; }

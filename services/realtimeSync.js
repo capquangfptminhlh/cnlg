@@ -63,7 +63,7 @@ async function runStockSync() {
   return withCatalogLock(async () => {
     const config = scraper.getConfig();
     const products = scraper.getProducts();
-    const dropbuyProducts = products.filter(p => !p.supplier || p.supplier === 'dropbuy');
+    const dropbuyProducts = products.filter(p => (!p.supplier || p.supplier === 'dropbuy') && !p.removed_from_dropbuy);
     const stock = await scraper.fetchStockMap(dropbuyProducts.map(p => p.id), config);
     const changed = [];
     for (const p of products) {
@@ -151,11 +151,55 @@ async function runPriceSync() {
   });
 }
 
-// ───────────────────────── Bộ lập lịch có giãn nhịp ─────────────────────────
+// ───────────────────────── Bộ lập lịch có giãn nhịp, jitter & night mode ─────────────────────────
+
+/**
+ * Lấy giờ hiện tại theo múi giờ Việt Nam (UTC+7).
+ */
+function getVietnamHour() {
+  try {
+    const vnTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false, hour: 'numeric' });
+    const h = parseInt(vnTime, 10);
+    return Number.isFinite(h) ? h : (new Date().getUTCHours() + 7) % 24;
+  } catch {
+    return (new Date().getUTCHours() + 7) % 24;
+  }
+}
+
+/**
+ * Thêm jitter (dao động ngẫu nhiên ±15% đến ±20%) vào thời gian delay.
+ * Phá vỡ nhịp định kỳ cứng nhắc để tránh bị hệ thống giám sát / WAF của nhà cung cấp nhận diện bot.
+ */
+function applyJitter(delayMs, factor = 0.2) {
+  const min = 1 - factor;
+  const max = 1 + factor;
+  const mult = min + Math.random() * (max - min);
+  return Math.max(1000, Math.round(delayMs * mult));
+}
+
+/**
+ * Tính thời gian chờ kế tiếp cho vòng quét, kết hợp Night Mode và Jitter:
+ * - Ban đêm (00h00 - 06h00 VN): Nhà cung cấp đóng cửa kho, không cập nhật tồn kho/giá.
+ *   -> Giãn nhịp tồn kho lên x3 (ví dụ 30s -> ~90s), giá x2 (ví dụ 10m -> 20m) để giảm 70-80% tải.
+ * - Ban ngày: Chạy theo baseMs kèm jitter ngẫu nhiên ±20% để không bao giờ có 2 lần chạy trùng chu kỳ giây.
+ */
+function computeNextDelay(loop) {
+  if (loop.failures) {
+    const backoff = Math.min(MAX_BACKOFF_MS, loop.baseMs * (2 ** loop.failures));
+    return applyJitter(backoff, 0.15);
+  }
+  const vnHour = getVietnamHour();
+  const isNight = vnHour >= 0 && vnHour < 6;
+  const nightMultiplier = isNight ? (loop.name === 'stock' ? 3 : 2) : 1;
+  const targetMs = loop.baseMs * nightMultiplier;
+  return applyJitter(targetMs, 0.2);
+}
+
 function schedule(loop, fn, delayMs) {
   clearTimeout(loop.timer);
-  loop.nextRun = new Date(Date.now() + delayMs).toISOString();
-  loop.timer = setTimeout(() => tick(loop, fn), delayMs);
+  const effectiveDelay = delayMs !== undefined ? delayMs : computeNextDelay(loop);
+  loop.nextRun = new Date(Date.now() + effectiveDelay).toISOString();
+  loop.timer = setTimeout(() => tick(loop, fn), effectiveDelay);
 }
 
 async function tick(loop, fn) {
@@ -175,7 +219,7 @@ async function tick(loop, fn) {
   } finally {
     loop.lastDurationMs = Date.now() - started;
     loop.running = false;
-    const delay = loop.failures ? Math.min(MAX_BACKOFF_MS, loop.baseMs * 2 ** loop.failures) : loop.baseMs;
+    const delay = computeNextDelay(loop);
     schedule(loop, fn, delay);
     if (ioRef) {
       ioRef.emit('REALTIME_HEARTBEAT', getPublicSyncStatus());
@@ -186,7 +230,7 @@ async function tick(loop, fn) {
 
 function startRealtimeSync(io) {
   ioRef = io;
-  console.log(`[RealtimeSync] ⚡ Tồn kho mỗi ${STOCK_INTERVAL_MS / 1000}s, giá & catalog mỗi ${PRICE_INTERVAL_MS / 1000}s.`);
+  console.log(`[RealtimeSync] ⚡ Tồn kho mỗi ~${STOCK_INTERVAL_MS / 1000}s, giá & catalog mỗi ~${PRICE_INTERVAL_MS / 1000}s (kèm jitter & night mode).`);
   schedule(loops.price, runPriceSync, 3000);
   schedule(loops.stock, runStockSync, 8000);
 }

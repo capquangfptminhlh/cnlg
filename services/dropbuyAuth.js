@@ -34,10 +34,18 @@ async function verifySession(cookieHeader) {
   try {
     const res = await fetch('https://dropbuy.vn/api/auth/session', {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
         'Cookie': cookieHeader,
         'Origin': 'https://dropbuy.vn',
-        'Referer': 'https://dropbuy.vn/'
+        'Referer': 'https://dropbuy.vn/',
+        'sec-ch-ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Dest': 'empty'
       }
     });
 
@@ -116,7 +124,7 @@ async function loginDropbuy(username, password, totpCode) {
   // B1: POST /api/proxy/login/get-challenge {username} → challenge_key, challenge_token (mfa_enabled, challenge_next)
   // B2: NextAuth credentials "password-login": username, hashed_password (= mật khẩu nguyên văn, trang DropBuy không băm),
   //     challenge_key, challenge_token, totp_code. Thành công → cookie session-token; phiên dùng được phải có user.sid.
-  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
   let networkError = null;
   try {
     console.log('[DropBuy Auth] Lấy mã challenge đăng nhập...');

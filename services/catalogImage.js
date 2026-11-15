@@ -81,8 +81,16 @@ async function fetchOneMedia(urlStr, maxBytes = MAX_MEDIA_BYTES) {
     const response = await fetch(urlStr, {
       method: 'GET', redirect: 'error', signal: AbortSignal.timeout(12000),
       headers: {
-        accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif,video/mp4,video/webm,*/*',
-        'user-agent': 'HoangMinhStore/1.0'
+        'accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'accept-language': 'vi,en-US;q=0.9,en;q=0.8',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'referer': 'https://dropbuy.vn/',
+        'sec-ch-ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'image',
+        'sec-fetch-mode': 'no-cors',
+        'sec-fetch-site': 'same-site'
       }
     });
     if (!response.ok) return null;

@@ -7,7 +7,7 @@
  */
 const BASE = 'https://dropbuy.vn';
 const BFF = `${BASE}/api/proxy/bff`;
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 const RECHECK_MS = 10 * 60 * 1000;
 
 let cache = { cookie: null, sid: null, exp: 0, checkedAt: 0, user: null };
@@ -37,7 +37,15 @@ async function ensureSession(config, { force = false } = {}) {
   const fresh = cache.cookie === cookie && cache.sid && Date.now() < cache.exp - 60e3 && Date.now() - cache.checkedAt < RECHECK_MS;
   if (fresh && !force) return { sid: cache.sid, user: cache.user, expiresAt: new Date(cache.exp).toISOString() };
 
-  const res = await fetch(`${BASE}/api/auth/session`, { headers: { 'user-agent': UA, cookie, referer: `${BASE}/` } });
+  const res = await fetch(`${BASE}/api/auth/session`, {
+    headers: {
+      'user-agent': UA,
+      'accept': 'application/json, text/plain, */*',
+      'accept-language': 'vi,en-US;q=0.9,en;q=0.8',
+      cookie,
+      referer: `${BASE}/`
+    }
+  });
   const session = await res.json().catch(() => null);
   const u = session?.user;
   if (!u?.sid) {
@@ -60,7 +68,20 @@ function invalidate() {
 }
 
 function headers(config, sid) {
-  const h = { 'content-type': 'application/json', 'user-agent': UA, origin: BASE, referer: `${BASE}/` };
+  const h = {
+    'content-type': 'application/json',
+    'accept': 'application/json, text/plain, */*',
+    'accept-language': 'vi,en-US;q=0.9,en;q=0.8',
+    'user-agent': UA,
+    'origin': BASE,
+    'referer': `${BASE}/`,
+    'sec-ch-ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-site': 'same-origin',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-dest': 'empty'
+  };
   const cookie = cookieOf(config);
   if (cookie) h.cookie = cookie;
   const s = sid || currentSid(config);

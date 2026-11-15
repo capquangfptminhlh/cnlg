@@ -92,8 +92,15 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
       if (fs.existsSync(cfgPath)) cookieHeader = JSON.parse(fs.readFileSync(cfgPath, 'utf8'))?.dropbuy?.cookieHeader || '';
     } catch (e) {}
     const reqHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+      'sec-ch-ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"Windows"',
+      'Sec-Fetch-Site': 'same-origin',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Dest': 'document'
     };
     if (cookieHeader) reqHeaders['Cookie'] = cookieHeader;
     const res = await fetch(dropbuyUrl, { headers: reqHeaders });
