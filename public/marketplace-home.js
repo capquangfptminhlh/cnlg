@@ -82,7 +82,7 @@
     const src = String(p.image || '');
     return '<article class="featured-card' + (p.is_flash_sale && !soldOut ? ' is-flash-card' : '') + '" data-product-id="' + id + '">' +
       '<button type="button" class="featured-media" data-shop-product="' + id + '" aria-label="Xem ' + escapeHTML(p.name) + '">' +
-      '<img loading="lazy" src="' + escapeHTML(src || fallback) + '" alt="' + escapeHTML(p.name) +
+      '<img loading="lazy" decoding="async" width="400" height="400" src="' + escapeHTML(src || fallback) + '" alt="' + escapeHTML(p.name) +
       '" onerror="this.onerror=null;this.src=' + "'" + fallback.replace(/'/g, '') + "'" + '">' +
       '</button>' + discountBadge + cornerOff +
       '<button type="button" class="card-heart" data-favorite-id="' + id + '" aria-pressed="false" aria-label="Lưu sản phẩm"><i class="fa-regular fa-heart"></i></button>' +

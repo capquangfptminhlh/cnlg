@@ -346,7 +346,7 @@ function productCardHtml(p) {
         ${productBadges(p)}
         ${!soldOut && p.discount_percent >= 20 ? `<span class="card-corner-off"><b>-${p.discount_percent}%</b><small>GIẢM</small></span>` : ''}
         <button type="button" class="card-heart" data-favorite-id="${p.id}" aria-label="Lưu sản phẩm" aria-pressed="false"><i class="fa-regular fa-heart"></i></button>
-        <img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'400\\' height=\\'400\\' viewBox=\\'0 0 400 400\\'><rect fill=\\'%23111422\\' width=\\'400\\' height=\\'400\\'/><text fill=\\'%238b92b3\\' font-size=\\'18\\' font-family=\\'sans-serif\\' x=\\'50%\\' y=\\'50%\\' text-anchor=\\'middle\\'>BESI</text></svg>'">
+        <img src="${esc(p.image)}" alt="${esc(p.name)}" width="400" height="400" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'400\\' height=\\'400\\' viewBox=\\'0 0 400 400\\'><rect fill=\\'%23111422\\' width=\\'400\\' height=\\'400\\'/><text fill=\\'%238b92b3\\' font-size=\\'18\\' font-family=\\'sans-serif\\' x=\\'50%\\' y=\\'50%\\' text-anchor=\\'middle\\'>BESI</text></svg>'">
 
         <div class="card-quick-overlay">
           <button class="btn-quick-view" onclick="openProductDetail(${p.id})">

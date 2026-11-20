@@ -13,6 +13,11 @@ const ALLOWED_MEDIA_MIMES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif',
   'video/mp4', 'video/webm'
 ]);
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const dns = require('dns');
+const net = require('net');
 const cache = new Map();
 const pending = new Map();
 let active = 0;
@@ -76,15 +81,15 @@ function allowedBytes(buffer, mime) {
   return false;
 }
 
-async function fetchOneMedia(urlStr, maxBytes = MAX_MEDIA_BYTES) {
+async function fetchOneMedia(urlStr, maxBytes = MAX_MEDIA_BYTES, { referer = 'https://dropbuy.vn/', accept = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' } = {}) {
   try {
     const response = await fetch(urlStr, {
       method: 'GET', redirect: 'error', signal: AbortSignal.timeout(12000),
       headers: {
-        'accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'accept': accept,
         'accept-language': 'vi,en-US;q=0.9,en;q=0.8',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-        'referer': 'https://dropbuy.vn/',
+        ...(referer ? { referer } : {}),
         'sec-ch-ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
         'sec-ch-ua-mobile': '?0',
         'sec-ch-ua-platform': '"Windows"',
@@ -191,7 +196,96 @@ function maskMediaUrl(url) {
   if (typeof url !== 'string' || !url) return url;
   const masked = maskOrigin(url).replace(/^https?:\/\/r6[is]\.pen\.dropbuy\.vn\/(md2?\/)/i, '/cdn/$1');
   if (/^(https?:)?\/\/(?:[\w-]+\.)*dropbuy\.vn(\/|$)/i.test(masked)) return '/logo.svg';
-  return masked;
+  return signExternal(masked);
+}
+
+// ───────── Ảnh nằm trên web khác (web hãng, AliExpress, máy chủ Trung Quốc…) ─────────
+// Trước đây trình duyệt khách tải thẳng → chậm, hay lỗi, không qua Cloudflare.
+// Giờ đi qua /cdn/x/<chữ ký>/<link mã hoá>.<đuôi> của cửa hàng. Máy chủ CHỈ tải link do chính nó ký
+// (link lấy từ catalog), không nhận link tuỳ ý → không bị lợi dụng tải hộ trang khác.
+const EXT_IMG = /\.(jpe?g|png|webp|gif)$/i;
+let mediaKey = null;
+function mediaSecret() {
+  if (mediaKey) return mediaKey;
+  const file = process.env.HM_MEDIA_SECRET_FILE || path.join(__dirname, '..', 'data', 'media-secret.json');
+  try { mediaKey = Buffer.from(JSON.parse(fs.readFileSync(file, 'utf8')).key, 'hex'); } catch (e) {}
+  if (!mediaKey || mediaKey.length < 32) {
+    mediaKey = crypto.randomBytes(32);
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, JSON.stringify({ key: mediaKey.toString('hex') }), { encoding: 'utf8', mode: 0o600 });
+    } catch (e) {}
+  }
+  return mediaKey;
+}
+const extSig = href => crypto.createHmac('sha256', mediaSecret()).update(`ext-media:${href}`).digest('base64url').slice(0, 16);
+
+function externalImageUrl(value) {
+  if (typeof value !== 'string' || value.length > 1200) return null;
+  try {
+    const u = new URL(value);
+    if (!/^https?:$/.test(u.protocol) || u.username || u.password || u.port) return null;
+    if (net.isIP(u.hostname.replace(/^\[|\]$/g, '')) || !u.hostname.includes('.') || /(^|\.)localhost$/i.test(u.hostname)) return null;
+    if (!EXT_IMG.test(u.pathname)) return null;
+    return u;
+  } catch (e) { return null; }
+}
+
+function signExternal(url) {
+  const u = /^https?:\/\//i.test(url) ? externalImageUrl(url) : null;
+  if (!u) return url;
+  const ext = u.pathname.match(EXT_IMG)[1].toLowerCase().replace('jpeg', 'jpg');
+  return `/cdn/x/${extSig(u.href)}/${Buffer.from(u.href, 'utf8').toString('base64url')}.${ext}`;
+}
+
+/** /cdn/x/<sig>/<b64> → link gốc nếu đúng chữ ký của máy chủ, ngược lại null. */
+function externalFromSigned(sig, b64) {
+  let href;
+  try { href = Buffer.from(String(b64), 'base64url').toString('utf8'); } catch (e) { return null; }
+  const u = externalImageUrl(href);
+  if (!u || u.href !== href) return null;
+  const want = extSig(href);
+  if (typeof sig !== 'string' || sig.length !== want.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
+  return href;
+}
+
+// Không tải địa chỉ nội bộ (máy chủ, mạng LAN) kể cả khi tên miền trỏ về đó
+function privateIp(ip) {
+  const v4 = ip.replace(/^::ffff:/i, '');
+  if (net.isIPv4(v4)) {
+    const [a, b] = v4.split('.').map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+  }
+  const s = ip.toLowerCase();
+  return s === '::' || s === '::1' || /^f[cd]/.test(s) || /^fe[89ab]/.test(s);
+}
+async function publicHost(hostname) {
+  try {
+    const addrs = await dns.promises.lookup(hostname, { all: true });
+    return addrs.length > 0 && addrs.every(a => !privateIp(a.address));
+  } catch (e) { return false; }
+}
+
+async function mediaFromExternal(href) {
+  const u = externalImageUrl(href);
+  if (!u) return null;
+  const hit = cache.get(href);
+  if (hit && Date.now() - hit.at < CACHE_AGE) return hit.result;
+  if (pending.has(href)) return pending.get(href);
+  const task = (async () => {
+    if (!await publicHost(u.hostname)) throw new Error('Địa chỉ ảnh không hợp lệ');
+    // Không nhận AVIF (trình duyệt cũ không mở được); WebP/JPG/PNG thì máy chủ nén lại được
+    const result = await fetchOneMedia(href, 8 * 1024 * 1024, { referer: null, accept: 'image/webp,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.5' });
+    if (!result || !result.mime.startsWith('image/')) throw new Error('Không phải ảnh hợp lệ');
+    if (result.buffer.length <= MAX_BYTES) {
+      cache.set(href, { at: Date.now(), result });
+      while (cache.size > MAX_ITEMS) cache.delete(cache.keys().next().value);
+    }
+    return result;
+  })();
+  pending.set(href, task);
+  try { return await task; } finally { pending.delete(href); }
 }
 
 function maskMediaHtml(html) {
@@ -243,5 +337,9 @@ module.exports = {
   maskMediaUrl,
   maskMediaHtml,
   mediaFromCdnPath,
+  mediaFromExternal,
+  externalFromSigned,
+  signExternal,
+  privateIp,
   sniffMime
 };

@@ -35,6 +35,7 @@ const watchdog = require('./services/dropbuyWatchdog');
 const vault = require('./services/credentialVault');
 const customerMessage = require('./services/customerMessage');
 const catalogImage = require('./services/catalogImage');
+const imageOptimizer = require('./services/imageOptimizer');
 const taobaoPublic = require('./services/taobaoPublic');
 const taobaoPriceShipping = require('./services/taobaoPriceShipping');
 const taobaoAutoSync = require('./services/taobaoAutoSync');
@@ -789,7 +790,8 @@ app.get('/api/catalog-image/:id', async (req, res) => {
   const product=storeCatalog.findProduct(id);
   if(!product||product.source)return res.sendStatus(404);
   try {
-    const result=await catalogImage.imageForProduct(product);
+    const load=()=>catalogImage.imageForProduct(product);
+    const result=/image\/webp/i.test(req.get('accept')||'')?await imageOptimizer.optimized('pid:'+id+'|'+product.image,load):await load();
     if(!result)return res.sendStatus(404);
     res.set('Content-Type',result.mime);
     res.set('Cache-Control','public, max-age=43200');
@@ -801,17 +803,39 @@ app.get('/api/catalog-image/:id', async (req, res) => {
   }
 });
 
+/**
+ * Gửi ảnh /cdn/…: trình duyệt nhận được WebP → ảnh đã thu nhỏ + nén (lưu sẵn trên ổ đĩa),
+ * không thì ảnh gốc. Video / GIF luôn gửi gốc.
+ */
+async function sendCdnMedia(req, res, id, loadOriginal) {
+  const webp = /image\/webp/i.test(req.get('accept') || '');
+  const result = webp ? await imageOptimizer.optimized(id, loadOriginal) : await loadOriginal();
+  if (!result) return res.sendStatus(404);
+  res.set('Content-Type', result.mime);
+  res.set('Cache-Control', 'public, max-age=604800');
+  res.set('X-Content-Type-Options', 'nosniff');
+  return res.send(result.buffer);
+}
+
 app.get(/^\/cdn\/((?:md2?|p[1-4])\/.+)$/, async (req, res) => {
   try {
-    const result = await catalogImage.mediaFromCdnPath(req.params[0]);
-    if (!result) return res.sendStatus(404);
-    res.set('Content-Type', result.mime);
-    res.set('Cache-Control', 'public, max-age=86400');
-    res.set('X-Content-Type-Options', 'nosniff');
-    return res.send(result.buffer);
+    return await sendCdnMedia(req, res, req.params[0], () => catalogImage.mediaFromCdnPath(req.params[0]));
   } catch (error) {
     res.set('Cache-Control', 'no-store');
     return res.status(503).type('text/plain').send('\u1ea2nh t\u1ea1m th\u1eddi kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c');
+  }
+});
+
+// Ảnh trên web khác (đã ký bởi máy chủ – xem catalogImage.signExternal)
+app.get(/^\/cdn\/x\/([A-Za-z0-9_-]{16})\/([A-Za-z0-9_-]{8,1700})\.(?:jpg|png|webp|gif)$/, async (req, res) => {
+  const href = catalogImage.externalFromSigned(req.params[0], req.params[1]);
+  if (!href) return res.sendStatus(404);
+  try {
+    return await sendCdnMedia(req, res, 'x:' + href, () => catalogImage.mediaFromExternal(href));
+  } catch (error) {
+    // Web gốc chặn máy chủ tải hộ → để trình duyệt tự tải như trước, ảnh vẫn hiện
+    res.set('Cache-Control', 'no-store');
+    return res.redirect(302, href);
   }
 });
 
@@ -2623,6 +2647,7 @@ if (require.main === module) {
     sources.start(pricedIo, readConfig);
     orderExpiry.startOrderExpiry(io, readConfig);
     backup.startBackups();
+    imageOptimizer.startPruning();
     watchdog.startWatchdog(io);
     notify.startZaloBotPolling();
 
