@@ -502,6 +502,8 @@ module.exports = {
   setAdminCookie,
   clearAdminCookie,
   isAdminRequest,
+  isHttpsRequest,
+  isSameOriginMutation,
   emitAdmin,
   safeEqual,
   clientIp,

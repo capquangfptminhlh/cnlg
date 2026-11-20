@@ -73,7 +73,7 @@ function renderProductPage(req, product, detail, config) {
   const url = base + productPath(product);
   const name = storeName(config, req);
   const priceText = `${Number(product.price).toLocaleString('vi-VN')} đ`;
-  const desc = stripSupplierText(stripHtml(detail?.description).slice(0, 160) || `${product.name} – Giá sỉ: ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, kiểm tra trước khi thanh toán.'}`);
+  const desc = stripSupplierText(stripHtml(detail?.description).slice(0, 160) || `${product.name} – Giá: ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, kiểm tra trước khi thanh toán.'}`);
   
   // Ưu tiên ảnh chuẩn 256x256 / 500px (< 150KB) để Zalo/Facebook bot tải ngay lập tức không bị timeout
   const chosenImg = product.image || product.image_hd;

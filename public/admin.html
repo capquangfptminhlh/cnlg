@@ -40,6 +40,12 @@
           <span class="tab-badge" id="navBadgeOrders">0</span>
         </button>
 
+        <button type="button" class="admin-tab-btn" data-target="customers" onclick="switchAdminModule('customers')">
+          <i class="fa-solid fa-user-tie"></i>
+          <span>Khách sỉ</span>
+          <span class="tab-badge" id="navBadgeCustomers" style="display:none;">0</span>
+        </button>
+
         <div class="sidebar-group-label">Hàng hoá &amp; Giá bán</div>
         <button type="button" class="admin-tab-btn" data-target="pricing-rules" onclick="switchAdminModule('pricing-rules')">
           <i class="fa-solid fa-percent"></i>
@@ -243,6 +249,34 @@
         <!-- =================================================================
              MODULE 3: CÔNG THỨC TÍNH GIÁ BÁN (pricing-rules)
              ================================================================= -->
+        <section class="admin-module-pane" data-module="customers">
+          <div class="admin-card">
+            <h3><i class="fa-solid fa-tags"></i> Giá lẻ cho khách chưa đăng nhập</h3>
+            <p class="help-text">Khách sỉ đã duyệt (đăng nhập) thấy giá bán hiện tại = <b>giá sỉ</b>. Mọi khách khác thấy <b>giá lẻ</b> = giá sỉ + % dưới đây, làm tròn lên, và không vượt giá niêm yết nếu bật.</p>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+              <label class="form-group" style="margin:0;">Cộng thêm cho giá lẻ (%)<input type="number" id="cpMarkup" min="0" max="200" step="1" style="width:110px;"></label>
+              <label class="form-group" style="margin:0;">Làm tròn lên tới (đ)<input type="number" id="cpRound" min="1" step="100" style="width:120px;"></label>
+              <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="cpCap"> Không vượt giá niêm yết</label>
+              <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="cpEnabled"> Bật giá lẻ (tắt = ai cũng thấy giá sỉ)</label>
+              <button type="button" class="btn-sync-now" onclick="saveCustomerPricing()"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+            </div>
+            <p class="help-text" id="cpExample" style="margin-top:8px;"></p>
+          </div>
+          <div class="admin-card">
+            <div class="flex-between" style="flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+              <div>
+                <h3><i class="fa-solid fa-user-tie"></i> Danh sách khách sỉ</h3>
+                <p class="help-text" style="margin:2px 0 0;">Khách tự đăng ký trên web → bấm <b>Duyệt</b> là khách thấy giá sỉ (đang đăng nhập thì có hiệu lực khi tải lại trang).</p>
+              </div>
+              <div class="order-filter-pills" id="custFilterPills"></div>
+            </div>
+            <div class="table-container"><table class="product-table">
+              <thead><tr><th>Khách</th><th>SĐT</th><th>Ghi chú</th><th>Đăng ký</th><th>Đơn / Doanh số</th><th>Trạng thái</th><th></th></tr></thead>
+              <tbody id="custTableBody"><tr><td colspan="7" style="text-align:center;">Đang tải...</td></tr></tbody>
+            </table></div>
+          </div>
+        </section>
+
         <section class="admin-module-pane" data-module="pricing-rules">
           <div class="admin-card" id="pricingSection">
             <div class="flex-between" style="flex-wrap: wrap; gap: 10px;">

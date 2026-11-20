@@ -23,7 +23,7 @@
   // Real, keyboard accessible banner carousel — informational messages only;
   // never pretend a promotion, review score or discount exists.
   const slides = [
-    {label:'TỔNG KHO GIÁ SỈ HOÀNG MINH',icon:'fa-bolt',over:'MUA LẺ 1 MÓN · TÍNH GIÁ SỈ TẬN GỐC',
+    {label:'TỔNG KHO GIÁ SỈ HOÀNG MINH',icon:'fa-bolt',over:'SHOP & ĐẠI LÝ · ĐĂNG NHẬP XEM GIÁ SỈ TẬN GỐC',
       headline:'Giá sỉ tận kho,<span><em>rẻ vô địch!</em></span>',
       description:'Nhập trực tiếp tổng kho không qua trung gian — tiết kiệm tới 70% mỗi đơn hàng.',
       cta:'Săn Giá Sỉ Ngay',ctaIcon:'fa-bolt',href:'#flashSaleSection'},

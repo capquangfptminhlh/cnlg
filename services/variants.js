@@ -135,6 +135,7 @@ async function checkLine(product, variationId, config = scraper.getConfig()) {
         live: true,
         in_stock: inStock,
         price: p.price,
+        original_price: p.original_price || null, // giá niêm yết – trần của giá lẻ
         cost: p.cost,
         cost_is_wholesale: p.is_wholesale,
         fs_program_code: fsCode,
@@ -155,6 +156,7 @@ async function checkLine(product, variationId, config = scraper.getConfig()) {
         live: true,
         in_stock: inStock,
         price: p.price,
+        original_price: p.original_price || null, // giá niêm yết – trần của giá lẻ
         cost: p.cost,
         cost_is_wholesale: p.is_wholesale,
         fs_program_code: fsCode,
@@ -167,9 +169,9 @@ async function checkLine(product, variationId, config = scraper.getConfig()) {
     // DropBuy không phản hồi: dùng dữ liệu đã đồng bộ gần nhất
     const p = variant && variant.id !== product.variation_id
       ? priceVariant(product, variant.public_price || product.public_price, null, ctx)
-      : { price: product.price, cost: product.dropbuy_cost, is_wholesale: !!product.is_wholesale_price };
+      : { price: product.price, original_price: product.original_price, cost: product.dropbuy_cost, is_wholesale: !!product.is_wholesale_price };
     const inStock = product.in_stock !== false && (variant ? variant.in_stock !== false : true);
-    return { ...base, ok: inStock, live: false, in_stock: inStock, price: p.price, cost: p.cost, cost_is_wholesale: p.is_wholesale, fs_program_code: product.fs_program_code || null, message: inStock ? null : `"${product.name}" đã hết hàng.` };
+    return { ...base, ok: inStock, live: false, in_stock: inStock, price: p.price, original_price: p.original_price || null, cost: p.cost, cost_is_wholesale: p.is_wholesale, fs_program_code: product.fs_program_code || null, message: inStock ? null : `"${product.name}" đã hết hàng.` };
   }
 }
 

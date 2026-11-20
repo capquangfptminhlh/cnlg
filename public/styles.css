@@ -1773,3 +1773,16 @@ input, textarea, select { font-family: var(--font); }
   color: #dc2626;
   border: 1px solid rgba(239, 68, 68, 0.28);
 }
+
+/* Khách sỉ: nút đầu trang + hộp đăng nhập/đăng ký */
+.header-account-btn .acct-tier-si { color: #16794a; }
+.header-account-btn .acct-tier-wait { color: #b45309; }
+.account-dialog { max-width: 560px; }
+.account-dialog .acct-lead { margin: 0 0 12px; font-size: 14px; color: #475467; }
+.account-dialog .acct-err { margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: #fef2f2; color: #b91c1c; font-size: 13px; }
+.account-dialog .acct-info { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #273141; margin-bottom: 12px; }
+.account-dialog .acct-state { margin-top: 6px; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+.account-dialog .acct-state.ok { background: #f0fbf5; color: #16794a; }
+.account-dialog .acct-state.wait { background: #fffbeb; color: #92400e; }
+.si-save-chip.is-login { cursor: pointer; }
+.detail-si-login { border: 0; cursor: pointer; font: inherit; }

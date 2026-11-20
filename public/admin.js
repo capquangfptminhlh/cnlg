@@ -154,6 +154,7 @@ const MODULE_META = {
   'shipping': ['Cấu hình Vận chuyển', 'Thiết lập phí ship thật theo Phường/Xã từ kho DropBuy và hạn thanh toán'],
   'payments': ['Ngân hàng & Đối soát CK', 'Cấu hình tài khoản nhận tiền VietQR và lịch sử Webhook SePay / Casso'],
   'dropbuy': ['Kết nối Kho DropBuy', 'Quản lý tài khoản đại lý DropBuy, đồng bộ Realtime và kiểm tra kết nối API'],
+  'customers': ['Khách sỉ & Giá lẻ', 'Duyệt tài khoản khách sỉ (đăng nhập mới thấy giá sỉ) và đặt % giá lẻ cho khách chưa đăng nhập'],
   'techmall': ['Kho TechMall.vn & Giá riêng', 'Đăng nhập đại lý TechMall lấy giá sỉ, cài đặt % lãi riêng và đồng bộ realtime 5 phút/lần']
 };
 
@@ -188,7 +189,134 @@ function switchAdminModule(modName, pushHash = true) {
   }
   window.scrollTo({ top: 0, behavior: 'instant' });
   if (target === 'techmall') loadTechmallAll();
+  if (target === 'customers') loadCustomers();
 }
+
+// ───────────── Khách sỉ ─────────────
+const CUST_STATUS = { pending: ['Chờ duyệt', '#b45309'], approved: ['Đã duyệt – giá sỉ', '#16a34a'], rejected: ['Từ chối', '#64748b'], disabled: ['Đã khoá', '#dc2626'] };
+let custFilter = 'pending';
+let custData = { data: [], counts: {}, rules: {} };
+
+function setCustomerBadge(counts) {
+  const badge = document.getElementById('navBadgeCustomers');
+  if (!badge) return;
+  badge.textContent = counts.pending || 0;
+  badge.style.display = counts.pending ? '' : 'none';
+}
+
+async function loadCustomers() {
+  try {
+    const json = await (await adminFetch('/api/admin/customers')).json();
+    if (!json.success) throw new Error(json.error);
+    custData = json;
+    const r = json.rules || {};
+    document.getElementById('cpMarkup').value = r.markupPercent ?? 20;
+    document.getElementById('cpRound').value = r.roundTo ?? 1000;
+    document.getElementById('cpCap').checked = r.capAtListed !== false;
+    document.getElementById('cpEnabled').checked = r.enabled !== false;
+    updateCpExample();
+    setCustomerBadge(json.counts);
+    if (custFilter === 'pending' && !json.counts.pending) custFilter = 'all';
+    renderCustomers();
+  } catch (e) {
+    document.getElementById('custTableBody').innerHTML = `<tr><td colspan="7" style="color:#ef4444;">${esc(e.message)}</td></tr>`;
+  }
+}
+
+function updateCpExample() {
+  const m = Number(document.getElementById('cpMarkup').value) || 0;
+  const round = Number(document.getElementById('cpRound').value) || 1000;
+  const ex = Math.ceil(100000 * (1 + m / 100) / round) * round;
+  document.getElementById('cpExample').innerHTML = document.getElementById('cpEnabled').checked
+    ? `Ví dụ: giá sỉ 100.000 đ → khách lẻ thấy <b>${formatPrice(ex)}</b>${document.getElementById('cpCap').checked ? ' (hoặc bằng giá niêm yết nếu giá niêm yết thấp hơn)' : ''}.`
+    : 'Đang tắt: mọi khách đều thấy giá sỉ.';
+}
+['cpMarkup', 'cpRound', 'cpCap', 'cpEnabled'].forEach(id => document.getElementById(id)?.addEventListener('input', updateCpExample));
+
+async function saveCustomerPricing() {
+  try {
+    const body = {
+      markupPercent: Number(document.getElementById('cpMarkup').value),
+      roundTo: Number(document.getElementById('cpRound').value),
+      capAtListed: document.getElementById('cpCap').checked,
+      enabled: document.getElementById('cpEnabled').checked
+    };
+    const json = await (await adminFetch('/api/admin/customer-pricing', { method: 'POST', body: JSON.stringify(body) })).json();
+    if (!json.success) throw new Error(json.error);
+    uiAlert('Đã lưu cách tính giá lẻ.');
+  } catch (e) {
+    uiAlert('Không lưu được: ' + e.message);
+  }
+}
+
+function setCustFilter(k) {
+  custFilter = k;
+  renderCustomers();
+}
+
+function renderCustomers() {
+  const counts = custData.counts || {};
+  const all = custData.data || [];
+  const pills = [['all', 'Tất cả', all.length], ['pending', 'Chờ duyệt', counts.pending || 0], ['approved', 'Đã duyệt', counts.approved || 0], ['disabled', 'Đã khoá', counts.disabled || 0], ['rejected', 'Từ chối', counts.rejected || 0]];
+  document.getElementById('custFilterPills').innerHTML = pills
+    .map(([k, label, n]) => `<button type="button" class="order-pill${custFilter === k ? ' active' : ''}" data-cust-filter="${k}">${label} <span>${n}</span></button>`).join('');
+  document.querySelectorAll('[data-cust-filter]').forEach(b => { b.onclick = () => setCustFilter(b.dataset.custFilter); });
+  const rows = all.filter(c => custFilter === 'all' || c.status === custFilter);
+  const t = iso => (iso ? new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–');
+  const btn = (c, st, text, cls) => `<button type="button" class="btn ${cls || 'btn-outline'}" style="padding:4px 10px; font-size:12px;" data-cust-id="${esc(c.id)}" data-cust-status="${st}">${text}</button>`;
+  document.getElementById('custTableBody').innerHTML = rows.length ? rows.map(c => {
+    const [label, color] = CUST_STATUS[c.status] || [c.status, '#64748b'];
+    const actions = [
+      c.status !== 'approved' ? btn(c, 'approved', '<i class="fa-solid fa-check"></i> Duyệt', 'btn-primary') : '',
+      c.status === 'pending' ? btn(c, 'rejected', 'Từ chối') : '',
+      c.status === 'approved' ? btn(c, 'disabled', 'Khoá') : '',
+      `<button type="button" class="btn btn-outline" style="padding:4px 10px; font-size:12px;" data-cust-pass="${esc(c.id)}">Đặt lại MK</button>`
+    ].join(' ');
+    return `<tr>
+      <td><strong>${esc(c.name)}</strong>${c.shop_name ? `<div style="font-size:12px; color:#64748b;">${esc(c.shop_name)}</div>` : ''}</td>
+      <td>${esc(c.phone)} <a href="https://zalo.me/${esc(c.phone)}" target="_blank" rel="noopener" style="font-size:12px;">Zalo</a></td>
+      <td style="max-width:220px; font-size:12px;">${esc(c.note || '')}</td>
+      <td style="font-size:12px;">${t(c.created_at)}${c.last_login_at ? `<div style="color:#64748b;">Vào gần nhất ${t(c.last_login_at)}</div>` : ''}</td>
+      <td>${c.orders || 0} đơn<div style="font-size:12px; color:#64748b;">${formatPrice(c.revenue || 0)}</div></td>
+      <td><span style="color:${color}; font-weight:700;">${label}</span></td>
+      <td style="white-space:nowrap;">${actions}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" style="text-align:center; color:#64748b;">Chưa có khách nào ở mục này.</td></tr>';
+  document.querySelectorAll('[data-cust-status]').forEach(b => { b.onclick = () => setCustomerStatus(b.dataset.custId, b.dataset.custStatus); });
+  document.querySelectorAll('[data-cust-pass]').forEach(b => { b.onclick = () => resetCustomerPassword(b.dataset.custPass); });
+}
+
+async function setCustomerStatus(id, status) {
+  const c = (custData.data || []).find(x => x.id === id);
+  const verb = { approved: 'Duyệt cho', rejected: 'Từ chối', disabled: 'Khoá tài khoản' }[status] || 'Đổi trạng thái';
+  if (status !== 'approved' && !await uiConfirm(`${verb} ${c ? c.name + ' (' + c.phone + ')' : id}?`)) return;
+  try {
+    const json = await (await adminFetch(`/api/admin/customers/${encodeURIComponent(id)}/status`, { method: 'POST', body: JSON.stringify({ status }) })).json();
+    if (!json.success) throw new Error(json.error);
+    if (status === 'approved') uiAlert(`Đã duyệt ${json.data.name} – khách đăng nhập là thấy giá sỉ.`);
+    loadCustomers();
+  } catch (e) {
+    uiAlert('Không cập nhật được: ' + e.message);
+  }
+}
+
+async function resetCustomerPassword(id) {
+  const pwd = await uiPrompt('Mật khẩu mới cho khách (tối thiểu 6 ký tự). Khách sẽ bị đăng xuất khỏi mọi máy:', { ok: 'Đặt lại' });
+  if (!pwd) return;
+  try {
+    const json = await (await adminFetch(`/api/admin/customers/${encodeURIComponent(id)}/password`, { method: 'POST', body: JSON.stringify({ password: pwd }) })).json();
+    if (!json.success) throw new Error(json.error);
+    uiAlert('Đã đặt lại mật khẩu. Báo khách mật khẩu mới qua Zalo.');
+  } catch (e) {
+    uiAlert('Không đặt lại được: ' + e.message);
+  }
+}
+
+socket.on('ADMIN_CUSTOMERS_CHANGED', () => {
+  if (document.querySelector('.admin-module-pane[data-module="customers"]')?.classList.contains('active')) loadCustomers();
+  else adminFetch('/api/admin/customers').then(r => r.json()).then(j => j.success && setCustomerBadge(j.counts)).catch(() => {});
+});
+
 
 function setOrderQuickFilter(filterKey) {
   orderFilterState.status = filterKey || 'all';
@@ -379,7 +507,7 @@ function renderOrders(orders) {
         ${ds.shipping_ref_code ? `<div style="font-size:11px; color:#64748b; margin-top:2px;">VĐ: <code>${esc(ds.shipping_ref_code)}</code></div>` : ''}
       </td>
       <td data-label="Khách hàng">
-        <div class="ord-cust-name">${esc(o.customer?.name || '—')}</div>
+        <div class="ord-cust-name">${esc(o.customer?.name || '—')}${o.price_tier === 'wholesale' ? ' <span class="ord-tier-tag is-si" title="Khách sỉ đã duyệt – mua giá sỉ">Khách sỉ</span>' : o.price_tier === 'retail' ? ' <span class="ord-tier-tag" title="Khách chưa đăng nhập – mua giá lẻ">Giá lẻ</span>' : ''}</div>
         <div class="ord-cust-phone">
           <span>${esc(o.customer?.phone || '')}</span>
           ${/^0\d{9}$/.test(digits) ? `<a class="ord-zalo-btn" href="https://zalo.me/${digits}" target="_blank" rel="noopener" title="Nhắn Zalo cho khách">Zalo</a>` : ''}

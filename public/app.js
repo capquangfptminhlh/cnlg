@@ -303,12 +303,16 @@ function productStockBadge(p) {
   }
   return `<span class="stock-pill is-in" title="Hàng sẵn tại kho, sẵn sàng giao toàn quốc"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <b>Còn hàng</b></span>`;
 }
+/** Khách sỉ đã duyệt (đăng nhập) – máy chủ đã trả đúng giá; chỉ để chữ trên thẻ nói đúng loại giá. */
+const isWholesaleView = () => document.body.dataset.tier === 'wholesale';
+window.addEventListener('storefront:tier', () => { if (state.products.length) renderProducts(); });
+
 function productBadges(p) {
   if (p.in_stock === false) return `<span class="card-tag tag-out">Hết hàng</span>`;
   if (p.is_flash_sale) return `<span class="card-tag tag-flash"><i class="fa-solid fa-bolt"></i> FLASH SALE</span>`;
-  if (p.discount_percent >= 35) return `<span class="card-tag tag-deal"><i class="fa-solid fa-fire"></i> GIÁ SỈ -${p.discount_percent}%</span>`;
+  if (p.discount_percent >= 35) return `<span class="card-tag tag-deal"><i class="fa-solid fa-fire"></i> ${isWholesaleView() ? 'GIÁ SỈ' : 'GIẢM'} -${p.discount_percent}%</span>`;
   if (p.is_mall) return `<span class="card-tag tag-mall"><i class="fa-solid fa-circle-check"></i> Chính hãng</span>`;
-  return `<span class="card-tag tag-si"><i class="fa-solid fa-tag"></i> GIÁ SỈ KHO</span>`;
+  return isWholesaleView() ? `<span class="card-tag tag-si"><i class="fa-solid fa-tag"></i> GIÁ SỈ KHO</span>` : '';
 }
 
 function renderProducts(appendFrom = null) {
@@ -354,7 +358,7 @@ function productCardHtml(p) {
         <div class="card-pricing">
           <span class="price-highlight">${formatPrice(p.price)}</span>
           ${p.original_price > p.price ? `<span class="price-old-row"><span class="price-strike">${formatPrice(p.original_price)}</span>${p.discount_percent > 0 ? `<span class="price-off">-${p.discount_percent}%</span>` : ''}</span>` : ''}
-          ${!soldOut ? (p.original_price > p.price && (p.original_price - p.price) >= 3000 ? `<span class="si-save-chip"><i class="fa-solid fa-fire-flame-curved"></i> Rẻ hơn ${formatCompactVnd(p.original_price - p.price)} · Giá sỉ</span>` : `<span class="si-save-chip is-base"><i class="fa-solid fa-check-double"></i> Mua 1 món cũng giá sỉ</span>`) : ''}
+          ${!soldOut ? (p.original_price > p.price && (p.original_price - p.price) >= 3000 ? `<span class="si-save-chip"><i class="fa-solid fa-fire-flame-curved"></i> Rẻ hơn ${formatCompactVnd(p.original_price - p.price)}${isWholesaleView() ? ' · Giá sỉ' : ''}</span>` : (isWholesaleView() ? `<span class="si-save-chip is-base"><i class="fa-solid fa-check-double"></i> Giá sỉ của bạn</span>` : `<span class="si-save-chip is-base is-login" data-store-action="account"><i class="fa-solid fa-user-tie"></i> Khách sỉ: đăng nhập xem giá sỉ</span>`)) : ''}
         </div>
 
         <div class="card-meta">
@@ -631,7 +635,7 @@ function renderDetailModal(prod) {
               : `<span class="stock-status-pill is-in" style="background: rgba(16,185,129,.15); color: #059669; font-weight: 700;"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <strong style="color: #047857;">${(v && v.stock != null && Number(v.stock) > 0) ? `${v.stock} sản phẩm (Giao ngay)` : (prod.stock != null && Number(prod.stock) > 0) ? `${prod.stock} sản phẩm (Giao ngay)` : 'Còn hàng (Giao ngay toàn quốc)'}</strong></span>`}
         </div>
 
-        ${!soldOut ? `<div class="detail-si-banner${prod.is_flash_sale ? ' is-flash' : ''}"><div class="detail-si-left"><i class="fa-solid ${prod.is_flash_sale ? 'fa-bolt' : 'fa-tags'}"></i> <strong>${prod.is_flash_sale ? 'FLASH SALE GIÁ SỈ TẬN KHO' : 'CAM KẾT GIÁ SỈ TỪ 1 SẢN PHẨM'}</strong></div>${original && original > price ? `<span class="detail-si-save">Rẻ hơn lẻ ${formatPrice(original - price)}</span>` : `<span class="detail-si-save">Lẻ = Giá buôn</span>`}</div>` : ''}
+        ${!soldOut ? `<div class="detail-si-banner${prod.is_flash_sale ? ' is-flash' : ''}"><div class="detail-si-left"><i class="fa-solid ${prod.is_flash_sale ? 'fa-bolt' : 'fa-tags'}"></i> <strong>${isWholesaleView() ? (prod.is_flash_sale ? 'FLASH SALE GIÁ SỈ TẬN KHO' : 'GIÁ SỈ DÀNH CHO BẠN') : (prod.is_flash_sale ? 'FLASH SALE' : 'GIÁ LẺ')}</strong></div>${isWholesaleView() ? (original && original > price ? `<span class="detail-si-save">Rẻ hơn ${formatPrice(original - price)}</span>` : '') : `<button type="button" class="detail-si-save detail-si-login" data-store-action="account">Khách sỉ? Đăng nhập xem giá sỉ</button>`}</div>` : ''}
         <div class="detail-pricing-box">
           <span class="detail-price-main">${formatPrice(price)}</span>
           ${original ? `<span class="detail-price-sub">${formatPrice(original)}</span>` : ''}
@@ -642,7 +646,7 @@ function renderDetailModal(prod) {
           <i class="fa-solid fa-shield-halved"></i> <span>Chính sách bảo hành: <strong>${esc(activeWarranty)}</strong></span>
           <small>${/^Không/i.test(activeWarranty) ? '• Đồng kiểm khi nhận' : '• Chính hãng NSX'}</small>
         </div>
-        ${!soldOut ? `<div class="detail-urgency-box"><div class="detail-urgency-top"><span class="detail-urgency-flame"><i class="fa-solid fa-fire-flame-curved"></i> SẮP HẾT HÀNG! Chỉ còn <b id="detailUrgentLeft">${urg.left}</b> suất giá sỉ cuối</span><span class="detail-urgency-viewers"><span class="live-viewer-dot"></span> <b id="detailViewerCount">${urg.viewers}</b> khách đang xem</span></div><div class="detail-urgency-bar"><span class="detail-urgency-fill" style="width:${urg.pct}%"></span><span class="detail-urgency-bar-label"><i class="fa-solid fa-bolt"></i> Đã săn ${urg.pct}% — Tranh thủ chốt đơn!</span></div></div>` : ''}
+        ${!soldOut ? `<div class="detail-urgency-box"><div class="detail-urgency-top"><span class="detail-urgency-flame"><i class="fa-solid fa-fire-flame-curved"></i> SẮP HẾT HÀNG! Chỉ còn <b id="detailUrgentLeft">${urg.left}</b> suất ${isWholesaleView() ? 'giá sỉ' : 'ưu đãi'} cuối</span><span class="detail-urgency-viewers"><span class="live-viewer-dot"></span> <b id="detailViewerCount">${urg.viewers}</b> khách đang xem</span></div><div class="detail-urgency-bar"><span class="detail-urgency-fill" style="width:${urg.pct}%"></span><span class="detail-urgency-bar-label"><i class="fa-solid fa-bolt"></i> Đã săn ${urg.pct}% — Tranh thủ chốt đơn!</span></div></div>` : ''}
 
 
         ${renderVariantPicker(prod)}
@@ -666,7 +670,7 @@ function renderDetailModal(prod) {
 
         <div class="detail-actions-row">
           <button class="btn-order-now-large${soldOut ? '' : ' is-urgent-buy'}" onclick="buyFromModalNow()" ${canBuy ? '' : 'disabled'}>
-            ${soldOut ? '<i class="fa-solid fa-ban"></i> Tạm hết hàng' : '<span class="urgent-buy-main"><i class="fa-solid fa-bolt"></i> MUA NGAY GIÁ SỈ — CHỐT KẺO HẾT!</span><small class="urgent-buy-sub">🔥 Sắp cháy kho • Giữ suất ưu đãi ngay</small>'}
+            ${soldOut ? '<i class="fa-solid fa-ban"></i> Tạm hết hàng' : (isWholesaleView() ? '<span class="urgent-buy-main"><i class="fa-solid fa-bolt"></i> MUA NGAY GIÁ SỈ — CHỐT KẺO HẾT!</span>' : '<span class="urgent-buy-main"><i class="fa-solid fa-bolt"></i> MUA NGAY — CHỐT KẺO HẾT!</span>') + '<small class="urgent-buy-sub">🔥 Sắp cháy kho • Giữ suất ưu đãi ngay</small>'}
           </button>
           <button class="btn-add-cart-large" onclick="addFromModalToCart()" ${canBuy ? '' : 'disabled'}>
             <i class="fa-solid fa-cart-plus"></i> Thêm vào giỏ
@@ -950,7 +954,7 @@ async function copyProductLink() {
     try {
       await navigator.share({
         title: p ? p.name : document.title,
-        text: p ? `${p.name} - Giá sỉ: ${formatPrice(p.price)}` : '',
+        text: p ? `${p.name} - Giá: ${formatPrice(p.price)}` : '',
         url: canonicalUrl
       });
     } catch (_) {}

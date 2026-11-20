@@ -71,8 +71,10 @@
       : '';
     const saveChip = !soldOut
       ? (showOld && (oldPrice - price) >= 3000
-          ? '<span class="si-save-chip"><i class="fa-solid fa-fire-flame-curved"></i> Rẻ hơn ' + compactVND(oldPrice - price) + ' · Giá sỉ</span>'
-          : '<span class="si-save-chip is-base"><i class="fa-solid fa-check-double"></i> Mua 1 món cũng giá sỉ</span>')
+          ? '<span class="si-save-chip"><i class="fa-solid fa-fire-flame-curved"></i> Rẻ hơn ' + compactVND(oldPrice - price) + (document.body.dataset.tier === 'wholesale' ? ' · Giá sỉ' : '') + '</span>'
+          : (document.body.dataset.tier === 'wholesale'
+            ? '<span class="si-save-chip is-base"><i class="fa-solid fa-check-double"></i> Giá sỉ của bạn</span>'
+            : '<span class="si-save-chip is-base is-login" data-store-action="account"><i class="fa-solid fa-user-tie"></i> Khách sỉ: đăng nhập xem giá sỉ</span>'))
       : '';
     const fallback = 'data:image/svg+xml,' + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="100%" height="100%" fill="#f8f8fa"/><text x="50%" y="50%" fill="#aab0b9" text-anchor="middle" dominant-baseline="central" font-size="20">Hoang Minh Store</text></svg>'

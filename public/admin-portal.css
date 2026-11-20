@@ -1314,3 +1314,7 @@ button:disabled {
 /* Đơn nhiều kiện: mỗi kiện đặt riêng một đơn ở nguồn/kho */
 .ord-parcel{border:1px dashed #cbd5e1;border-radius:8px;padding:6px 8px;margin-bottom:6px}
 .ord-parcel-head{font-size:12px;font-weight:700;color:#ea580c;margin-bottom:4px}
+
+/* Loại giá của đơn */
+.ord-tier-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;font-size:11px;font-weight:700;background:#f1f5f9;color:#475569;vertical-align:middle}
+.ord-tier-tag.is-si{background:#dcfce7;color:#166534}

@@ -74,6 +74,7 @@
 
       <!-- Right: Hotline & Cart -->
       <div class="header-right">
+        <button type="button" class="header-track-btn header-account-btn" id="accountBtn"><i class="fa-solid fa-user-tie"></i><span>Khách sỉ<br>Đăng nhập</span></button>
         <button type="button" class="header-track-btn" data-store-action="track"><i class="fa-solid fa-truck-fast"></i><span>Theo dõi<br>đơn hàng</span></button>
         <button class="cart-trigger-btn" id="openCartBtn">
           <div class="cart-icon-wrap">
@@ -469,7 +470,7 @@
         </div>
       </div>
       <div class="fs-header-right">
-        <span class="fs-header-promise"><i class="fa-solid fa-check-double"></i> Lẻ 1 món = Giá buôn</span>
+        <span class="fs-header-promise"><i class="fa-solid fa-check-double"></i> Khách sỉ đăng nhập: giá buôn</span>
         <button type="button" class="fs-view-all-btn" id="fsViewAllBtn">Xem tất cả Deal <i class="fa-solid fa-chevron-right"></i></button>
       </div>
     </div>
@@ -486,7 +487,7 @@
   </section>
 
   <section class="container market-footer-offers" aria-label="Hỗ trợ mua sắm">
-    <div class="market-footer-offer offer-red"><span><i class="fa-solid fa-bolt-lightning"></i> CAM KẾT GIÁ SỈ 100%</span><strong>Mua lẻ 1 món vẫn tính giá sỉ tận gốc</strong><a href="#flashSaleSection">SĂN FLASH SALE <i class="fa-solid fa-arrow-right"></i></a></div>
+    <div class="market-footer-offer offer-red"><span><i class="fa-solid fa-bolt-lightning"></i> DÀNH CHO SHOP &amp; ĐẠI LÝ</span><strong>Đăng ký khách sỉ – được duyệt là thấy giá sỉ tận gốc</strong><button type="button" data-store-action="account" data-acct-view="register">ĐĂNG KÝ SỈ <i class="fa-solid fa-arrow-right"></i></button></div>
     <div class="market-footer-offer offer-peach"><span><i class="fa-solid fa-shield-halved"></i> NHẬN HÀNG ĐỒNG KIỂM COD</span><strong>Kiểm tra hàng chuẩn mới thanh toán tiền</strong><button type="button" data-store-action="track">TRA CỨU ĐƠN <i class="fa-solid fa-arrow-right"></i></button></div>
   </section>
 
@@ -815,6 +816,7 @@
   </nav>
   <script src="/dialogs.js"></script>
   <script src="/besi-checkout-guard.js"></script>
+  <script src="/account.js"></script>
   <script src="/app.js"></script>
   <script src="/marketplace-home.js"></script>
   <script src="/category-view.js"></script>
