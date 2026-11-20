@@ -58,6 +58,7 @@ const { createStore: createSpecReviewStore } = require('./services/besi/specRevi
 const besiSpecLocalAI = require('./services/besi/specLocalAI');
 const specReviewStore = createSpecReviewStore();
 const shipments = require('./services/shipments');
+const postRef = require('./services/postRef');
 const deliveryEta = require('./services/deliveryEta');
 
 const CARRIER = { V: 'Viettel Post', S: 'SPX Express' };
@@ -169,6 +170,8 @@ app.use(['/api/taobao/browser-quote','/api/taobao/browser-products'],(req,res,ne
 });
 app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
 app.use(express.json({ limit: '100kb' }));
+// Link bài đăng Zalo có ?r=mã → nhớ mã vào cookie để biết bài/nhóm nào ra đơn (services/postRef.js)
+app.use(postRef.capture);
 // Giá theo khách: khách sỉ đã duyệt thấy giá sỉ, còn lại giá lẻ – đổi ở cổng ra, catalog/cache vẫn giữ giá sỉ
 const customerPriceRules = () => customerPricing.normalizeRules(readConfig().customerPricing);
 app.use(['/api/products', '/api/flash-sale', '/api/besi/products'], customerPricing.priceResponses(() => readConfig().customerPricing));
@@ -1567,6 +1570,8 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       total_amount,
       payment_method: paymentMethod
     });
+    const postRefHit = postRef.fromRequest(req);
+    if (postRefHit) orderStore.updateOrder(order.id, { post_ref: postRefHit.code, post_ref_clicked_at: postRefHit.clicked_at });
     orderStore.updateOrder(order.id, { subtotal, shipping_fee: ship.fee, shipping_detail: ship.detail, shipping_source: ship.source, shipping_live: ship.live || null, shipments: (ship.shipments || []).map(({ refs, ...x }) => x), delivery_eta: ship.eta || null, price_tier: priceTier, customer_id: buyer?.id || null, weight_gram: ship.weight_gram, live_verified: orderItems.every(i => i.live_verified) });
     order.subtotal = subtotal;
     order.shipping_fee = ship.fee;
@@ -1816,6 +1821,17 @@ app.post('/api/admin/orders/:id/test-flag', requireAdmin, (req, res) => {
   if (!o) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
   emitAdmin(io, 'ADMIN_ORDER_CHANGED', { orderId: o.id, status: o.status });
   res.json({ success: true, data: o });
+});
+
+// App LHMLead-CRM đọc đơn ẩn danh (không tên/SĐT/địa chỉ) để biết bài đăng nào ra đơn.
+app.get('/api/attribution/orders', rateLimit('attribution', 10 * 60e3, 60), postRef.requireKey, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, data: postRef.report(orderStore.getOrders(), req.query.since) });
+});
+// Admin lấy khoá thống kê để dán/kết nối vào app CRM (khoá này chỉ đọc được đơn ẩn danh).
+app.get('/api/admin/attribution-key', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, key: postRef.getKey() });
 });
 
 app.get('/api/admin/report', requireAdmin, (req, res) => {
