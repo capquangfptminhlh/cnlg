@@ -78,7 +78,7 @@ function validPassword(p) {
   return null;
 }
 
-function register({ phone, password, name, shop_name, note }) {
+function register({ phone, password, name, shop_name, note }, { status = 'pending', created_by = 'self' } = {}) {
   const p = normPhone(phone);
   if (!p) throw new Error('Số điện thoại không hợp lệ.');
   const n = String(name || '').trim().slice(0, 80);
@@ -90,11 +90,29 @@ function register({ phone, password, name, shop_name, note }) {
   const c = {
     id: `KS${crypto.randomBytes(5).toString('hex').toUpperCase()}`,
     phone: p, name: n, shop_name: String(shop_name || '').trim().slice(0, 120), note: String(note || '').trim().slice(0, 300),
-    status: 'pending', pass: hashPassword(password), pwv: 1, created_at: new Date().toISOString()
+    status, pass: hashPassword(password), pwv: 1, created_at: new Date().toISOString(),
+    ...(created_by !== 'self' ? { created_by } : {}),
+    ...(status === 'approved' ? { approved_at: new Date().toISOString() } : {})
   };
   list.push(c);
   saveAll(list);
   return view(c);
+}
+
+// Mật khẩu tự tạo cho khách admin tạo hộ: dễ đọc qua điện thoại (bỏ 0/O, 1/l/I)
+const PASS_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
+function generatePassword(len = 8) {
+  return Array.from(crypto.randomBytes(len), b => PASS_CHARS[b % PASS_CHARS.length]).join('');
+}
+
+/**
+ * Admin tạo hộ khách sỉ quen (gọi điện / Zalo): ĐÃ DUYỆT luôn.
+ * Không nhập mật khẩu → tự tạo; mật khẩu trả về MỘT lần để admin gửi khách (file chỉ lưu bản băm).
+ */
+function createByAdmin({ phone, password, name, shop_name, note }) {
+  const pwd = String(password || '').trim() || generatePassword();
+  const c = register({ phone, password: pwd, name, shop_name, note }, { status: 'approved', created_by: 'admin' });
+  return { customer: c, password: pwd, generated: !String(password || '').trim() };
 }
 
 /** Đúng SĐT + mật khẩu → khách (mọi trạng thái, để báo "đang chờ duyệt"); sai → null. */
@@ -173,6 +191,6 @@ function clearCookie(res, secure) {
 }
 
 module.exports = {
-  COOKIE, STATUSES, normPhone, register, login, setStatus, resetPassword, remove, getAll, view,
+  COOKIE, STATUSES, normPhone, register, createByAdmin, generatePassword, login, setStatus, resetPassword, remove, getAll, view,
   sessionToken, fromCookieHeader, fromRequest, isWholesale, setCookie, clearCookie
 };

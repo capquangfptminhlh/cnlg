@@ -2515,6 +2515,18 @@ app.get('/api/admin/customers', requireAdmin, (req, res) => {
   res.json({ success: true, data: all.map(c => ({ ...c, ...(stats.get(c.id) || { orders: 0, revenue: 0 }) })), counts, rules: customerPriceRules() });
 });
 
+// Admin tạo hộ khách sỉ (đã duyệt). Mật khẩu chỉ trả trong câu trả lời này để gửi khách.
+app.post('/api/admin/customers', requireAdmin, (req, res) => {
+  try {
+    const b = req.body || {};
+    const r = customers.createByAdmin({ phone: b.phone, password: b.password, name: b.name, shop_name: b.shop_name, note: b.note });
+    emitAdmin(io, 'ADMIN_CUSTOMERS_CHANGED', { id: r.customer.id, status: r.customer.status });
+    res.set('Cache-Control', 'no-store').json({ success: true, data: r.customer, password: r.password, generated: r.generated });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/admin/customers/:id/status', requireAdmin, (req, res) => {
   try {
     const c = customers.setStatus(String(req.params.id), String(req.body?.status || ''));

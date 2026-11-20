@@ -286,6 +286,40 @@ function renderCustomers() {
   document.querySelectorAll('[data-cust-pass]').forEach(b => { b.onclick = () => resetCustomerPassword(b.dataset.custPass); });
 }
 
+function toggleCustCreate(show) {
+  const f = document.getElementById('custCreateForm');
+  const open = show ?? f.hidden;
+  f.hidden = !open;
+  if (open) document.getElementById('ccPhone').focus();
+  else f.reset();
+}
+
+async function createCustomer(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('ccSubmit');
+  const val = id => document.getElementById(id).value.trim();
+  const body = { phone: val('ccPhone'), name: val('ccName'), shop_name: val('ccShop'), password: val('ccPass'), note: val('ccNote') };
+  btn.disabled = true;
+  try {
+    const json = await (await adminFetch('/api/admin/customers', { method: 'POST', body: JSON.stringify(body) })).json();
+    if (!json.success) throw new Error(json.error);
+    toggleCustCreate(false);
+    custFilter = 'approved';
+    loadCustomers();
+    const c = json.data;
+    const msg = `Chào ${c.name}, shop đã tạo tài khoản khách sỉ cho bạn trên ${location.origin}\n`
+      + `- Đăng nhập: bấm nút tài khoản ở góc trên trang\n`
+      + `- Số điện thoại: ${c.phone}\n`
+      + `- Mật khẩu: ${json.password}\n`
+      + `Đăng nhập xong là thấy giá sỉ.`;
+    await uiPrompt(`Đã tạo và duyệt ${c.name} (${c.phone}).${json.generated ? ' Mật khẩu do hệ thống tạo – chỉ hiện lần này.' : ''}\nSao chép tin nhắn dưới đây gửi khách qua Zalo:`, { value: msg, readOnly: true });
+  } catch (e) {
+    uiAlert('Không tạo được: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function setCustomerStatus(id, status) {
   const c = (custData.data || []).find(x => x.id === id);
   const verb = { approved: 'Duyệt cho', rejected: 'Từ chối', disabled: 'Khoá tài khoản' }[status] || 'Đổi trạng thái';

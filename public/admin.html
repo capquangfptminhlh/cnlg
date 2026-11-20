@@ -266,10 +266,25 @@
             <div class="flex-between" style="flex-wrap:wrap; gap:12px; margin-bottom:12px;">
               <div>
                 <h3><i class="fa-solid fa-user-tie"></i> Danh sách khách sỉ</h3>
-                <p class="help-text" style="margin:2px 0 0;">Khách tự đăng ký trên web → bấm <b>Duyệt</b> là khách thấy giá sỉ (đang đăng nhập thì có hiệu lực khi tải lại trang).</p>
+                <p class="help-text" style="margin:2px 0 0;">Khách tự đăng ký trên web → bấm <b>Duyệt</b> là khách thấy giá sỉ (đang đăng nhập thì có hiệu lực khi tải lại trang). Khách quen gọi điện / Zalo → bấm <b>Tạo khách sỉ</b>.</p>
               </div>
-              <div class="order-filter-pills" id="custFilterPills"></div>
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <div class="order-filter-pills" id="custFilterPills"></div>
+                <button type="button" class="btn-sync-now" id="custCreateToggle" onclick="toggleCustCreate()"><i class="fa-solid fa-user-plus"></i> Tạo khách sỉ</button>
+              </div>
             </div>
+            <form id="custCreateForm" class="cust-create" hidden onsubmit="createCustomer(event)" autocomplete="off">
+              <label class="form-group">Số điện thoại *<input type="tel" id="ccPhone" required inputmode="tel" placeholder="0912 345 678"></label>
+              <label class="form-group">Họ tên *<input type="text" id="ccName" required maxlength="80" placeholder="Nguyễn Văn A"></label>
+              <label class="form-group">Tên shop<input type="text" id="ccShop" maxlength="120" placeholder="Shop / cửa hàng"></label>
+              <label class="form-group">Mật khẩu<input type="text" id="ccPass" maxlength="100" placeholder="Để trống = tự tạo" autocomplete="new-password"></label>
+              <label class="form-group cust-create-note">Ghi chú<input type="text" id="ccNote" maxlength="300" placeholder="Khu vực, mặt hàng hay lấy…"></label>
+              <div class="cust-create-actions">
+                <span class="help-text" style="margin:0;">Tạo xong là <b>đã duyệt</b> – khách đăng nhập bằng SĐT + mật khẩu là thấy giá sỉ.</span>
+                <button type="button" class="btn btn-outline" onclick="toggleCustCreate(false)">Huỷ</button>
+                <button type="submit" class="btn btn-primary" id="ccSubmit"><i class="fa-solid fa-check"></i> Tạo &amp; duyệt</button>
+              </div>
+            </form>
             <div class="table-container"><table class="product-table">
               <thead><tr><th>Khách</th><th>SĐT</th><th>Ghi chú</th><th>Đăng ký</th><th>Đơn / Doanh số</th><th>Trạng thái</th><th></th></tr></thead>
               <tbody id="custTableBody"><tr><td colspan="7" style="text-align:center;">Đang tải...</td></tr></tbody>

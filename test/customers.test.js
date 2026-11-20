@@ -15,6 +15,25 @@ const RULES = cp.normalizeRules({});
 const cookieOf = c => `${customers.COOKIE}=${customers.sessionToken(c)}`;
 const full = id => customers.getAll().find(c => c.id === id);
 
+test('admin tạo hộ khách sỉ: đã duyệt ngay, tự tạo mật khẩu khi để trống, không lưu mật khẩu thô', () => {
+  const r = customers.createByAdmin({ phone: '0977 000 222', name: 'Chị Hoa', shop_name: 'Hoa Store' });
+  assert.equal(r.customer.status, 'approved');
+  assert.equal(r.generated, true);
+  assert.match(r.password, /^[a-z2-9]{8}$/);
+  assert.equal(full(r.customer.id).created_by, 'admin');
+  assert.ok(full(r.customer.id).approved_at);
+  assert.equal(JSON.stringify(customers.getAll()).includes(r.password), false);
+  const c = customers.login('0977000222', r.password);
+  assert.ok(c && customers.isWholesale(c));
+  const r2 = customers.createByAdmin({ phone: '0977000333', name: 'Anh Nam', password: 'namshop9' });
+  assert.equal(r2.generated, false);
+  assert.ok(customers.login('0977000333', 'namshop9'));
+  assert.throws(() => customers.createByAdmin({ phone: '+84977000222', name: 'Trùng' }), /đã đăng ký/);
+  assert.throws(() => customers.createByAdmin({ phone: '0977000444', name: 'Anh X', password: '12' }), /6 ký tự/);
+  // đăng ký tự làm vẫn phải chờ duyệt
+  assert.equal(customers.register({ phone: '0977000555', password: 'matkhau1', name: 'Tự đăng ký' }).status, 'pending');
+});
+
 test('giá lẻ = giá sỉ +20%, làm tròn lên nghìn, không vượt giá niêm yết, không thấp hơn giá sỉ', () => {
   assert.equal(cp.retailPrice(100000, null, RULES), 120000);
   assert.equal(cp.retailPrice(99500, null, RULES), 120000); // 119.400 → 120.000
