@@ -220,6 +220,9 @@
    $('besiUniversalStatus').textContent='Đang tìm trong kho BESI…';
    $('besiUniversalGrid').replaceChildren();$('besiUniversalPossible').hidden=true;
    result.scrollIntoView({behavior:'smooth',block:'start'});
+   const slug=window.slugifyQuery?window.slugifyQuery($('besiUniversalQuery').value):'';
+   const url=slug?'/tim-kiem/'+slug:'/';
+   if(location.pathname+location.search!==url)history.replaceState({universal:true},'',url);
    fetchPage(1);
  }
  let debounce;

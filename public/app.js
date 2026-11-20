@@ -215,6 +215,10 @@ function renderBrandPills() {
   const container = document.getElementById('brandPills');
   if (!container) return;
   const list = state.brands || [];
+  if (state.currentBrand !== 'all') {
+    const hit = list.find(b => slugifyQuery(b.name) === slugifyQuery(state.currentBrand));
+    if (hit) state.currentBrand = hit.name;
+  }
   let html = `<button type="button" class="brand-pill ${state.currentBrand === 'all' ? 'active' : ''}" data-brand="all"><i class="fa-solid fa-border-all"></i> Tất cả</button>`;
   for (const b of list) {
     const isAct = state.currentBrand.toLowerCase() === b.name.toLowerCase();
@@ -1737,27 +1741,59 @@ function slugifyQuery(s) {
   return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
 }
 
+/**
+ * Link gọn, đọc được, dán Zalo/Facebook không ra %E1%BB…:
+ *   /danh-muc/<id>-<ten>  /thuong-hieu/<ten>  /tim-kiem/<tu-khoa>  (ghép được, theo thứ tự này)
+ * Giá / sắp xếp / flash sale vẫn là ?min=&max=&sort=&flash= (chỉ chữ số, không dấu).
+ * Link cũ /?q=…&danh-muc=…&brand=… vẫn mở được (parseFilterLocation).
+ */
 function buildFilterUrl() {
+  const parts = [];
   const sp = new URLSearchParams();
-  if (state.searchQuery && state.searchQuery.trim()) {
-    sp.set('q', state.searchQuery.trim());
-  }
   if (state.currentCategory && state.currentCategory !== 'all') {
     const cat = Array.isArray(state.categories) ? state.categories.find(c => String(c.id) === String(state.currentCategory)) : null;
-    const slug = cat ? '-' + slugifyQuery(cat.name) : '';
-    sp.set('danh-muc', `${state.currentCategory}${slug}`);
+    parts.push('danh-muc', `${state.currentCategory}${cat ? '-' + slugifyQuery(cat.name) : ''}`);
   }
   if (state.currentBrand && state.currentBrand !== 'all') {
-    sp.set('brand', state.currentBrand);
+    const b = slugifyQuery(state.currentBrand);
+    if (b) parts.push('thuong-hieu', b);
+    else sp.set('brand', state.currentBrand);
+  }
+  const q = (state.searchQuery || '').trim();
+  if (q) {
+    const s = slugifyQuery(q);
+    if (s) parts.push('tim-kiem', s);
+    else sp.set('q', q); // từ khoá toàn ký hiệu: giữ nguyên
   }
   if (state.minPrice) sp.set('min', state.minPrice);
   if (state.maxPrice) sp.set('max', state.maxPrice);
   if (state.flashSaleOnly) sp.set('flash', '1');
   if (state.sort && state.sort !== 'default') sp.set('sort', state.sort);
-
   const qs = sp.toString();
-  return qs ? `/?${qs}` : '/';
+  return '/' + parts.join('/') + (qs ? `?${qs}` : '');
 }
+
+/** Đọc bộ lọc từ link mới (đường dẫn) hoặc link cũ (?q=…). */
+function parseFilterLocation() {
+  const sp = new URLSearchParams(window.location.search);
+  const seg = window.location.pathname.split('/').filter(Boolean).map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } });
+  const fromPath = key => { const i = seg.indexOf(key); return i >= 0 && seg[i + 1] ? seg[i + 1] : ''; };
+  let pathQ = fromPath('tim-kiem').replace(/-/g, ' ');
+  const accented = document.querySelector('meta[name="besi:q"]')?.content || '';
+  if (pathQ && accented && slugifyQuery(accented) === slugifyQuery(pathQ)) pathQ = accented;
+  const pathBrand = fromPath('thuong-hieu');
+  return {
+    q: (pathQ || sp.get('q') || sp.get('search') || '').trim(),
+    brand: (pathBrand ? pathBrand.replace(/-/g, ' ') : (sp.get('brand') || 'all')).trim(),
+    category: fromPath('danh-muc') || sp.get('danh-muc') || sp.get('category') || 'all',
+    min: (sp.get('min') || sp.get('minPrice') || '').trim(),
+    max: (sp.get('max') || sp.get('maxPrice') || '').trim(),
+    flash: sp.get('flash') === '1' || sp.get('flashSale') === '1',
+    sort: (sp.get('sort') || 'default').trim()
+  };
+}
+window.parseFilterLocation = parseFilterLocation;
+window.slugifyQuery = slugifyQuery;
 window.buildFilterUrl = buildFilterUrl;
 
 function syncFilterUrl({ push = false } = {}) {
@@ -1838,16 +1874,9 @@ if (shareFilterBtn) {
 }
 
 function applyFilterFromUrl({ initial = false, fetch = true, scroll = false } = {}) {
-  const sp = new URLSearchParams(window.location.search);
-  const q = (sp.get('q') || sp.get('search') || '').trim();
-  const brand = (sp.get('brand') || 'all').trim();
-  const catRaw = sp.get('danh-muc') || sp.get('category') || 'all';
+  const { q, brand, category: catRaw, min, max, flash, sort } = parseFilterLocation();
   const catMatch = String(catRaw).match(/^(\d+)/);
   const catId = catMatch ? catMatch[1] : (catRaw === 'all' ? 'all' : catRaw);
-  const min = (sp.get('min') || sp.get('minPrice') || '').trim();
-  const max = (sp.get('max') || sp.get('maxPrice') || '').trim();
-  const flash = sp.get('flash') === '1' || sp.get('flashSale') === '1';
-  const sort = (sp.get('sort') || 'default').trim();
 
   state.searchQuery = q;
   state.currentBrand = brand;
@@ -1947,7 +1976,7 @@ loadCart();
 updateCartUI();
 fetchCategories();
 loadBrands();
-applyFilterFromUrl({ initial: true, fetch: true, scroll: Boolean(location.search) });
+applyFilterFromUrl({ initial: true, fetch: true, scroll: Boolean(location.search) || /^\/(danh-muc|thuong-hieu|tim-kiem)\//.test(location.pathname) });
 refreshCartPrices();
 openFromHash();
 

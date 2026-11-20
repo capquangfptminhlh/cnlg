@@ -48,7 +48,7 @@
       <nav class="cat-crumbs" aria-label="Đường dẫn">
         <a href="/" data-cat-go="all"><i class="fa-solid fa-house"></i> Trang chủ</a>
         <i class="fa-solid fa-chevron-right"></i>
-        ${parent ? `<a href="?danh-muc=${parent.id}" data-cat-go="${parent.id}">${escH(parent.name)}</a><i class="fa-solid fa-chevron-right"></i>` : ''}
+        ${parent ? `<a href="/danh-muc/${parent.id}" data-cat-go="${parent.id}">${escH(parent.name)}</a><i class="fa-solid fa-chevron-right"></i>` : ''}
         <strong>${escH(cat.name)}</strong>
       </nav>
       <div class="cat-view-title">
@@ -123,7 +123,7 @@
     }
     if (String(id) === 'all') return location.pathname === '/' ? '/' : '/';
     const cat = catById(id);
-    return `/?danh-muc=${id}${cat ? '-' + slugify(cat.name) : ''}`;
+    return `/danh-muc/${id}${cat ? '-' + slugify(cat.name) : ''}`;
   }
   function pushUrl(id) {
     if (typeof window.syncFilterUrl === 'function') {
@@ -138,7 +138,9 @@
     if (location.pathname + location.search !== url) history.pushState({ cat: String(id) }, '', url);
   }
   function catFromUrl() {
-    const v = new URLSearchParams(location.search).get('danh-muc');
+    const v = typeof window.parseFilterLocation === 'function'
+      ? window.parseFilterLocation().category
+      : new URLSearchParams(location.search).get('danh-muc');
     const m = v && v.match(/^(\d+)/);
     return m ? m[1] : 'all';
   }
@@ -156,7 +158,7 @@
   });
 
   window.addEventListener('popstate', () => {
-    if (location.pathname !== '/') return;
+    if (location.pathname.startsWith('/sp/')) return;
     const id = catFromUrl();
     if (String(state.currentCategory) !== id) select(id, { push: false });
   });

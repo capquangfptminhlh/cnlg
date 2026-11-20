@@ -29,8 +29,10 @@ test('Shareable filter and search links: index.html, styles.css and app.js contr
   assert.ok(app.includes('function copyFilterLink'), 'app.js must define copyFilterLink');
   assert.ok(app.includes('function applyFilterFromUrl'), 'app.js must define applyFilterFromUrl');
   assert.ok(app.includes('applyFilterFromUrl({ initial: true'), 'app.js init must call applyFilterFromUrl');
-  assert.ok(app.includes("sp.set('q', state.searchQuery.trim())"), 'buildFilterUrl must set q parameter');
-  assert.ok(app.includes("sp.get('q') || sp.get('search')"), 'applyFilterFromUrl must accept q and search params');
+  // Link gọn: /tim-kiem/<slug>, /danh-muc/<id>-<slug>, /thuong-hieu/<slug>; link cũ ?q= / ?search= vẫn đọc được
+  assert.ok(app.includes("parts.push('tim-kiem', s)"), 'buildFilterUrl must put the search query in /tim-kiem/<slug>');
+  assert.ok(app.includes("parts.push('danh-muc'"), 'buildFilterUrl must put the category in /danh-muc/<id>-<slug>');
+  assert.ok(app.includes("sp.get('q') || sp.get('search')"), 'parseFilterLocation must still accept old q and search params');
 
   // 4. Check category-view.js integrates with filter URL
   assert.ok(catView.includes('buildFilterUrl'), 'category-view.js must use buildFilterUrl');
@@ -117,4 +119,52 @@ test('Storefront UI: stock pills rendered in cards and detail modal', () => {
   assert.ok(app.includes('productStockBadge'), 'app.js must include productStockBadge function');
   assert.ok(app.includes('Sẵn kho:'), 'app.js must display stock count');
   assert.ok(app.includes('this.onerror=null'), 'img tags must protect against infinite error loop');
+});
+
+test('Link gọn: tạo và đọc lại đúng bộ lọc, không còn ký tự %, ?, + khi chỉ tìm / lọc danh mục', () => {
+  const vm = require('node:vm');
+  const src = read('public/app.js');
+  const pick = name => {
+    const start = src.indexOf(`function ${name}(`);
+    let depth = 0;
+    for (let i = src.indexOf('{', start); i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) return src.slice(start, i + 1);
+    }
+    throw new Error(name);
+  };
+  const run = (stateInit, href, metaQ = '') => {
+    const url = new URL(href || 'http://x/');
+    const ctx = {
+      state: { categories: [{ id: 1, name: 'Điện thoại & phụ kiện' }], currentCategory: 'all', currentBrand: 'all', searchQuery: '', ...stateInit },
+      window: { location: url }, URLSearchParams,
+      document: { querySelector: () => (metaQ ? { content: metaQ } : null) }
+    };
+    vm.createContext(ctx);
+    vm.runInContext([pick('slugifyQuery'), pick('buildFilterUrl'), pick('parseFilterLocation')].join('\n') + ';this.b=buildFilterUrl;this.p=parseFilterLocation;', ctx);
+    return ctx;
+  };
+  assert.equal(run({ searchQuery: 'tai nghe chống ồn' }).b(), '/tim-kiem/tai-nghe-chong-on');
+  assert.equal(run({ currentCategory: '1', searchQuery: 'ốp lưng' }).b(), '/danh-muc/1-dien-thoai-phu-kien/tim-kiem/op-lung');
+  assert.equal(run({ currentBrand: 'Lock&Lock', minPrice: '50000' }).b(), '/thuong-hieu/lock-lock?min=50000');
+  assert.equal(run({ searchQuery: '+++' }).b(), '/?q=%2B%2B%2B');
+  assert.equal(run({}).b(), '/');
+
+  const parsed = run({}, 'http://x/danh-muc/1-dien-thoai-phu-kien/tim-kiem/op-lung?sort=price-asc').p();
+  assert.equal(parsed.q, 'op lung');
+  assert.equal(parsed.category, '1-dien-thoai-phu-kien');
+  assert.equal(parsed.sort, 'price-asc');
+  assert.equal(run({}, 'http://x/tim-kiem/tai-nghe-chong-on', 'tai nghe chống ồn').p().q, 'tai nghe chống ồn');
+  assert.equal(run({}, 'http://x/tim-kiem/tai-nghe-chong-on', 'thứ khác').p().q, 'tai nghe chong on');
+  const old = run({}, 'http://x/?q=tai+nghe&danh-muc=1-dien-thoai&brand=Baseus').p();
+  assert.deepEqual([old.q, old.category, old.brand], ['tai nghe', '1-dien-thoai', 'Baseus']);
+});
+
+test('SEO: link gọn có tiêu đề xem trước đúng (từ khoá có dấu, danh mục)', () => {
+  const req = { get: h => (h.toLowerCase() === 'host' ? 'besi.com.vn' : ''), query: {}, originalUrl: '/tim-kiem/may-say-toc', protocol: 'https', socket: { remoteAddress: '127.0.0.1' } };
+  const html = seo.renderHomePage(req, { store: { name: 'Hoàng Minh Store' } }, 100, { q: 'máy sấy tóc' });
+  assert.match(html, /<title>Tìm kiếm &quot;máy sấy tóc&quot; \| BESI<\/title>/);
+  assert.match(html, /<meta name="besi:q" content="máy sấy tóc">/);
+  const cat = seo.renderHomePage({ ...req, originalUrl: '/danh-muc/1-dien-thoai' }, { store: { name: 'Hoàng Minh Store' } }, 100, { category: 'Điện thoại & phụ kiện' });
+  assert.match(cat, /<title>Điện thoại &amp; phụ kiện \| BESI<\/title>/);
 });

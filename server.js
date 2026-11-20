@@ -176,6 +176,36 @@ app.use(['/api/products', '/api/flash-sale', '/api/besi/products'], customerPric
 app.get('/', (req, res) => {
   res.type('html').send(seo.renderHomePage(req, readConfig(), storeCatalog.getProducts().length));
 });
+// Link gọn của trang danh sách: /tim-kiem/<tu-khoa>, /danh-muc/<id>-<ten>, /thuong-hieu/<ten> (ghép được)
+const plainVi = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+/**
+ * Link không dấu → cụm có dấu lấy từ tên SP thật ("tai nghe chong on" → "tai nghe chống ồn"),
+ * để tiêu đề xem trước Zalo/Facebook và ô tìm kiếm có dấu. Không tìm thấy thì giữ nguyên.
+ */
+function restoreAccents(plain) {
+  const target = plain.toLowerCase().trim();
+  if (!target) return plain;
+  ensureCatalogCaches();
+  for (const p of cachedSellable) {
+    if (!(p._normName || plainVi(p.name)).includes(target)) continue;
+    const chars = [...String(p.name || '')];
+    const flat = chars.map(plainVi);
+    if (flat.some(c => c.length !== 1)) continue;
+    const i = flat.join('').indexOf(target);
+    if (i >= 0) return chars.slice(i, i + target.length).join('').toLowerCase();
+  }
+  return plain;
+}
+app.get(/^\/(?:(?:danh-muc|thuong-hieu|tim-kiem)\/[^/]{1,120}\/?){1,3}$/, (req, res) => {
+  const seg = req.path.split('/').filter(Boolean).map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } });
+  const at = key => { const i = seg.indexOf(key); return i >= 0 ? seg[i + 1] || '' : ''; };
+  const q = at('tim-kiem') ? restoreAccents(at('tim-kiem').replace(/-/g, ' ')) : '';
+  const brandSlug = at('thuong-hieu');
+  const brand = brandSlug ? (storeCatalog.getProducts().find(p => p.brand && plainVi(p.brand).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') === brandSlug)?.brand || brandSlug.replace(/-/g, ' ')) : '';
+  const catId = Number((at('danh-muc').match(/^\d+/) || [])[0]);
+  const category = catId ? storeCatalog.getCategories().find(c => Number(c.id) === catId)?.name || '' : '';
+  res.type('html').send(seo.renderHomePage(req, readConfig(), storeCatalog.getProducts().length, { q, brand, category: stripSupplierText(category) }));
+});
 
 // Taobao is a separate BESI browsing tab; private staged products never enter the
 // main product catalog, cart, orders, and public APIs.
@@ -1070,7 +1100,10 @@ app.get('/api/products', (req, res) => {
       if (brand && brand !== 'all') {
         const normB = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim();
         const targetBrand = normB(brand);
-        products = products.filter(p => (p._normBrand || normB(p.brand || '')) === targetBrand);
+        // link /thuong-hieu/lock-lock → "Lock&Lock": so thêm dạng không dấu-gạch nối
+        const slugB = s => normB(s).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const targetSlug = slugB(brand);
+        products = products.filter(p => (p._normBrand || normB(p.brand || '')) === targetBrand || (targetSlug && slugB(p.brand || '') === targetSlug));
       }
 
       let relevance = null;

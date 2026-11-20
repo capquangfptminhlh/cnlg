@@ -133,10 +133,12 @@ function renderProductPage(req, product, detail, config) {
 }
 
 /** HTML trang chủ kèm meta mô tả cửa hàng (tự động đổi theo từ khoá tìm kiếm / bộ lọc) */
-function renderHomePage(req, config, total) {
+/** extra: bộ lọc đọc từ link gọn /tim-kiem/…, /thuong-hieu/…, /danh-muc/… (đã khôi phục dấu) */
+function renderHomePage(req, config, total, extra = {}) {
   const name = storeName(config, req);
-  const q = String(req.query?.q || req.query?.search || '').trim();
-  const brand = String(req.query?.brand || '').trim();
+  const q = String(extra.q || req.query?.q || req.query?.search || '').trim();
+  const brand = String(extra.brand || req.query?.brand || '').trim();
+  const category = String(extra.category || '').trim();
 
   let pageTitle = isBesiHost(req) ? 'BESI | Sàn mua lẻ giá tốt, nhập sỉ từ nhiều tổng kho' : (config.store?.slogan ? `${name} | ${config.store.slogan}` : name);
   let ogTitle = name;
@@ -152,6 +154,10 @@ function renderHomePage(req, config, total) {
     pageTitle = `Thương hiệu ${brand} | ${name}`;
     ogTitle = `Thương hiệu ${brand} | ${name}`;
     desc = `Khám phá các sản phẩm thương hiệu ${brand} chính hãng, giá sỉ tốt nhất tại ${name}.`;
+  } else if (category) {
+    pageTitle = `${category} | ${name}`;
+    ogTitle = `${category} | ${name}`;
+    desc = `Danh mục ${category} tại ${name}: hàng chính hãng từ nhiều tổng kho, kiểm tra trước khi nhận, giao hàng toàn quốc.`;
   }
 
   const base = baseUrl(req);
@@ -165,7 +171,8 @@ function renderHomePage(req, config, total) {
   <meta property="og:title" content="${escAttr(ogTitle)}">
   <meta property="og:description" content="${escAttr(desc)}">
   <meta property="og:image" content="${escAttr(base + (isBesiHost(req) ? '/besi-logo.svg' : '/logo.svg'))}">
-  <meta property="og:url" content="${escAttr(canonicalUrl)}">`;
+  <meta property="og:url" content="${escAttr(canonicalUrl)}">${q ? `
+  <meta name="besi:q" content="${escAttr(q)}">` : ''}`;
   return getTemplate()
     .replace(/<title>[\s\S]*?<\/title>/, '')
     .replace('</head>', `${head}\n</head>`);
