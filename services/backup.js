@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Sao lưu dữ liệu không thể lấy lại từ DropBuy (đơn hàng, cấu hình, giao dịch ngân hàng) mỗi ngày.
+ * Sao lưu dữ liệu không thể lấy lại từ DropBuy (đơn hàng, cấu hình, giao dịch ngân hàng, tài khoản khách sỉ) mỗi ngày.
  * data/backups/YYYY-MM-DD/<file>.json – giữ BACKUP_KEEP_DAYS ngày gần nhất (mặc định 14).
  */
 const DATA_DIR = path.join(__dirname, '..', 'data');
@@ -10,7 +10,9 @@ const BACKUP_DIR = process.env.HM_BACKUP_DIR || path.join(DATA_DIR, 'backups');
 const FILES = () => [
   process.env.HM_ORDERS_FILE || path.join(DATA_DIR, 'orders.json'),
   process.env.HM_PAYMENTS_FILE || path.join(DATA_DIR, 'payments.json'),
-  path.join(DATA_DIR, 'config.json')
+  path.join(DATA_DIR, 'config.json'),
+  // tài khoản khách sỉ (mật khẩu đã băm); mất file này khách phải đăng ký lại, admin duyệt lại
+  path.join(process.env.HM_CUSTOMERS_DIR || DATA_DIR, 'customers.json')
 ];
 
 // Ngày theo giờ Việt Nam (UTC+7) để mỗi bản sao lưu khớp với một ngày bán hàng
