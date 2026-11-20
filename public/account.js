@@ -10,7 +10,18 @@
     account = a || account;
     document.body.dataset.tier = account.tier === 'wholesale' ? 'wholesale' : 'retail';
     renderButton();
+    prefillCheckout();
     window.dispatchEvent(new CustomEvent('storefront:tier', { detail: account }));
+  }
+
+  /** Khách đã đăng nhập: điền sẵn họ tên + SĐT ở form đặt hàng (chỉ ô đang trống – không ghi đè). */
+  function prefillCheckout() {
+    const c = account.customer;
+    if (!c) return;
+    const name = document.getElementById('custName');
+    const phone = document.getElementById('custPhone');
+    if (name && !name.value.trim()) name.value = c.name;
+    if (phone && !phone.value.trim()) phone.value = c.phone;
   }
 
   function renderButton() {
@@ -62,10 +73,13 @@
             ? '<div class="acct-state ok"><i class="fa-solid fa-circle-check"></i> Đã duyệt – bạn đang xem và mua theo <b>giá sỉ</b>.</div>'
             : '<div class="acct-state wait"><i class="fa-regular fa-clock"></i> Đang chờ cửa hàng duyệt. Trong lúc chờ, giá hiển thị là giá lẻ.</div>'}
         </div>
+        <h4 class="acct-orders-title"><i class="fa-solid fa-receipt"></i> Đơn hàng của tôi</h4>
+        <div class="acct-orders" id="acctOrders"><p class="acct-empty"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải đơn hàng…</p></div>
         <div class="checkout-actions flex-between"><span></span><button type="button" class="btn-ghost" id="acctLogout"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button></div>`;
       body.querySelector('#acctLogout').onclick = async () => {
         try { await post('/api/account/logout'); reloadPrices('Đã đăng xuất – đang xem giá lẻ.'); } catch (e) { showErr(e.message); }
       };
+      loadOrders();
     } else if (view === 'register') {
       title.innerHTML = '<i class="fa-solid fa-user-plus"></i> Đăng ký khách sỉ';
       body.innerHTML = `<form class="checkout-form" id="acctForm">
@@ -108,6 +122,89 @@
     m.classList.add('open');
     m.setAttribute('aria-hidden', 'false');
   }
+  // ───────────── Đơn hàng của tôi ─────────────
+  let orders = [];
+  const money = n => `${Number(n || 0).toLocaleString('vi-VN')} đ`;
+  const when = iso => new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  async function loadOrders() {
+    const box = document.getElementById('acctOrders');
+    if (!box) return;
+    try {
+      const res = await fetch('/api/account/orders', { credentials: 'same-origin', cache: 'no-store' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Không tải được đơn hàng.');
+      orders = json.data || [];
+      box.innerHTML = orders.length
+        ? orders.map(orderCard).join('')
+        : '<p class="acct-empty">Chưa có đơn nào. Các đơn bạn đặt khi đã đăng nhập sẽ hiện ở đây.</p>';
+      box.querySelectorAll('[data-reorder]').forEach(b => { b.onclick = () => reorder(b.dataset.reorder, b); });
+    } catch (e) {
+      box.innerHTML = `<p class="acct-err">${esc(e.message)}</p>`;
+    }
+  }
+
+  function orderCard(o) {
+    const [label, color] = (typeof STATUS_VI !== 'undefined' && STATUS_VI[o.status]) || [o.status, '#64748b'];
+    const count = o.items.reduce((s, i) => s + i.quantity, 0);
+    const items = o.items.map(i => `<div class="acct-oi"><span>${esc(i.name)}${i.variant_name ? ` <em>[${esc(i.variant_name)}]</em>` : ''} × ${i.quantity}</span><span>${money(i.price * i.quantity)}</span></div>`).join('');
+    // Dùng lại khối ngày giao + mã vận đơn của trang tra cứu đơn (app.js)
+    const track = (typeof deliveryBlock === 'function' ? deliveryBlock(o) : '') + (o.shipping_ref_code && typeof shipmentBlock === 'function' ? shipmentBlock(o) : '');
+    return `<details class="acct-order">
+      <summary>
+        <span class="acct-oid">#${esc(o.id)}</span>
+        <span class="acct-odate">${when(o.created_at)} · ${count} món</span>
+        <span class="acct-ost" style="color:${color}">${esc(label)}</span>
+        <strong class="acct-ototal">${money(o.total_amount)}</strong>
+      </summary>
+      <div class="acct-obody">
+        ${items}
+        <div class="acct-oi"><span>Phí vận chuyển</span><span>${o.shipping_fee ? money(o.shipping_fee) : 'Miễn phí'}</span></div>
+        <div class="acct-oi acct-ometa"><span>${o.payment_method === 'COD' ? 'Thanh toán khi nhận hàng' : 'Chuyển khoản'}${o.price_tier === 'wholesale' ? ' · giá sỉ' : o.price_tier === 'retail' ? ' · giá lẻ' : ''}</span><span>Giao tới: ${esc([o.address, o.customer?.ward_name, o.customer?.province].filter(Boolean).join(', '))}</span></div>
+        ${o.cancel_reason ? `<div class="acct-oi acct-ometa"><span>Lý do huỷ: ${esc(o.cancel_reason)}</span></div>` : ''}
+        ${track}
+        <div class="acct-oactions"><button type="button" class="btn-primary" data-reorder="${esc(o.id)}"><i class="fa-solid fa-rotate-right"></i> Mua lại đơn này</button></div>
+      </div>
+    </details>`;
+  }
+
+  /** Cho lại các món của đơn vào giỏ theo giá & tồn kho HIỆN TẠI (giá đơn cũ có thể đã đổi). */
+  async function reorder(id, btn) {
+    const o = orders.find(x => x.id === id);
+    if (!o || typeof addLineToCart !== 'function' || typeof cartLine !== 'function') return;
+    btn.disabled = true;
+    const skipped = [];
+    let added = 0;
+    for (const it of o.items) {
+      const label = it.name + (it.variant_name ? ` [${it.variant_name}]` : '');
+      try {
+        const res = await fetch(`/api/products/${encodeURIComponent(it.id)}`, { credentials: 'same-origin' });
+        const json = res.ok ? await res.json() : null;
+        const p = json && json.success ? json.data : null;
+        if (!p || p.in_stock === false) { skipped.push(`${label} (hết hàng)`); continue; }
+        const vs = Array.isArray(p.variants) ? p.variants : [];
+        const v = it.variation_id ? vs.find(x => String(x.id) === String(it.variation_id)) || null : null;
+        if (!v && vs.length > 1) { skipped.push(`${label} (phân loại không còn)`); continue; }
+        if (v && v.in_stock === false) { skipped.push(`${label} (hết hàng)`); continue; }
+        if (typeof productCache !== 'undefined' && productCache.set) productCache.set(p.id, p);
+        addLineToCart(cartLine(p, Math.min(50, it.quantity), v));
+        added++;
+      } catch (e) {
+        skipped.push(`${label} (chưa tải được)`);
+      }
+    }
+    btn.disabled = false;
+    if (added) {
+      close();
+      if (typeof openCartDrawer === 'function') openCartDrawer();
+    }
+    const msg = added
+      ? `Đã cho ${added} món vào giỏ theo giá hiện tại.${skipped.length ? ' Không thêm được: ' + skipped.join(', ') + '.' : ''}`
+      : `Không thêm được món nào: ${skipped.join(', ')}.`;
+    if (skipped.length && window.uiAlert) window.uiAlert(msg);
+    else if (window.showToast) window.showToast(msg);
+  }
+
   function showErr(msg) {
     const el = document.getElementById('acctErr');
     if (el) { el.hidden = false; el.textContent = msg; } else if (window.uiAlert) window.uiAlert(msg);

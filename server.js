@@ -2475,6 +2475,26 @@ app.post('/api/account/login', sameOrigin, rateLimit('acct-login', 15 * 60e3, 10
   res.set('Cache-Control', 'no-store').json({ success: true, data: accountView(c), message: c.status === 'pending' ? STATUS_MSG.pending : 'Đã đăng nhập – bạn đang xem giá sỉ.' });
 });
 
+// Đơn của chính khách sỉ: chỉ đơn đặt LÚC ĐÃ ĐĂNG NHẬP (gắn customer_id). Không ghép đơn cũ theo SĐT
+// vì SĐT đăng ký chưa xác minh OTP – ghép theo SĐT thì người đăng ký số của người khác sẽ xem được đơn của họ.
+app.get('/api/account/orders', rateLimit('acct-orders', 60e3, 60), (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const c = customers.fromRequest(req);
+  if (!c) return res.status(401).json({ success: false, error: 'Vui lòng đăng nhập tài khoản khách sỉ.' });
+  if (c.status === 'rejected' || c.status === 'disabled') return res.status(403).json({ success: false, error: STATUS_MSG[c.status] });
+  const list = orderStore.getOrders()
+    .filter(o => o.customer_id === c.id)
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, 50)
+    .map(o => ({
+      ...publicOrder(o),
+      address: o.customer?.address || null,
+      price_tier: o.price_tier || null,
+      items: (o.items || []).map(i => ({ id: i.id, variation_id: i.variation_id || null, variant_name: i.variant_name || null, name: stripSupplierText(i.name), price: i.price, quantity: i.quantity, image: catalogImage.maskMediaUrl(i.image) }))
+    }));
+  res.json({ success: true, data: list });
+});
+
 app.post('/api/account/logout', sameOrigin, (req, res) => {
   customers.clearCookie(res, isHttpsRequest(req));
   res.set('Cache-Control', 'no-store').json({ success: true, data: accountView(null) });
