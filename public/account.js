@@ -56,6 +56,22 @@
     return json;
   }
 
+  // Giỏ hàng + "đơn đã đặt trên máy này" nằm trong trình duyệt. Máy dùng chung (shop nhiều người):
+  // đăng xuất, hoặc đăng nhập tài khoản KHÁC trên cùng máy → xoá, để người sau không thấy của người trước.
+  // (Khách chưa đăng nhập bỏ hàng vào giỏ rồi mới đăng nhập thì giữ nguyên giỏ.)
+  const OWNER_KEY = 'hm_acct_owner';
+  const clearLocal = () => { try { ['hm_cart_v1', 'hm_my_orders', OWNER_KEY].forEach(k => localStorage.removeItem(k)); } catch (e) {} };
+  /** Ghi máy này thuộc khách id; trả true nếu vừa xoá dữ liệu của khách trước. */
+  function claimDevice(id) {
+    let cleared = false;
+    try {
+      const prev = localStorage.getItem(OWNER_KEY);
+      if (prev && prev !== id) { clearLocal(); cleared = true; }
+      localStorage.setItem(OWNER_KEY, id);
+    } catch (e) {}
+    return cleared;
+  }
+
   // Giá trên trang, trong giỏ, giá đẩy realtime đều theo cookie → tải lại để mọi thứ đổi cùng lúc
   const reloadPrices = msg => { try { sessionStorage.setItem('hm_acct_msg', msg || ''); } catch (e) {} location.reload(); };
 
@@ -77,7 +93,7 @@
         <div class="acct-orders" id="acctOrders"><p class="acct-empty"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải đơn hàng…</p></div>
         <div class="checkout-actions flex-between"><span></span><button type="button" class="btn-ghost" id="acctLogout"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button></div>`;
       body.querySelector('#acctLogout').onclick = async () => {
-        try { await post('/api/account/logout'); reloadPrices('Đã đăng xuất – đang xem giá lẻ.'); } catch (e) { showErr(e.message); }
+        try { await post('/api/account/logout'); clearLocal(); reloadPrices('Đã đăng xuất – đang xem giá lẻ.'); } catch (e) { showErr(e.message); }
       };
       loadOrders();
     } else if (view === 'register') {
@@ -111,7 +127,8 @@
       btn.disabled = true;
       try {
         const json = await post(view === 'register' ? '/api/account/register' : '/api/account/login', data);
-        if (json.data.tier === 'wholesale') reloadPrices(json.message);
+        const changedOwner = json.data.customer?.id ? claimDevice(json.data.customer.id) : false;
+        if (json.data.tier === 'wholesale' || changedOwner) reloadPrices(json.message);
         else { setTier(json.data); show('login'); }
       } catch (err) {
         showErr(err.message);
