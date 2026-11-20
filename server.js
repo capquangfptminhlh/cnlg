@@ -523,8 +523,10 @@ io.on('connection', socket => {
       socket.join('admins');
     }
   });
-  socket.on('join-order', orderId => {
-    if (typeof orderId === 'string' && /^HM[A-Z0-9]{6,10}$/.test(orderId)) socket.join(orderId);
+  // Phòng realtime của đơn (QR, trạng thái thanh toán): phải có vé của đơn
+  socket.on('join-order', msg => {
+    const orderId = msg?.orderId;
+    if (typeof orderId === 'string' && /^HM[A-Z0-9]{6,10}$/.test(orderId) && customers.checkOrderKey(orderId, msg.key)) socket.join(orderId);
   });
 });
 
@@ -1586,6 +1588,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
       return res.json({
         success: true,
         orderId: order.id,
+        access_key: customers.orderKey(order.id),
         payment_method: 'COD',
         subtotal,
         shipping_fee: ship.fee,
@@ -1609,6 +1612,7 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
     res.json({
       success: true,
       orderId: order.id,
+      access_key: customers.orderKey(order.id),
       subtotal,
       shipping_fee: ship.fee,
       shipping_detail: ship.detail,
@@ -1624,16 +1628,28 @@ app.post('/api/orders/checkout', rateLimit('checkout', 10 * 60e3, 8), async (req
   }
 });
 
+/**
+ * Ai được xem / thao tác một đơn: người có vé của đơn (người đặt, người tra đúng mã + SĐT)
+ * hoặc khách sỉ đang đăng nhập là chủ đơn. Không đủ → trả "không tìm thấy" (không lộ đơn có tồn tại).
+ */
+function canAccessOrder(req, order) {
+  if (!order) return false;
+  if (customers.checkOrderKey(order.id, String(req.get('x-order-key') || ''))) return true;
+  const c = order.customer_id ? customers.fromRequest(req) : null;
+  return !!c && c.id === order.customer_id && c.status !== 'rejected' && c.status !== 'disabled';
+}
+
 app.get('/api/orders/:id', rateLimit('order', 10 * 60e3, 300), (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
   const order = orderStore.getOrderById(req.params.id);
-  if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
+  if (!canAccessOrder(req, order)) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
   res.json({ success: true, data: publicOrder(order) });
 });
 
 // Khách báo đã chuyển khoản → chờ admin đối soát (KHÔNG tự đánh dấu đã thanh toán)
 app.post('/api/orders/:id/report-paid', rateLimit('report', 10 * 60e3, 20), (req, res) => {
   const order = orderStore.getOrderById(req.params.id);
-  if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
+  if (!canAccessOrder(req, order)) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
   if (order.status !== 'PENDING_PAYMENT') {
     return res.json({ success: true, data: publicOrder(order), message: 'Đơn hàng đã được ghi nhận trước đó.' });
   }
@@ -1658,7 +1674,7 @@ app.get('/api/orders/:id/track', rateLimit('track', 10 * 60e3, 30), (req, res) =
     order.completed_at && { status: 'COMPLETED', at: order.completed_at, label: 'Giao hàng thành công' },
     order.cancelled_at && { status: 'CANCELLED', at: order.cancelled_at, label: customerSafe(order.cancel_reason) || 'Đã huỷ' }
   ].filter(Boolean);
-  res.json({ success: true, data: { ...publicOrder(order), address: order.customer?.address, timeline } });
+  res.set('Cache-Control', 'private, no-store').json({ success: true, data: { ...publicOrder(order), address: order.customer?.address, timeline, access_key: customers.orderKey(order.id) } });
 });
 
 /** Xác nhận đã nhận tiền (admin bấm tay hoặc webhook ngân hàng) – dùng chung để ghi nguồn & báo Telegram */
@@ -2490,6 +2506,7 @@ app.get('/api/account/orders', rateLimit('acct-orders', 60e3, 60), (req, res) =>
       ...publicOrder(o),
       address: o.customer?.address || null,
       price_tier: o.price_tier || null,
+      access_key: customers.orderKey(o.id),
       items: (o.items || []).map(i => ({ id: i.id, variation_id: i.variation_id || null, variant_name: i.variant_name || null, name: stripSupplierText(i.name), price: i.price, quantity: i.quantity, image: catalogImage.maskMediaUrl(i.image) }))
     }));
   res.json({ success: true, data: list });

@@ -1383,7 +1383,8 @@ checkoutForm.addEventListener('submit', async e => {
     }
     openRealtimeQrModal();
     state.activeOrder = json.orderId;
-    socket.emit('join-order', json.orderId);
+    state.activeOrderKey = json.access_key || '';
+    socket.emit('join-order', { orderId: json.orderId, key: state.activeOrderKey });
     // Đề phòng QR được tạo trước khi socket kịp vào phòng: hỏi lại trạng thái đơn
     setTimeout(() => pollOrderOnce(json.orderId), 2500);
   } catch (err) {
@@ -1400,7 +1401,7 @@ checkoutForm.addEventListener('submit', async e => {
 async function pollOrderOnce(orderId) {
   if (state.activeOrder !== orderId || !qrStageConnecting || qrStageConnecting.classList.contains('hidden')) return;
   try {
-    const json = await (await fetch(`/api/orders/${orderId}`)).json();
+    const json = await (await fetch(`/api/orders/${orderId}`, { headers: { 'X-Order-Key': state.activeOrderKey || '' } })).json();
     if (json.success && json.data.payment) showQr({ orderId, qr: json.data.payment });
     else setTimeout(() => pollOrderOnce(orderId), 2000);
   } catch (e) {}
@@ -1567,7 +1568,7 @@ reportPaidBtn.addEventListener('click', async () => {
   reportPaidBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
 
   try {
-    const res = await fetch(`/api/orders/${state.activeOrder}/report-paid`, { method: 'POST' });
+    const res = await fetch(`/api/orders/${state.activeOrder}/report-paid`, { method: 'POST', headers: { 'X-Order-Key': state.activeOrderKey || '' } });
     const json = await res.json();
     if (!json.success) throw new Error(json.error);
     reportPaidBtn.innerHTML = '<i class="fa-solid fa-hourglass-half"></i> Đang chờ cửa hàng xác nhận';
@@ -2089,7 +2090,8 @@ function resumePayment(orderId) {
   trackModal.classList.remove('open');
   openRealtimeQrModal();
   state.activeOrder = orderId;
-  socket.emit('join-order', orderId);
+  state.activeOrderKey = o.access_key || '';
+  socket.emit('join-order', { orderId, key: state.activeOrderKey });
   const remaining = Math.max(60, Math.round((new Date(o.created_at).getTime() + (o.payment.expires_in_seconds || 1800) * 1000 - Date.now()) / 1000));
   showQr({ orderId, qr: { ...o.payment, expires_in_seconds: remaining } });
 }

@@ -160,6 +160,13 @@ function remove(id) {
 
 const sign = body => crypto.createHmac('sha256', getSecret()).update(body).digest('base64url');
 
+/**
+ * Vé xem một đơn: chỉ máy chủ tạo được (HMAC). Trả cho người đặt lúc đặt hàng và cho người tra
+ * đúng mã đơn + SĐT; không có vé thì không xem được đơn / không vào phòng realtime của đơn.
+ */
+const orderKey = orderId => sign(`order:${orderId}`).slice(0, 24);
+const checkOrderKey = (orderId, key) => typeof key === 'string' && key.length === 24 && safeEqual(key, orderKey(orderId));
+
 function sessionToken(c, now = Date.now()) {
   const body = `${c.id}.${Math.floor(now / 1000) + MAX_AGE_S}.${c.pwv || 1}`;
   return `${body}.${sign(body)}`;
@@ -192,5 +199,5 @@ function clearCookie(res, secure) {
 
 module.exports = {
   COOKIE, STATUSES, normPhone, register, createByAdmin, generatePassword, login, setStatus, resetPassword, remove, getAll, view,
-  sessionToken, fromCookieHeader, fromRequest, isWholesale, setCookie, clearCookie
+  sessionToken, orderKey, checkOrderKey, fromCookieHeader, fromRequest, isWholesale, setCookie, clearCookie
 };

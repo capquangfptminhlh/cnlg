@@ -34,6 +34,17 @@ test('admin tạo hộ khách sỉ: đã duyệt ngay, tự tạo mật khẩu k
   assert.equal(customers.register({ phone: '0977000555', password: 'matkhau1', name: 'Tự đăng ký' }).status, 'pending');
 });
 
+test('vé xem đơn: chỉ đúng vé của đúng đơn mới qua', () => {
+  const k = customers.orderKey('HMAB12CD34');
+  assert.equal(k.length, 24);
+  assert.equal(customers.checkOrderKey('HMAB12CD34', k), true);
+  assert.equal(customers.checkOrderKey('HMAB12CD35', k), false); // vé đơn khác
+  assert.equal(customers.checkOrderKey('HMAB12CD34', k.slice(0, 23) + (k[23] === 'A' ? 'B' : 'A')), false);
+  assert.equal(customers.checkOrderKey('HMAB12CD34', ''), false);
+  assert.equal(customers.checkOrderKey('HMAB12CD34', undefined), false);
+  assert.equal(customers.checkOrderKey('HMAB12CD34', { length: 24 }), false);
+});
+
 test('giá lẻ = giá sỉ +20%, làm tròn lên nghìn, không vượt giá niêm yết, không thấp hơn giá sỉ', () => {
   assert.equal(cp.retailPrice(100000, null, RULES), 120000);
   assert.equal(cp.retailPrice(99500, null, RULES), 120000); // 119.400 → 120.000
