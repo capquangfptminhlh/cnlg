@@ -97,6 +97,11 @@ test('đơn gửi cho app CRM không có tên, SĐT, địa chỉ, giá vốn', 
   });
   const s = JSON.stringify(o);
   assert.ok(!/Nguyễn A|0900000000|Đường B|dropbuy_cost|wholesale_price|9000/.test(s));
+  // SĐT chỉ có dạng dấu có khoá: cùng SĐT (mọi cách viết) → cùng dấu; khác khoá → khác dấu
+  assert.match(o.phone_hash, /^[0-9a-f]{24}$/);
+  assert.equal(o.phone_hash, postRef.phoneHash('+84 900 000 000'));
+  assert.notEqual(postRef.phoneHash('0900000000', 'khoa-khac'), o.phone_hash);
+  assert.equal(postRef.phoneHash('123'), null);
   assert.equal(o.ref, 'k7f2');
   assert.equal(o.province, 'Hà Nội');
   assert.deepEqual(o.items, [{ id: 9, variation_id: 3, name: 'Giá đỡ K72', price: 15000, quantity: 10 }]);

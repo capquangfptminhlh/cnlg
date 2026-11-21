@@ -131,9 +131,27 @@ function requireKey(req, res, next) {
   next();
 }
 
-/** Đơn ẩn danh cho app CRM: không tên, không SĐT, không địa chỉ, không giá vốn. */
+/** SĐT Việt Nam về dạng 0xxxxxxxxx ('' nếu không hợp lệ). */
+function normPhone(v) {
+  let d = String(v || '').replace(/\D/g, '');
+  if (d.startsWith('84') && (d.length === 11 || d.length === 12)) d = '0' + d.slice(2);
+  if (d.length === 9 && !d.startsWith('0')) d = '0' + d;
+  return /^0\d{9,10}$/.test(d) ? d : '';
+}
+
+/**
+ * Dấu SĐT có khoá: HMAC-SHA256(khoá thống kê, SĐT) cắt 24 ký tự. App CRM (giữ cùng khoá) tính dấu SĐT của khách
+ * trong kho để GHÉP đơn ↔ khách mà không cần nhận SĐT thật. Không có khoá thì không suy ngược ra SĐT.
+ */
+function phoneHash(phone, key = getKey()) {
+  const p = normPhone(phone);
+  return p ? crypto.createHmac('sha256', String(key)).update(p).digest('hex').slice(0, 24) : null;
+}
+
+/** Đơn ẩn danh cho app CRM: không tên, không SĐT, không địa chỉ, không giá vốn (SĐT chỉ ở dạng dấu có khoá). */
 function anonymousOrder(o) {
   return {
+    phone_hash: phoneHash(o.customer?.phone),
     id: o.id,
     created_at: o.created_at,
     status: o.status,
@@ -157,4 +175,4 @@ function report(orders, sinceIso, now = Date.now()) {
   return { since: new Date(since).toISOString(), orders: list, clicks: refClicks };
 }
 
-module.exports = { COOKIE, MAX_AGE_S, validCode, isBot, productIdFromPath, capture, fromRequest, getKey, requireKey, anonymousOrder, report, recordClick, flushClicks, _reset: () => { clicks = null; } };
+module.exports = { COOKIE, MAX_AGE_S, validCode, isBot, productIdFromPath, capture, fromRequest, getKey, requireKey, normPhone, phoneHash, anonymousOrder, report, recordClick, flushClicks, _reset: () => { clicks = null; } };
