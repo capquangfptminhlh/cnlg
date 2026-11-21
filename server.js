@@ -596,6 +596,7 @@ let cachedSellable = null;
 let cachedBrandsJson = null;
 let cachedCategoriesJson = null;
 let cachedDefaultMixed = null;
+let cachedBrandSet = new Set();
 let cachedCategoryIdsMap = new Map();
 let cachedSpecsIndex = null;
 let cachedCategoryFacetsIndex = null;
@@ -674,6 +675,7 @@ function ensureCatalogCaches() {
     p._tokens = new Set((n + ' ' + nb + ' ' + nv).split(/[^a-z0-9]+/));
   }
   cachedSellable = sellable;
+  cachedBrandSet = new Set(sellable.map(p => p._normBrand).filter(Boolean));
 
   // 3. Chuỗi JSON danh sách thương hiệu (phục vụ /api/brands trong 0.1ms)
   const brands = [...brandCounts.entries()]
@@ -840,43 +842,30 @@ app.get(/^\/cdn\/x\/([A-Za-z0-9_-]{16})\/([A-Za-z0-9_-]{8,1700})\.(?:jpg|png|web
   }
 });
 
-/** Xen 1 món nguồn khác sau mỗi `every - 1` món DropBuy (giữ nguyên thứ tự trong từng nhóm). */
-function mixSources(products, every = 4) {
+/**
+ * Thứ tự mặc định (trang chủ, danh mục, thương hiệu): hàng DropBuy TRƯỚC (giá nhập rẻ hơn),
+ * hàng nguồn sỉ khác (TechMall…) sau. Trong nhóm nguồn khác vẫn xoay vòng thương hiệu để
+ * không dồn 1 hãng lên đầu. Giữ nguyên thứ tự trong nhóm DropBuy.
+ */
+function mixSources(products) {
   const own = products.filter(p => !storeCatalog.sourceOf(p.id));
   const other = products.filter(p => storeCatalog.sourceOf(p.id));
   if (!other.length || !own.length) return products;
-
-  // Cân bằng các thương hiệu trong other (round-robin: Baseus, Vention, USAMS, Ulanzi, Mcdodo, Mark Ryden...)
-  // để trang chủ luôn có đa dạng thương hiệu thay vì dồn toàn bộ Baseus lên 200 trang đầu
   const byBrand = new Map();
-  other.forEach(p => {
+  for (const p of other) {
     const rawB = p.brand || 'Khác';
     const b = rawB.toLowerCase() === 'ulanzi' ? 'Ulanzi' : rawB;
     if (!byBrand.has(b)) byBrand.set(b, []);
     byBrand.get(b).push(p);
-  });
+  }
   const balancedOther = [];
-  let added = true;
-  let round = 0;
-  while (added) {
+  for (let round = 0, added = true; added; round++) {
     added = false;
     for (const list of byBrand.values()) {
-      if (round < list.length) {
-        balancedOther.push(list[round]);
-        added = true;
-      }
+      if (round < list.length) { balancedOther.push(list[round]); added = true; }
     }
-    round++;
   }
-
-  const out = [];
-  let i = 0;
-  let j = 0;
-  while (i < own.length || j < balancedOther.length) {
-    if (j < balancedOther.length && (out.length % every === every - 1 || i >= own.length)) out.push(balancedOther[j++]);
-    else out.push(own[i++]);
-  }
-  return out;
+  return [...own, ...balancedOther];
 }
 
 /** Public, indexed specification search across the ENTIRE sellable catalog.
@@ -1143,6 +1132,7 @@ app.get('/api/products', (req, res) => {
         const words = q.split(' ').filter(Boolean);
         const raw = String(search).toLowerCase().replace(/\s+/g, ' ').trim();
         relevance = new Map();
+        const brandQuery = cachedBrandSet.has(q);
         products = products.filter(p => {
           const name = p._normName || norm(p.name);
           const brand = p._normBrand || norm(p.brand || '');
@@ -1157,6 +1147,7 @@ app.get('/api/products', (req, res) => {
           if ((p._normSku || norm(p.sku)) === q) score += 10;
           if (brand && brand === q) score += 20;
           else if (brand && brand.includes(q)) score += 10;
+          else if (!brand && brandQuery && words.every(w => tokens.has(w))) score += 20;
           relevance.set(p.id, score);
           return true;
         });
@@ -1188,7 +1179,14 @@ app.get('/api/products', (req, res) => {
       } else if (sort === 'discount-desc') {
         products.sort((a, b) => (validDisc(b) - validDisc(a)) || ((b.is_flash_sale ? 1 : 0) - (a.is_flash_sale ? 1 : 0)) || (eff(a) - eff(b)));
       } else if (relevance) {
-        products.sort((a, b) => relevance.get(b.id) - relevance.get(a.id));
+        // Cùng bậc khớp từ khoá → hàng DropBuy (giá nhập rẻ hơn) trước hàng nguồn sỉ khác, rồi mới tới điểm chi tiết.
+        // Bậc: khớp hãng/mã (≥ 20) · khớp gần đủ cụm từ (≥ 9) · chứa cụm từ (≥ 4) · chỉ chứa các từ
+        const tier = sc => (sc >= 20 ? 3 : sc >= 9 ? 2 : sc >= 4 ? 1 : 0);
+        const own = p => (storeCatalog.sourceOf(p.id) ? 0 : 1);
+        products.sort((a, b) => {
+          const ra = relevance.get(a.id), rb = relevance.get(b.id);
+          return (tier(rb) - tier(ra)) || (own(b) - own(a)) || (rb - ra);
+        });
       } else {
         products = mixSources(products);
       }
@@ -1229,7 +1227,10 @@ app.get('/api/flash-sale', (req, res) => {
       return d > 70 ? 0 : d;
     };
     const fsPool = sellable.filter(p => p.is_flash_sale && discOf(p) >= 15);
-    const dealPool = fsPool.length >= 18 ? fsPool : sellable.filter(p => discOf(p) >= 25);
+    const anyPool = fsPool.length >= 18 ? fsPool : sellable.filter(p => discOf(p) >= 25);
+    // Ưu tiên hàng DropBuy (giá nhập rẻ hơn): đủ 18 món thì chỉ lấy DropBuy, thiếu mới bù hàng nguồn khác
+    const ownPool = anyPool.filter(p => !storeCatalog.sourceOf(p.id));
+    const dealPool = ownPool.length >= 18 ? ownPool : anyPool;
 
     const slotStartMs = slotIndex * slotMs - vnOffsetMs;
     const slotEndMs = slotStartMs + slotMs;
