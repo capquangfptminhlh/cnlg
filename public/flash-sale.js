@@ -1,4 +1,5 @@
-/* HOÀNG MINH STORE — Flash Sale Khung Giờ, Hiệu Ứng Đơn Hàng Liên Tục & Khan Hiếm Kích Thích Mua Hàng
+/* HOÀNG MINH STORE — Flash Sale theo khung giờ (SP đổi theo khung 3 giờ, đếm ngược tới khung sau).
+   Chỉ hiện số liệu thật: giá, % giảm, bảo hành. Không có đơn hàng / người xem / số suất bịa.
    - Đồng bộ trực tiếp với /api/flash-sale và Socket.IO PRODUCTS_UPDATED. */
 (() => {
   'use strict';
@@ -61,8 +62,6 @@
     const hasOld = oldPrice > price;
     const discount = hasOld ? Math.max(0, Math.round(Number(p.discount_percent) || ((1 - price / oldPrice) * 100))) : 0;
     const savedAmt = hasOld ? oldPrice - price : 0;
-    const fireWidth = Math.min(94, Math.max(58, 46 + discount));
-    const fireLabel = discount >= 45 ? `GIẢM SỐC -${discount}%` : 'SẮP CHÁY KHO';
     const warrantyText = p.warranty || 'Không bảo hành';
     const fallbackSvg = 'data:image/svg+xml,' + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="100%" height="100%" fill="#fff7f4"/><text x="50%" y="50%" fill="#d97757" text-anchor="middle" dominant-baseline="central" font-size="18">Hoang Minh Store</text></svg>'
@@ -85,10 +84,6 @@
           ? `<span class="si-save-chip"><i class="fa-solid fa-fire-flame-curved"></i> Rẻ hơn ${fmtCompact(savedAmt)}</span>`
           : `<span class="si-save-chip is-base"><i class="fa-solid fa-check-double"></i> Lẻ = Giá sỉ</span>`}
         <div class="fs-warranty-line"><i class="fa-solid fa-shield-halved"></i> ${escHtml(warrantyText)}</div>
-        <div class="fs-fire-bar" aria-label="${escHtml(fireLabel)}">
-          <span class="fs-fire-fill" style="width:${fireWidth}%"></span>
-          <span class="fs-fire-text"><i class="fa-solid fa-fire"></i> ${escHtml(fireLabel)}</span>
-        </div>
         <div class="fs-actions">
           <button type="button" class="fs-cart-btn" data-shop-cart="${id}" aria-label="Thêm vào giỏ"><i class="fa-solid fa-cart-plus"></i></button>
           <button type="button" class="fs-buy-btn" data-shop-buy="${id}">Chốt Giá Sỉ</button>
@@ -157,10 +152,7 @@
         if (!cdTimer) cdTimer = setInterval(tickCountdown, 1000);
       }
       renderTrack();
-      startLiveOrderStream();
-    } catch (_) {
-      startLiveOrderStream();
-    }
+    } catch (_) {}
   }
 
   prevBtn?.addEventListener('click', () => {
@@ -199,229 +191,5 @@
     });
   }
 
-  // =========================================================================
-  // 1. HIỆU ỨNG ĐƠN HÀNG NHẢY LIÊN TỤC (LIVE SOCIAL PROOF ORDER STREAM)
-  // =========================================================================
-  const BUYERS = [
-    ['Anh Minh Tuấn', '098***412', 'TP. Hồ Chí Minh'],
-    ['Chị Lan Anh', '091***836', 'Hà Nội'],
-    ['Anh Quốc Bảo', '090***205', 'Đà Nẵng'],
-    ['Chị Thu Hà', '038***619', 'Bình Dương'],
-    ['Anh Hoàng Nam', '097***540', 'Đồng Nai'],
-    ['Chị Ngọc Mai', '093***128', 'Hải Phòng'],
-    ['Anh Đức Huy', '035***904', 'Cần Thơ'],
-    ['Chị Phương Thảo', '096***371', 'Bắc Ninh'],
-    ['Anh Gia Hưng', '086***752', 'Khánh Hòa'],
-    ['Chị Thanh Trúc', '094***663', 'Quảng Ninh'],
-    ['Anh Trọng Nghĩa', '039***185', 'Nghệ An'],
-    ['Chị Mỹ Linh', '070***490', 'Bà Rịa - Vũng Tàu'],
-    ['Anh Hải Đăng', '092***817', 'Thanh Hóa'],
-    ['Chị Khánh Vy', '089***234', 'Lâm Đồng'],
-    ['Anh Tiến Đạt', '037***509', 'Long An'],
-    ['Chị Kim Ngân', '079***941', 'Hưng Yên'],
-    ['Anh Minh Khôi', '098***167', 'TP. Hồ Chí Minh'],
-    ['Chị Bảo Châu', '091***723', 'Hà Nội'],
-    ['Anh Quang Vinh', '093***658', 'Bình Định'],
-    ['Chị Yến Nhi', '036***402', 'Thái Nguyên']
-  ];
-  const ORDER_VERBS = [
-    'vừa chốt đơn giá sỉ',
-    'vừa đặt mua 2 sản phẩm',
-    'vừa săn thành công Flash Sale',
-    'vừa đặt đơn COD',
-    'vừa chốt nhanh 3 món giá sỉ',
-    'vừa giữ suất ưu đãi'
-  ];
-  const ORDER_TIMES = ['Vừa xong', '6 giây trước', '14 giây trước', '25 giây trước', '42 giây trước', '1 phút trước'];
-
-  let orderToastEl = null;
-  let orderLoopTimer = null;
-  let orderHideTimer = null;
-  let orderHover = false;
-  let orderMuted = false;
-  let orderCursor = Math.floor(Math.random() * BUYERS.length);
-  let prodCursor = 0;
-
-  function candidateProducts() {
-    const map = new Map();
-    for (const p of fsItems) {
-      if (p && p.in_stock !== false && p.image) map.set(p.id, p);
-    }
-    if (typeof state !== 'undefined' && Array.isArray(state.products)) {
-      for (const p of state.products) {
-        if (p && p.in_stock !== false && p.image && !map.has(p.id)) map.set(p.id, p);
-      }
-    }
-    return [...map.values()];
-  }
-
-  function ensureOrderToast() {
-    if (orderToastEl) return orderToastEl;
-    orderToastEl = document.createElement('aside');
-    orderToastEl.className = 'fs-live-spotlight hm-live-order-toast';
-    orderToastEl.id = 'fsLiveSpotlight';
-    orderToastEl.setAttribute('aria-label', 'Thông báo đơn hàng mới');
-    orderToastEl.addEventListener('mouseenter', () => {
-      orderHover = true;
-      clearTimeout(orderHideTimer);
-    });
-    orderToastEl.addEventListener('mouseleave', () => {
-      orderHover = false;
-      scheduleNextOrderToast(1600);
-    });
-    orderToastEl.addEventListener('click', e => {
-      if (e.target.closest('.fs-spot-close')) {
-        orderMuted = true;
-        orderToastEl.classList.remove('is-shown');
-        clearTimeout(orderLoopTimer);
-        clearTimeout(orderHideTimer);
-        return;
-      }
-      const id = Number(orderToastEl.dataset.productId);
-      if (Number.isSafeInteger(id) && id > 0 && typeof openProductDetail === 'function') {
-        orderToastEl.classList.remove('is-shown');
-        openProductDetail(id);
-      }
-    });
-    document.body.appendChild(orderToastEl);
-    return orderToastEl;
-  }
-
-  function isBlockingModalOpen() {
-    return ['checkoutModal', 'qrModal', 'trackModal'].some(id => document.getElementById(id)?.classList.contains('open'))
-      || document.getElementById('cartDrawer')?.classList.contains('open')
-      || document.body.classList.contains('cat-sheet-open')
-      || (window.innerWidth <= 760 && document.getElementById('productDetailModal')?.classList.contains('open'));
-  }
-
-  function scheduleNextOrderToast(delayMs) {
-    clearTimeout(orderLoopTimer);
-    if (orderMuted || reducedMotion.matches) return;
-    orderLoopTimer = setTimeout(popOrderToast, delayMs);
-  }
-
-  function popOrderToast() {
-    if (orderMuted || reducedMotion.matches) return;
-    if (document.hidden || orderHover || isBlockingModalOpen()) {
-      scheduleNextOrderToast(2800);
-      return;
-    }
-    const pool = candidateProducts();
-    if (!pool.length) {
-      scheduleNextOrderToast(2500);
-      return;
-    }
-    const buyer = BUYERS[orderCursor % BUYERS.length];
-    const verb = ORDER_VERBS[(orderCursor * 3 + prodCursor) % ORDER_VERBS.length];
-    const ago = ORDER_TIMES[(orderCursor + prodCursor) % ORDER_TIMES.length];
-    const item = pool[prodCursor % pool.length];
-    orderCursor++;
-    prodCursor++;
-
-    const el = ensureOrderToast();
-    el.dataset.productId = String(item.id);
-    const disc = Number(item.discount_percent) || 0;
-    el.innerHTML = `
-      <div class="hm-order-thumb-wrap">
-        <img class="fs-spot-thumb" src="${escHtml(item.image)}" alt="" loading="lazy">
-        <span class="hm-order-check"><i class="fa-solid fa-check"></i></span>
-      </div>
-      <div class="fs-spot-info">
-        <div class="hm-order-buyer">
-          <strong>${escHtml(buyer[0])}</strong> <small>(${escHtml(buyer[1])} · ${escHtml(buyer[2])})</small>
-        </div>
-        <div class="hm-order-action">${escHtml(verb)}: <b>${escHtml(item.name)}</b></div>
-        <div class="fs-spot-price">
-          <strong>${fmtPrice(item.price)}</strong>
-          ${disc > 0 ? `<span>-${disc}%</span>` : '<span>Giá sỉ</span>'}
-          <em class="hm-order-time"><i class="fa-solid fa-circle-check"></i> ${escHtml(ago)}</em>
-        </div>
-      </div>
-      <button type="button" class="fs-spot-close" aria-label="Tắt thông báo đơn hàng">&times;</button>`;
-
-    el.classList.remove('is-shown');
-    void el.offsetWidth;
-    el.classList.add('is-shown');
-
-    clearTimeout(orderHideTimer);
-    orderHideTimer = setTimeout(() => {
-      if (!orderHover) {
-        el.classList.remove('is-shown');
-        const nextGap = 1200 + Math.floor(Math.random() * 1000);
-        scheduleNextOrderToast(nextGap);
-      }
-    }, 4000);
-  }
-
-  function startLiveOrderStream() {
-    if (orderLoopTimer || orderMuted || reducedMotion.matches) return;
-    scheduleNextOrderToast(800);
-  }
-
-  window.addEventListener('storefront:products', () => {
-    if (!orderToastEl || !orderToastEl.classList.contains('is-shown')) {
-      scheduleNextOrderToast(600);
-    }
-  });
-  window.addEventListener('storefront:flash-sale-rendered', () => {
-    if (!orderToastEl || !orderToastEl.classList.contains('is-shown')) {
-      scheduleNextOrderToast(600);
-    }
-  });
-
-  // =========================================================================
-  // 2. HIỆU ỨNG KHAN HIẾM TRỰC TIẾP TRONG TRANG CHI TIẾT SẢN PHẨM
-  // =========================================================================
-  let detailUrgencyTimer = null;
-  let detailDropTimer = null;
-
-  function stopDetailUrgency() {
-    clearInterval(detailUrgencyTimer);
-    clearTimeout(detailDropTimer);
-    detailUrgencyTimer = null;
-    detailDropTimer = null;
-  }
-
-  window.addEventListener('storefront:detail-open', () => {
-    stopDetailUrgency();
-    if (reducedMotion.matches) return;
-    const modal = document.getElementById('productDetailModal');
-    if (!modal) return;
-
-    // Nhịp người đang xem trực tuyến tăng/giảm tự nhiên
-    detailUrgencyTimer = setInterval(() => {
-      if (!modal.classList.contains('open')) {
-        stopDetailUrgency();
-        return;
-      }
-      const vEl = document.getElementById('detailViewerCount');
-      if (vEl) {
-        const cur = Number.parseInt(vEl.textContent, 10) || 12;
-        const delta = Math.random() > 0.45 ? 1 : -1;
-        const next = Math.max(6, Math.min(39, cur + delta));
-        vEl.textContent = String(next);
-      }
-    }, 3200);
-
-    // Sau 4.2s khách đang xem: giảm nhẹ 1 suất còn lại để kích thích chốt đơn ngay
-    detailDropTimer = setTimeout(() => {
-      if (!modal.classList.contains('open')) return;
-      const leftEl = document.getElementById('detailUrgentLeft');
-      const box = modal.querySelector('.detail-urgency-box');
-      if (!leftEl || !box) return;
-      const cur = Number.parseInt(leftEl.textContent, 10) || 3;
-      if (cur > 2) {
-        leftEl.textContent = String(cur - 1);
-        box.classList.remove('is-just-claimed');
-        void box.offsetWidth;
-        box.classList.add('is-just-claimed');
-      }
-    }, 4200);
-  });
-
-  if (section && track) {
-    loadFlashSale();
-  } else {
-    startLiveOrderStream();
-  }
+  if (section && track) loadFlashSale();
 })();

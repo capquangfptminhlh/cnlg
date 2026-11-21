@@ -541,14 +541,6 @@ function pickVariantOption(groupIndex, optionIndex) {
   if (match) pickVariant(match.id);
 }
 
-function urgencyStatsFor(prod, v) {
-  const seed = ((Number(prod?.id) || 1) * 37 + (Number(String(v?.id || 0).replace(/\D/g, '').slice(-4)) || 11)) >>> 0;
-  const left = 2 + (seed % 7);
-  const pct = Math.min(96, 98 - left * 2);
-  const viewers = 9 + (seed % 21);
-  return { left, pct, viewers };
-}
-
 function getEffectiveGallery(prod, v) {
   const baseGallery = Array.isArray(prod?.gallery) && prod.gallery.length > 0
     ? prod.gallery.slice()
@@ -579,7 +571,6 @@ function renderDetailModal(prod) {
   const soldOut = prod.in_stock === false || (needsChoice ? (prod.variants || []).every(x => !x.in_stock) : v ? !v.in_stock : false);
   const canBuy = !soldOut && (!needsChoice || (v && v.in_stock));
   const activeWarranty = (v && v.warranty) || prod.warranty || 'Không bảo hành';
-  const urg = urgencyStatsFor(prod, v);
 
   detailModalBody.innerHTML = `
     <div class="product-detail-grid">
@@ -650,7 +641,6 @@ function renderDetailModal(prod) {
           <i class="fa-solid fa-shield-halved"></i> <span>Chính sách bảo hành: <strong>${esc(activeWarranty)}</strong></span>
           <small>${/^Không/i.test(activeWarranty) ? '• Đồng kiểm khi nhận' : '• Chính hãng NSX'}</small>
         </div>
-        ${!soldOut ? `<div class="detail-urgency-box"><div class="detail-urgency-top"><span class="detail-urgency-flame"><i class="fa-solid fa-fire-flame-curved"></i> SẮP HẾT HÀNG! Chỉ còn <b id="detailUrgentLeft">${urg.left}</b> suất ${isWholesaleView() ? 'giá sỉ' : 'ưu đãi'} cuối</span><span class="detail-urgency-viewers"><span class="live-viewer-dot"></span> <b id="detailViewerCount">${urg.viewers}</b> khách đang xem</span></div><div class="detail-urgency-bar"><span class="detail-urgency-fill" style="width:${urg.pct}%"></span><span class="detail-urgency-bar-label"><i class="fa-solid fa-bolt"></i> Đã săn ${urg.pct}% — Tranh thủ chốt đơn!</span></div></div>` : ''}
 
 
         ${renderVariantPicker(prod)}

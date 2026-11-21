@@ -589,6 +589,12 @@ app.get('/sp/:slugId', async (req, res) => {
   }
 });
 
+// CSS của trang bán hàng gộp 1 file (services/seo.js). Đúng mã phiên bản → cache 1 năm; sai/thiếu → 5 phút.
+app.get('/bundle.css', (req, res) => {
+  const b = seo.getCssBundle();
+  res.type('text/css').set('Cache-Control', req.query.v === b.version ? 'public, max-age=31536000, immutable' : 'public, max-age=300').send(b.css);
+});
+
 // Sitemap: chỉ mục → trang (chủ, danh mục, thương hiệu) + SP còn hàng (bài cha sau gộp phân loại), 5.000 link/tệp
 const sitemapProducts = () => { ensureCatalogCaches(); return cachedSellable.filter(p => p.in_stock !== false); };
 app.get('/sitemap.xml', (req, res) => res.type('application/xml').set('Cache-Control', 'public, max-age=3600').send(seo.sitemapIndexXml(req, sitemapProducts().length)));

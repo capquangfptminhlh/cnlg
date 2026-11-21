@@ -120,18 +120,16 @@ test('Flash Sale & Tổng Kho Giá Sỉ layer nạp đúng thứ tự, cân bằ
 });
 
 
-test('Đơn hàng ảo nhảy liên tục + Bảo hành DropBuy chính xác + Hiệu ứng khan hiếm nút mua',()=>{
+test('Không có số liệu bịa: đơn hàng ảo, người đang xem, số suất còn lại; giữ bảo hành + nút mua',()=>{
   const fsCss=read('public/flash-sale.css');
   const fsJs=read('public/flash-sale.js');
   const appJs=read('public/app.js');
   const mHome=read('public/marketplace-home.js');
-  assert.match(fsCss, /\.hm-live-order-toast/);
+  // Popup "Anh X vừa mua" với tên / SĐT viết sẵn, "khách đang xem" ngẫu nhiên, "chỉ còn X suất" tính từ mã SP
+  assert.doesNotMatch(fsJs, /BUYERS|vừa săn thành công|vừa chốt đơn|hm-live-order-toast|detailViewerCount|SẮP CHÁY KHO/);
+  assert.doesNotMatch(appJs, /urgencyStatsFor|detail-urgency-box|khách đang xem|SẮP HẾT HÀNG!/);
   assert.match(fsCss, /\.fs-warranty-line/);
-  assert.match(fsCss, /\.detail-urgency-box/);
   assert.match(fsCss, /\.btn-order-now-large\.is-urgent-buy/);
-  assert.match(fsJs, /hm-live-order-toast/);
-  assert.match(appJs, /urgencyStatsFor/);
-  assert.match(appJs, /detail-urgency-box/);
   assert.match(appJs, /is-urgent-buy/);
   assert.match(mHome, /fs-warranty-line/);
 });

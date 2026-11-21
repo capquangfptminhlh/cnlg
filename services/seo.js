@@ -34,11 +34,46 @@ function bustAssets(html) {
     .replace(/(src="\/[a-zA-Z0-9_\-\.]+\.js)(")/g, `$1?${ASSET_VERSION}$2`);
 }
 
+/**
+ * Tốc độ tải trang (Core Web Vitals): trước đây trang tải 17 file CSS riêng + Font Awesome + 16 script
+ * chặn hiển thị. Giờ:
+ *  - CSS của shop gộp thành 1 file /bundle.css?v=<mã nội dung> (giữ đúng thứ tự, cache 1 năm);
+ *  - Font Awesome (chỉ là biểu tượng) tải không chặn hiển thị;
+ *  - mọi <script src> thêm defer (chạy theo đúng thứ tự cũ, sau khi HTML đã đọc xong).
+ * index.html giữ nguyên danh sách file để dễ sửa; việc gộp làm lúc gửi trang.
+ */
+const LOCAL_CSS_RE = /^[ \t]*<link rel="stylesheet" href="(\/[a-zA-Z0-9_.-]+\.css)">[ \t]*\n/gm;
+let cssBundle = null;
+function getCssBundle() {
+  const mtime = fs.statSync(INDEX_FILE).mtimeMs;
+  if (cssBundle && cssBundle.mtime === mtime) return cssBundle;
+  const html = fs.readFileSync(INDEX_FILE, 'utf8').replace(/\r\n/g, '\n');
+  const files = [...html.matchAll(LOCAL_CSS_RE)].map(m => m[1]);
+  const css = files.map(f => `/* ${f} */\n${fs.readFileSync(path.join(__dirname, '..', 'public', f.slice(1)), 'utf8')}`).join('\n');
+  const version = crypto.createHash('sha256').update(css).digest('hex').slice(0, 12);
+  cssBundle = { mtime, files, css, version };
+  return cssBundle;
+}
+
+function optimizeLoading(html) {
+  const { version } = getCssBundle();
+  let first = true;
+  return html
+    // các file CSS của shop → 1 thẻ (ở vị trí file đầu tiên, giữ thứ tự cascade)
+    .replace(LOCAL_CSS_RE, () => (first ? ((first = false), `  <link rel="stylesheet" href="/bundle.css?v=${version}">\n`) : ''))
+    // Font Awesome: không chặn hiển thị (biểu tượng hiện sau chữ một chút)
+    .replace(/<link rel="stylesheet" href="(https:\/\/cdnjs\.cloudflare\.com\/[^"]+font-awesome[^"]+)">/,
+      '<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>\n  <link rel="stylesheet" href="$1" media="print" onload="this.media=\'all\'">\n  <noscript><link rel="stylesheet" href="$1"></noscript>')
+    // script: chạy sau khi đọc xong HTML, giữ đúng thứ tự
+    .replace(/<script src="([^"]+)"><\/script>/g, '<script defer src="$1"></script>');
+}
+
 function getTemplate() {
   const mtime = fs.statSync(INDEX_FILE).mtimeMs;
   if (!template || mtime !== templateMtime) {
     // Chuẩn hoá xuống dòng (máy Windows checkout ra CRLF) để các mốc chèn nội dung luôn khớp
-    template = bustAssets(fs.readFileSync(INDEX_FILE, 'utf8').replace(/\r\n/g, '\n'));
+    // Gộp CSS trước (đọc thẻ link gốc), rồi mới gắn ?v= cho các file còn lại
+    template = bustAssets(optimizeLoading(fs.readFileSync(INDEX_FILE, 'utf8').replace(/\r\n/g, '\n')));
     templateMtime = mtime;
   }
   return template;
@@ -265,4 +300,4 @@ function robotsTxt(req) {
   ].join('\n');
 }
 
-module.exports = { ASSET_VERSION, renderProductPage, renderHomePage, sitemapXml, sitemapIndexXml, sitemapPagesXml, sitemapProductsXml, SITEMAP_CHUNK, robotsTxt, productPath, baseUrl, isBesiHost, MARK };
+module.exports = { ASSET_VERSION, getCssBundle, renderProductPage, renderHomePage, sitemapXml, sitemapIndexXml, sitemapPagesXml, sitemapProductsXml, SITEMAP_CHUNK, robotsTxt, productPath, baseUrl, isBesiHost, MARK };
