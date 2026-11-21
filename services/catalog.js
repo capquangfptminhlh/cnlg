@@ -59,7 +59,7 @@ function sourceProducts() {
   }
   lastSourceKey = key;
   const rawSources = allSources.flatMap(s => s.store.getProducts().filter(p => !p.removed));
-  sourceProductsCache = variantGrouper.groupProducts(rawSources);
+  sourceProductsCache = variantGrouper.mergeFamilies(variantGrouper.groupProducts(rawSources));
   return sourceProductsCache;
 }
 

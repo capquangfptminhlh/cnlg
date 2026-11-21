@@ -150,3 +150,58 @@ test('findInGrouped: tìm sản phẩm cha qua ID cha, ID biến thể hoặc ID
   // ID không tồn tại
   assert.equal(findInGrouped(grouped, 99999), null);
 });
+
+const { mergeFamilies } = require('../services/variantGrouper');
+const hub = (id, mid, price, cat) => ({ id, source_id: id % 10000000, brand: 'Baseus', name: `Baseus Enjoyment Series Type-C to ${mid} HUB Convertor Deep gray`, price, in_stock: true, category_id: cat, image: `/img/${id}.jpg`, sku: 'S' + id });
+
+test('mergeFamilies: cùng dòng chỉ khác cổng → 1 bài nhiều phân loại, giữ mã SP gốc để đặt hàng', () => {
+  const list = [
+    hub(10004074, 'VGA+PD', 383000, 631), hub(10004076, 'HD4K+PD', 383000, 428), hub(10004078, 'Mini DP + PD', 348000, 632),
+    hub(10004080, 'VGA', 313000, 631), hub(10004082, 'HD4K', 313000, 428), hub(10004084, 'Mini DP', 253000, 632),
+    { id: 10009999, brand: 'Baseus', name: 'Baseus Bowie E3 True Wireless Earphones Black', price: 300000, category_id: 1 }
+  ];
+  const out = groupProducts(list);
+  const merged = mergeFamilies(out);
+  assert.equal(merged.length, 2);
+  const f = merged.find(p => p.family_merged);
+  assert.equal(f.name, 'Baseus Enjoyment Series Type-C HUB Convertor Deep gray');
+  assert.equal(f.slug, 'baseus-enjoyment-series-type-c-hub-convertor-deep-gray');
+  assert.deepEqual(f.variants.map(v => v.name), ['Mini DP', 'VGA', 'HD4K', 'Mini DP + PD', 'VGA + PD', 'HD4K + PD']);
+  assert.equal(f.price, 253000);
+  assert.equal(f.variants[0].is_default, true);
+  const vga = f.variants.find(v => v.name === 'VGA');
+  assert.equal(vga.product_id, 10004080);
+  assert.equal(vga.source_id, 4080);
+  assert.equal(vga.image, '/img/10004080.jpg');
+  assert.deepEqual(f.category_ids.sort(), [428, 631, 632]);
+  assert.deepEqual(f.variation_options, [{ display: 'Phân loại', options: f.variants.map(v => v.name) }]);
+  // link cũ của từng kiểu vẫn mở đúng bài gộp
+  assert.equal(findInGrouped(merged, 10004082), f);
+  assert.equal(findInGrouped(merged, 10004074), f);
+});
+
+test('mergeFamilies: không gộp khi chênh giá > 2 lần, khác thương hiệu, cắt ngang ngoặc, hoặc tên quá ngắn', () => {
+  const pricey = [
+    { id: 1, brand: 'Earfun', name: 'Tai nghe Bluetooth TWS Earfun Air Mini (Đen)', price: 690000 },
+    { id: 2, brand: 'Earfun', name: 'Tai nghe Bluetooth TWS Earfun Air Pro SV (Đen)', price: 1790000 }
+  ];
+  assert.equal(mergeFamilies(pricey).length, 2);
+  const brands = [
+    { id: 3, brand: 'Baseus', name: 'Cáp sạc nhanh Type-C to Lightning 20W 1m loại A', price: 100000 },
+    { id: 4, brand: 'Ugreen', name: 'Cáp sạc nhanh Type-C to Lightning 20W 1m loại B', price: 100000 }
+  ];
+  assert.equal(mergeFamilies(brands).length, 2);
+  const paren = [
+    { id: 5, brand: 'Baseus', name: 'Baseus EnerFill FE11 Fast Charger 2C + U 100W (EU Plug) BLACK', price: 805000 },
+    { id: 6, brand: 'Baseus', name: 'Baseus EnerFill FE11 Fast Charger 2C + U 100W (US Plug) BLACK', price: 854000 }
+  ];
+  const pm = mergeFamilies(paren);
+  // chỉ được gộp khi cả cụm ngoặc là phân loại, không có nhãn kiểu "(EU"
+  assert.equal(pm.length, 1);
+  assert.deepEqual(pm[0].variants.map(v => v.name), ['(EU Plug)', '(US Plug)']);
+  for (const v of pm[0].variants) assert.equal((v.name.match(/\(/g) || []).length, (v.name.match(/\)/g) || []).length, v.name);
+  const short = [
+    { id: 7, brand: 'X', name: 'Ốp X A', price: 1 }, { id: 8, brand: 'X', name: 'Ốp X B', price: 1 }
+  ];
+  assert.equal(mergeFamilies(short).length, 2);
+});

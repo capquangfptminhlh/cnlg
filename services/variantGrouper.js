@@ -352,6 +352,172 @@ function groupProducts(products = []) {
   return result;
 }
 
+// ───────────── Gộp "cùng dòng, khác kiểu" (bước 2, cho nguồn sỉ khác DropBuy) ─────────────
+// Nguồn đăng mỗi kiểu thành 1 sản phẩm riêng, tên chỉ khác 1 cụm ở giữa:
+//   Baseus Enjoyment Series Type-C to VGA+PD HUB Convertor Deep gray
+//   Baseus Enjoyment Series Type-C to Mini DP + PD HUB Convertor Deep gray
+// → 1 bài "Baseus Enjoyment Series Type-C HUB Convertor Deep gray", phân loại: VGA + PD / Mini DP + PD / …
+// Mỗi phân loại giữ nguyên mã SP gốc (product_id/source_id) nên đặt hàng vẫn đúng món.
+const FAMILY_MIN_PREFIX = 3;   // ≥ 3 từ chung ở đầu (thương hiệu + dòng + …)
+const FAMILY_MIN_KEPT = 5;     // ≥ 5 từ chung tổng cộng
+const FAMILY_MAX_WINDOW = 3;   // cụm khác nhau ≤ 3 từ
+const FAMILY_MAX_PRICE_RATIO = 2; // chênh giá > 2 lần thường là mẫu khác hẳn (Air Mini vs Air Pro) → không gộp
+const FAMILY_MAX_MEMBERS = 12;
+const FAMILY_MAX_VARIANTS = 24; // nhiều hơn: thường là trộn nhiều loại cáp khác nhau → không gộp
+const DANGLING = new Set(['to', 'for', 'with', 'and', 'sang', 'cho', 'và', 'cùng', '-', '–', '/', '+']);
+
+// "Mini DP + PD" → "Mini", "DP+PD": dấu + / & dính vào từ để 1 cụm không bị đếm thành nhiều từ
+const familyTokens = name => String(name || '').replace(/\s*([+&])\s*/g, '$1').trim().split(/\s+/).filter(Boolean);
+const tokKey = t => normalizeBaseTitle(t) || t.toLowerCase();
+const spaced = s => s.replace(/([+&])/g, ' $1 ').replace(/\s+/g, ' ').trim();
+// Độ sâu ngoặc sau mỗi từ: chỉ cắt cụm khác nhau ở chỗ KHÔNG nằm trong ngoặc và cụm phải đủ cặp ngoặc
+// (tránh nhãn kiểu "(EU · BLACK" hay "Audio) · WHITE")
+function bracketDepths(toks) {
+  const out = [];
+  let d = 0;
+  for (const t of toks) {
+    for (const ch of t) {
+      if ('([（【'.includes(ch)) d++;
+      else if (')]）】'.includes(ch)) d--;
+    }
+    out.push(d);
+  }
+  return out;
+}
+const HAS_WORD = /[\p{L}\p{N}]/u;
+
+function mergeFamilies(list = []) {
+  if (!Array.isArray(list) || list.length < 2) return list;
+  const info = list.map((p, idx) => ({ p, idx, toks: familyTokens(p.name) }));
+  const sigs = new Map();
+  for (const it of info) {
+    const n = it.toks.length;
+    if (!it.p.brand || n < FAMILY_MIN_KEPT + 1) continue;
+    const keys = it.toks.map(tokKey);
+    const depth = bracketDepths(it.toks);
+    if (depth[n - 1] !== 0) continue; // tên lệch ngoặc: không đoán
+    for (let w = 1; w <= FAMILY_MAX_WINDOW; w++) {
+      if (n - w < FAMILY_MIN_KEPT) continue;
+      for (let i = FAMILY_MIN_PREFIX; i + w <= n; i++) {
+        if (depth[i - 1] !== 0 || depth[i + w - 1] !== 0) continue;
+        let inside = false;
+        for (let k = i; k < i + w - 1; k++) if (depth[k] < 0) inside = true;
+        if (inside || !HAS_WORD.test(it.toks.slice(i, i + w).join(''))) continue;
+        const sig = `${String(it.p.brand).toLowerCase()}|${keys.slice(0, i).join(' ')}|_|${keys.slice(i + w).join(' ')}`;
+        let s = sigs.get(sig);
+        if (!s) sigs.set(sig, (s = { kept: n - w, members: [] }));
+        s.members.push({ it, i, w });
+      }
+    }
+  }
+
+  // Cụm lớn + phần chung dài trước; mỗi SP chỉ vào 1 cụm
+  const cands = [...sigs.values()].filter(s => s.members.length >= 2)
+    .sort((a, b) => b.members.length - a.members.length || b.kept - a.kept);
+  const used = new Set();
+  const merged = new Map(); // idx nhỏ nhất của cụm → SP cha; các idx khác → null (bỏ)
+  for (const s of cands) {
+    const seen = new Set();
+    const members = s.members.filter(m => {
+      if (used.has(m.it.idx) || seen.has('#' + m.it.idx)) return false;
+      const k = m.it.toks.slice(m.i, m.i + m.w).map(tokKey).join(' ');
+      if (seen.has(k)) return false;
+      seen.add(k); seen.add('#' + m.it.idx);
+      return true;
+    });
+    if (members.length < 2 || members.length > FAMILY_MAX_MEMBERS) continue;
+    const prices = members.map(m => Number(m.it.p.price) || 0).filter(x => x > 0);
+    if (!prices.length || Math.max(...prices) / Math.min(...prices) > FAMILY_MAX_PRICE_RATIO) continue;
+    const parent = buildFamily(members);
+    if (!parent) continue;
+    members.forEach(m => used.add(m.it.idx));
+    const first = Math.min(...members.map(m => m.it.idx));
+    for (const m of members) merged.set(m.it.idx, m.it.idx === first ? parent : null);
+  }
+  if (!merged.size) return list;
+  const out = [];
+  list.forEach((p, idx) => {
+    if (!merged.has(idx)) out.push(p);
+    else if (merged.get(idx)) out.push(merged.get(idx));
+  });
+  return out;
+}
+
+function familyVariantOf(it, name) {
+  return {
+    id: String(it.variation_id || it.id),
+    product_id: it.id,
+    source_id: it.source_id ?? (it.id >= 10000000 ? it.id % 10000000 : it.id),
+    sku: it.sku || String(it.id),
+    name,
+    is_default: false,
+    in_stock: it.in_stock !== false,
+    price: it.price || 0,
+    original_price: it.original_price || null,
+    dealer_price: it.dealer_price || 0,
+    supplier_cost: it.supplier_cost || 0,
+    dropbuy_cost: it.dropbuy_cost || it.supplier_cost || 0,
+    pricing_rule: it.pricing_rule,
+    profit_margin: it.profit_margin,
+    weight_gram: it.weight_gram || 0,
+    warranty: it.warranty || 'Bảo hành chính hãng',
+    image: it.image || '',
+    image_hd: it.image_hd || '',
+    source_url: it.source_url,
+    category_id: it.category_id,
+    all_ids: [it.id]
+  };
+}
+
+function buildFamily(members) {
+  const variants = [];
+  for (const { it, i, w } of members) {
+    const label = cleanVariantLabel(spaced(it.toks.slice(i, i + w).join(' ')));
+    const p = it.p;
+    if (Array.isArray(p.variants) && p.variants.length > 1) {
+      for (const v of p.variants) variants.push({ ...v, name: `${label} · ${v.name}`, category_id: v.category_id || p.category_id, is_default: false });
+    } else if (Array.isArray(p.variants) && p.variants.length === 1) {
+      variants.push({ ...p.variants[0], name: label, category_id: p.category_id, is_default: false });
+    } else {
+      variants.push(familyVariantOf(p, label));
+    }
+  }
+  if (variants.length > FAMILY_MAX_VARIANTS) return null;
+  const ids = new Set();
+  for (const v of variants) { if (ids.has(v.id)) return null; ids.add(v.id); } // trùng mã phân loại → không gộp
+  variants.sort((a, b) => (a.in_stock !== b.in_stock ? (b.in_stock ? 1 : -1) : (a.price || 0) - (b.price || 0)));
+  variants[0].is_default = true;
+
+  const { it: first, i, w } = members[0];
+  let prefix = first.toks.slice(0, i);
+  const suffix = first.toks.slice(i + w);
+  while (prefix.length > FAMILY_MIN_PREFIX && DANGLING.has(prefix[prefix.length - 1].toLowerCase())) prefix = prefix.slice(0, -1);
+  const name = spaced([...prefix, ...suffix].join(' ')).replace(/[\s,;:–—/-]+$/, '');
+
+  const def = variants[0];
+  const items = members.map(m => m.it.p);
+  const primary = items.find(p => p.id === def.product_id || (p.variants || []).some(v => v.id === def.id)) || first.p;
+  const inStock = variants.find(v => v.in_stock);
+  const gallery = (primary.gallery && primary.gallery.length) ? primary.gallery : (items.find(p => p.gallery && p.gallery.length)?.gallery || []);
+  return {
+    ...primary,
+    name,
+    slug: normalizeBaseTitle(name).replace(/ /g, '-'),
+    family_merged: true,
+    category_ids: [...new Set(items.map(p => p.category_id).filter(x => x != null))],
+    variant_count: variants.length,
+    variation_id: def.id,
+    image: def.image || primary.image,
+    image_hd: def.image_hd || primary.image_hd,
+    gallery,
+    in_stock: !!inStock,
+    price: (inStock || def).price,
+    original_price: (inStock || def).original_price,
+    variants,
+    variation_options: [{ display: 'Phân loại', options: variants.map(v => v.name) }]
+  };
+}
+
 /**
  * Tìm sản phẩm theo id cha hoặc id của bất kỳ biến thể nào
  */
@@ -372,6 +538,7 @@ function findInGrouped(groupedProducts = [], id) {
 module.exports = {
   parseVariant,
   groupProducts,
+  mergeFamilies,
   findInGrouped,
   COLOR_WORDS,
   WAREHOUSE_PREFIX

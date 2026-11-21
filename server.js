@@ -656,7 +656,7 @@ function ensureCatalogCaches() {
     if (!(Number(p.price) > 0) || p.removed_from_dropbuy || !scraper.hasRealPhoto(p)) continue;
     sellable.push(p);
 
-    perCat.set(p.category_id, (perCat.get(p.category_id) || 0) + 1);
+    for (const c of (p.category_ids && p.category_ids.length ? p.category_ids : [p.category_id])) perCat.set(c, (perCat.get(c) || 0) + 1);
 
     const b = (p.brand || '').trim();
     if (b) {
@@ -669,8 +669,9 @@ function ensureCatalogCaches() {
     p._normName = n;
     p._normBrand = nb;
     p._normSku = norm(p.sku);
-    p._hay = n + ' ' + p._normSku + (nb ? ' ' + nb : '');
-    p._tokens = new Set((n + ' ' + nb).split(/[^a-z0-9]+/));
+    const nv = p.family_merged && Array.isArray(p.variants) ? norm(p.variants.map(v => v.name).join(' ')) : '';
+    p._hay = n + ' ' + p._normSku + (nb ? ' ' + nb : '') + (nv ? ' ' + nv : '');
+    p._tokens = new Set((n + ' ' + nb + ' ' + nv).split(/[^a-z0-9]+/));
   }
   cachedSellable = sellable;
 
@@ -1123,7 +1124,7 @@ app.get('/api/products', (req, res) => {
 
       if (category && category !== 'all') {
         const ids = categoryIdsFor(parseInt(category, 10));
-        products = products.filter(p => ids.has(p.category_id));
+        products = products.filter(p => ids.has(p.category_id) || (p.category_ids && p.category_ids.some(c => ids.has(c))));
       }
 
       if (brand && brand !== 'all') {
