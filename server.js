@@ -36,6 +36,7 @@ const vault = require('./services/credentialVault');
 const customerMessage = require('./services/customerMessage');
 const catalogImage = require('./services/catalogImage');
 const seoPages = require('./services/seoPages');
+const infoPages = require('./services/infoPages');
 const imageOptimizer = require('./services/imageOptimizer');
 const taobaoPublic = require('./services/taobaoPublic');
 const taobaoPriceShipping = require('./services/taobaoPriceShipping');
@@ -201,7 +202,7 @@ app.get('/', (req, res) => {
     robots: hasFilterQuery(req) ? 'noindex, follow' : undefined,
     gridHtml: seoPages.cardsHtml(items),
     footerHtml: cachedFooterHtml,
-    ld: seoPages.ldScript([seoPages.orgLd(base), seoPages.websiteLd(base), seoPages.itemListLd(base, items)])
+    ld: seoPages.ldScript([infoPages.organizationLd(base, readConfig()), infoPages.returnPolicyLd(base), seoPages.websiteLd(base), seoPages.itemListLd(base, items)])
   }));
 });
 // Link gọn của trang danh sách: /tim-kiem/<tu-khoa>, /danh-muc/<id>-<ten>, /thuong-hieu/<ten> (ghép được)
@@ -281,12 +282,39 @@ app.get(/^\/(?:(?:danh-muc|thuong-hieu|tim-kiem)\/[^/]{1,120}\/?){1,3}$/, (req, 
   extra.pagerHtml = seoPages.pagerHtml(path, page, totalPages);
   extra.ogImage = items[0] ? seoPages.imageOf(items[0]) : undefined;
   extra.ld = seoPages.ldScript([
-    seoPages.orgLd(base),
+    infoPages.organizationLd(base, readConfig()),
+    infoPages.returnPolicyLd(base),
     { '@type': 'CollectionPage', '@id': `${base}${path}#page`, name: h1, url: base + extra.canonicalPath, inLanguage: 'vi-VN', isPartOf: { '@id': `${base}/#website` } },
     seoPages.breadcrumbLd(base, crumbs),
     seoPages.itemListLd(base, items, (page - 1) * SSR_PER_PAGE)
   ]);
   res.type('html').send(seo.renderHomePage(req, readConfig(), storeCatalog.getProducts().length, extra));
+});
+
+// ───────── Trang thông tin & chính sách (giai đoạn 2 – AEO/GEO) + /llms.txt cho AI ─────────
+function storeStats() {
+  ensureCatalogCaches();
+  return {
+    products: cachedSellable.length,
+    categories: cachedCategoriesList.filter(c => c.product_count > 0).length,
+    brands: cachedBrandsList.length
+  };
+}
+app.get(new RegExp(`^/(${infoPages.SLUGS.join('|')})/?$`), (req, res) => {
+  const html = infoPages.renderInfoPage({
+    slug: req.params[0], base: seo.baseUrl(req), cfg: readConfig(), stats: storeStats(),
+    footerHtml: cachedFooterHtml, assetVersion: seo.ASSET_VERSION
+  });
+  if (!html) return res.sendStatus(404);
+  res.type('html').set('Cache-Control', 'public, max-age=300').send(html);
+});
+app.get('/llms.txt', (req, res) => {
+  const stats = storeStats();
+  res.type('text/plain; charset=utf-8').set('Cache-Control', 'public, max-age=3600').send(infoPages.llmsTxt({
+    base: seo.baseUrl(req), cfg: readConfig(), stats,
+    categories: cachedCategoriesList.filter(c => !c.parent_id && c.product_count > 0).sort((a, b) => b.product_count - a.product_count).slice(0, 30),
+    brands: cachedBrandsList.filter(b => b.count >= 3).slice(0, 40)
+  }));
 });
 
 // Taobao is a separate BESI browsing tab; private staged products never enter the
@@ -554,7 +582,7 @@ app.get('/sp/:slugId', async (req, res) => {
     try { descHtml = detail?.description ? stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(detail.description))) : ''; } catch (e) {}
     res.type('html').send(seo.renderProductPage(req, shown, detail, readConfig(), {
       crumbs, category: cat, footerHtml: cachedFooterHtml,
-      articleHtml: seoPages.productArticleHtml({ product: shown, crumbs, descHtml, related, category: cat })
+      articleHtml: seoPages.productArticleHtml({ product: shown, crumbs, descHtml, related, category: cat, qaHtml: infoPages.productQaHtml(shown, readConfig()) })
     }));
   } catch (err) {
     res.redirect(302, '/');
@@ -568,7 +596,8 @@ app.get('/sitemap-pages.xml', (req, res) => {
   ensureCatalogCaches();
   res.type('application/xml').set('Cache-Control', 'public, max-age=3600').send(seo.sitemapPagesXml(req,
     cachedCategoriesList.filter(c => c.product_count > 0),
-    cachedBrandsList.filter(b => b.count >= 3)));
+    cachedBrandsList.filter(b => b.count >= 3),
+    infoPages.SLUGS.map(infoPages.pagePath)));
 });
 app.get(/^\/sitemap-products-(\d{1,3})\.xml$/, (req, res) => {
   const xml = seo.sitemapProductsXml(req, sitemapProducts(), Number(req.params[0]));
@@ -807,7 +836,8 @@ function ensureCatalogCaches() {
   cachedCategoriesList = withCount.map(c => ({ ...c, name: stripSupplierText(c.name) })).filter(c => c.name);
   cachedFooterHtml = seoPages.footerLinksHtml(
     cachedCategoriesList.filter(c => !c.parent_id && c.product_count > 0).sort((a, b) => b.product_count - a.product_count).slice(0, 24),
-    cachedBrandsList.filter(b => b.count >= 3).slice(0, 30)
+    cachedBrandsList.filter(b => b.count >= 3).slice(0, 30),
+    infoPages.supportLinks()
   );
 
   // 5. Danh sách SP mặc định trang chủ (đã xen kẽ nguồn sỉ & ưu tiên còn hàng)
@@ -2053,6 +2083,22 @@ app.get('/api/admin/orders', requireAdmin, (req, res) => {
 
 app.get('/api/admin/config', requireAdmin, (req, res) => {
   res.json({ success: true, data: redactConfig(readConfig()) });
+});
+
+// Thông tin cửa hàng hiện trên trang Giới thiệu / Liên hệ / chính sách, JSON-LD và llms.txt
+app.get('/api/admin/store-info', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store').json({ success: true, data: infoPages.infoOf(readConfig()), policy: infoPages.POLICY });
+});
+app.post('/api/admin/store-info', requireAdmin, (req, res) => {
+  try {
+    const info = infoPages.normalizeStoreInfo(req.body || {});
+    const cfg = readConfig();
+    cfg.storeInfo = info;
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
+    res.json({ success: true, data: info, message: 'Đã lưu – các trang Giới thiệu, Liên hệ, chính sách cập nhật ngay.' });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
 });
 
 // Chỉ cho sửa các trường cấu hình an toàn; không ghi đè phiên đăng nhập DropBuy

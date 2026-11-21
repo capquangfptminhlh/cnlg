@@ -155,6 +155,7 @@ const MODULE_META = {
   'payments': ['Ngân hàng & Đối soát CK', 'Cấu hình tài khoản nhận tiền VietQR và lịch sử Webhook SePay / Casso'],
   'dropbuy': ['Kết nối Kho DropBuy', 'Quản lý tài khoản đại lý DropBuy, đồng bộ Realtime và kiểm tra kết nối API'],
   'customers': ['Khách sỉ & Giá lẻ', 'Duyệt tài khoản khách sỉ (đăng nhập mới thấy giá sỉ) và đặt % giá lẻ cho khách chưa đăng nhập'],
+  'store-info': ['Thông tin cửa hàng', 'Tên đăng ký, mã số thuế, địa chỉ, hotline, Zalo… hiện trên trang Giới thiệu, Liên hệ, chính sách và dữ liệu cho Google / AI'],
   'techmall': ['Kho TechMall.vn & Giá riêng', 'Đăng nhập đại lý TechMall lấy giá sỉ, cài đặt % lãi riêng và đồng bộ realtime 5 phút/lần']
 };
 
@@ -190,6 +191,37 @@ function switchAdminModule(modName, pushHash = true) {
   window.scrollTo({ top: 0, behavior: 'instant' });
   if (target === 'techmall') loadTechmallAll();
   if (target === 'customers') loadCustomers();
+  if (target === 'store-info') loadStoreInfo();
+}
+
+// ───────────── Thông tin cửa hàng (trang Giới thiệu / Liên hệ / chính sách) ─────────────
+const SI_FIELDS = { legalName: 'siLegalName', taxId: 'siTaxId', address: 'siAddress', hotline: 'siHotline', zalo: 'siZalo', email: 'siEmail', hours: 'siHours', facebook: 'siFacebook' };
+async function loadStoreInfo() {
+  try {
+    const json = await (await adminFetch('/api/admin/store-info')).json();
+    if (!json.success) throw new Error(json.error);
+    for (const [k, id] of Object.entries(SI_FIELDS)) document.getElementById(id).value = json.data[k] || '';
+    const p = json.policy || {};
+    document.getElementById('siPolicy').innerHTML = `Chính sách đang áp dụng: đổi trả <b>${p.returnDays} ngày</b> khi hàng lỗi / giao sai (cửa hàng chịu phí ship), ${p.changeOfMind ? 'nhận' : '<b>không nhận</b>'} đổi ý, bảo hành theo từng sản phẩm (cửa hàng tiếp nhận).`;
+  } catch (e) {
+    uiAlert('Không tải được thông tin cửa hàng: ' + e.message);
+  }
+}
+async function saveStoreInfo(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('siSave');
+  const body = Object.fromEntries(Object.entries(SI_FIELDS).map(([k, id]) => [k, document.getElementById(id).value.trim()]));
+  btn.disabled = true;
+  try {
+    const json = await (await adminFetch('/api/admin/store-info', { method: 'POST', body: JSON.stringify(body) })).json();
+    if (!json.success) throw new Error(json.error);
+    for (const [k, id] of Object.entries(SI_FIELDS)) document.getElementById(id).value = json.data[k] || '';
+    uiAlert(json.message || 'Đã lưu.');
+  } catch (e) {
+    uiAlert('Không lưu được: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ───────────── Khách sỉ ─────────────

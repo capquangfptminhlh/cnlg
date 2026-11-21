@@ -74,7 +74,7 @@ function listingHeadHtml({ path, crumbs, h1, intro, links = [] }) {
 }
 
 /** Bài sản phẩm đầy đủ (bot đọc được; khách dùng JS vẫn thấy popup như cũ). */
-function productArticleHtml({ product: p, crumbs, descHtml, related = [], category }) {
+function productArticleHtml({ product: p, crumbs, descHtml, related = [], category, qaHtml = '' }) {
   const name = cleanName(p.name);
   const variants = Array.isArray(p.variants) && p.variants.length > 1 ? p.variants : [];
   const prices = variants.length ? variants.map(v => Number(v.price) || 0).filter(x => x > 0) : [Number(p.price) || 0];
@@ -104,16 +104,18 @@ function productArticleHtml({ product: p, crumbs, descHtml, related = [], catego
       </div>
     </div>
     ${descHtml ? `<section class="ssr-desc"><h2>Mô tả sản phẩm</h2>${descHtml}</section>` : ''}
+    ${qaHtml}
     ${related.length ? `<section class="ssr-related"><h2>Sản phẩm liên quan</h2><div class="ssr-grid">${cardsHtml(related)}</div></section>` : ''}
   </article>`;
 }
 
 /** Danh mục + thương hiệu ở chân trang: link nội bộ thật, ai cũng thấy. */
-function footerLinksHtml(categories = [], brands = []) {
-  if (!categories.length && !brands.length) return '';
+function footerLinksHtml(categories = [], brands = [], support = []) {
+  if (!categories.length && !brands.length && !support.length) return '';
   return `<div class="container ssr-footer-links">
     ${categories.length ? `<nav aria-label="Danh mục sản phẩm"><h2>Danh mục</h2><ul>${categories.map(c => `<li><a href="${esc(categoryPath(c))}">${esc(cleanName(c.name))}</a></li>`).join('')}</ul></nav>` : ''}
     ${brands.length ? `<nav aria-label="Thương hiệu"><h2>Thương hiệu</h2><ul>${brands.map(b => `<li><a href="${esc(brandPath(b.name))}">${esc(b.name)}</a></li>`).join('')}</ul></nav>` : ''}
+    ${support.length ? `<nav aria-label="Hỗ trợ khách hàng"><h2>Hỗ trợ khách hàng</h2><ul>${support.map(l => `<li><a href="${esc(l.url)}">${esc(l.name)}</a></li>`).join('')}</ul></nav>` : ''}
   </div>`;
 }
 
@@ -151,7 +153,8 @@ function productLd(base, p, { description, category } = {}) {
   } else {
     offers = {
       '@type': 'Offer', url, priceCurrency: 'VND', price: Number(p.price) || 0, priceValidUntil: validUntil,
-      availability, itemCondition: 'https://schema.org/NewCondition', seller: { '@id': `${base}/#organization` }
+      availability, itemCondition: 'https://schema.org/NewCondition', seller: { '@id': `${base}/#organization` },
+      hasMerchantReturnPolicy: { '@id': `${base}/chinh-sach-doi-tra#policy` }
     };
   }
   return {

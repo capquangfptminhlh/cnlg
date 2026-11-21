@@ -62,6 +62,10 @@
         </a>
 
         <div class="sidebar-group-label">Cấu hình Vận hành</div>
+        <button type="button" class="admin-tab-btn" data-target="store-info" onclick="switchAdminModule('store-info')">
+          <i class="fa-solid fa-id-card"></i>
+          <span>Thông tin cửa hàng</span>
+        </button>
         <button type="button" class="admin-tab-btn" data-target="auto-order" onclick="switchAdminModule('auto-order')">
           <i class="fa-solid fa-robot"></i>
           <span>Tự đặt đơn &amp; Thanh toán</span>
@@ -462,6 +466,27 @@
         <!-- =================================================================
              MODULE 6: CẤU HÌNH VẬN CHUYỂN & HẠN ĐƠN (shipping)
              ================================================================= -->
+        <section class="admin-module-pane" data-module="store-info">
+          <div class="admin-card">
+            <h3><i class="fa-solid fa-id-card"></i> Thông tin cửa hàng hiện trên web</h3>
+            <p class="help-text" style="margin:4px 0 16px;">Hiện ở trang <a href="/gioi-thieu" target="_blank" rel="noopener">Giới thiệu</a>, <a href="/lien-he" target="_blank" rel="noopener">Liên hệ</a>, các trang chính sách, dữ liệu cho Google (JSON-LD) và <a href="/llms.txt" target="_blank" rel="noopener">llms.txt</a> cho AI. Ô nào để trống thì web không hiện dòng đó. Google và khách tin cửa hàng có tên, địa chỉ và số liên hệ thật hơn.</p>
+            <form id="storeInfoForm" class="pricing-grid" onsubmit="saveStoreInfo(event)">
+              <div class="form-group"><label>Tên đăng ký kinh doanh</label><input type="text" id="siLegalName" maxlength="160" placeholder="VD: Hộ kinh doanh Hoàng Minh"></div>
+              <div class="form-group"><label>Mã số thuế</label><input type="text" id="siTaxId" maxlength="20" inputmode="numeric" placeholder="10 số"></div>
+              <div class="form-group" style="grid-column: 1 / -1;"><label>Địa chỉ</label><input type="text" id="siAddress" maxlength="240" placeholder="Số nhà, đường, phường/xã, tỉnh/thành"></div>
+              <div class="form-group"><label>Hotline</label><input type="tel" id="siHotline" maxlength="20" placeholder="09xx xxx xxx"></div>
+              <div class="form-group"><label>Zalo hỗ trợ</label><input type="tel" id="siZalo" maxlength="20" placeholder="Số Zalo khách nhắn"></div>
+              <div class="form-group"><label>Email</label><input type="email" id="siEmail" maxlength="120" placeholder="hotro@…"></div>
+              <div class="form-group"><label>Giờ làm việc</label><input type="text" id="siHours" maxlength="120" placeholder="VD: 8:00 – 21:00, Thứ 2 – Chủ nhật"></div>
+              <div class="form-group" style="grid-column: 1 / -1;"><label>Trang Facebook</label><input type="url" id="siFacebook" maxlength="200" placeholder="https://facebook.com/…"></div>
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <p class="help-text" id="siPolicy" style="margin:0 0 10px;"></p>
+                <button type="submit" class="btn-sync-now" id="siSave"><i class="fa-solid fa-floppy-disk"></i> Lưu thông tin</button>
+              </div>
+            </form>
+          </div>
+        </section>
+
         <section class="admin-module-pane" data-module="shipping">
           <div class="admin-card" id="shippingSection">
             <h3><i class="fa-solid fa-truck-fast"></i> Cấu Hình Phí Vận Chuyển &amp; Thời Hạn Thanh Toán</h3>

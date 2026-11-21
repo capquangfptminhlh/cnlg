@@ -58,9 +58,55 @@
 }
 
 /* Danh mục + thương hiệu ở chân trang */
-.ssr-footer-links { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; padding: 24px 16px 8px; }
+.ssr-footer-links { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 24px; padding: 24px 16px 8px; }
 .ssr-footer-links h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; color: inherit; opacity: .85; }
 .ssr-footer-links ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .ssr-footer-links a { color: inherit; opacity: .78; font-size: 13px; text-decoration: none; }
 .ssr-footer-links a:hover { opacity: 1; text-decoration: underline; }
 @media (max-width: 760px) { .ssr-footer-links { grid-template-columns: 1fr; } }
+
+/* Hỏi đáp nhanh trên trang SP */
+.ssr-qa { margin-top: 18px; }
+.ssr-qa h3 { font-size: 15px; margin: 12px 0 4px; color: #111827; }
+.ssr-qa p { margin: 0; font-size: 14px; line-height: 1.6; color: #374151; }
+
+/* Trang thông tin & chính sách (services/infoPages.js) */
+.info-body { margin: 0; background: #f6f8fc; color: #1f2937; font: 15px/1.7 'Be Vietnam Pro', 'Inter', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+.info-wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+.info-top { background: #fff; border-bottom: 1px solid #edf0f4; }
+.info-top .info-wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 60px; flex-wrap: wrap; }
+.info-logo { font-size: 26px; font-weight: 800; letter-spacing: -.04em; text-decoration: none; color: #1f2937; }
+.info-logo span { color: #ff4025; }
+.info-top nav { display: flex; gap: 18px; flex-wrap: wrap; }
+.info-top nav a { color: #374151; text-decoration: none; font-weight: 600; font-size: 14px; }
+.info-top nav a:hover { color: #ff4025; }
+.info-main { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 24px; padding-top: 20px; padding-bottom: 32px; align-items: start; }
+.info-article { background: #fff; border: 1px solid #edf0f4; border-radius: 16px; padding: 20px 24px 28px; }
+.info-article h1 { font-size: clamp(22px, 3vw, 30px); line-height: 1.25; margin: 4px 0 14px; color: #111827; }
+.info-article h2 { font-size: 18px; margin: 22px 0 8px; color: #111827; }
+.info-article p, .info-article li { color: #374151; }
+.info-article a { color: #e5481f; }
+.info-article ul, .info-article ol { padding-left: 22px; }
+.info-lead { background: #fff4ee; border: 1px solid #ffd9c7; border-radius: 12px; padding: 12px 14px; }
+.info-faq h2 { font-size: 17px; }
+.info-faq + .info-faq { border-top: 1px solid #f1f3f6; }
+.info-dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 8px 0 0; }
+.info-dl dt { color: #6b7280; }
+.info-dl dd { margin: 0; font-weight: 600; }
+.info-aside { background: #fff; border: 1px solid #edf0f4; border-radius: 16px; padding: 14px 16px; position: sticky; top: 16px; }
+.info-aside h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; margin: 0 0 8px; }
+.info-aside ul { list-style: none; margin: 0; padding: 0; }
+.info-aside a { display: block; padding: 7px 10px; border-radius: 8px; color: #374151; text-decoration: none; font-size: 14px; }
+.info-aside a:hover { background: #f6f8fc; }
+.info-aside a[aria-current] { background: #fff1ea; color: #e5481f; font-weight: 700; }
+.info-footer { background: #111827; color: #e5e7eb; padding: 8px 0 20px; }
+.info-footer > p { font-size: 13px; opacity: .7; margin-top: 12px; }
+@media (max-width: 860px) {
+  .info-main { grid-template-columns: 1fr; }
+  .info-aside { position: static; order: -1; }
+  .info-aside ul { display: flex; flex-wrap: wrap; gap: 4px; }
+  .info-article { padding: 16px; }
+  .info-dl { grid-template-columns: 1fr; gap: 0 0; }
+  .info-dl dd { margin-bottom: 8px; }
+  .ssr-footer-links { grid-template-columns: 1fr; }
+}

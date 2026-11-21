@@ -2123,7 +2123,9 @@ document.getElementById('trackForm').addEventListener('submit', e => {
 // Link tra cứu shop gửi khách: /?tra-cuu=HMxxxxxxxx → mở sẵn ô tra cứu, khách chỉ cần nhập SĐT
 document.addEventListener('DOMContentLoaded', () => {
   const code = new URLSearchParams(location.search).get('tra-cuu');
-  if (!code || !/^HM[0-9A-F]{8}$/i.test(code)) return;
+  if (code === null) return;
+  // /?tra-cuu=1 (link "Theo dõi đơn" ở trang Liên hệ / chính sách): mở ô tra cứu trống
+  if (!/^HM[0-9A-F]{8}$/i.test(code)) { openTrackModal(); return; }
   const saved = myOrders().find(o => o.id === code.toUpperCase());
   openTrackModal({ id: code.toUpperCase(), phone: saved?.phone || '' });
   if (saved?.phone) trackOrder(code.toUpperCase(), saved.phone);

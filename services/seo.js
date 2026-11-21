@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { maskMediaUrl } = require('./catalogImage');
 const { stripSupplierText } = require('./security');
 const pages = require('./seoPages');
+const infoPages = require('./infoPages');
 
 /**
  * Trang sản phẩm có URL thật /sp/<id>-<slug> cho Google và ảnh xem trước khi chia sẻ (Facebook, Zalo...).
@@ -107,7 +108,8 @@ function renderProductPage(req, product, detail, config, extra = {}) {
 
   const crumbs = extra.crumbs || [{ name: 'Trang chủ', url: '/' }, { name: product.name }];
   const ld = pages.ldScript([
-    pages.orgLd(base),
+    infoPages.organizationLd(base, config),
+    infoPages.returnPolicyLd(base),
     pages.productLd(base, product, { description: stripSupplierText(stripHtml(detail?.description)) || desc, category: extra.category }),
     pages.breadcrumbLd(base, crumbs)
   ]);
@@ -222,9 +224,10 @@ function sitemapIndexXml(req, productCount) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${files.map(f => `  <sitemap><loc>${xmlEsc(base + f)}</loc><lastmod>${today}</lastmod></sitemap>`).join('\n')}\n</sitemapindex>\n`;
 }
 
-function sitemapPagesXml(req, categories, brands) {
+function sitemapPagesXml(req, categories, brands, infoPaths = []) {
   const base = baseUrl(req);
   const rows = [`  <url><loc>${base}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`]
+    .concat(infoPaths.map(p => `  <url><loc>${xmlEsc(base + p)}</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>`))
     .concat(categories.map(c => `  <url><loc>${xmlEsc(base + pages.categoryPath(c))}</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`))
     .concat(brands.map(b => `  <url><loc>${xmlEsc(base + pages.brandPath(b.name))}</loc><changefreq>daily</changefreq><priority>0.6</priority></url>`));
   return urlset(rows);
@@ -262,4 +265,4 @@ function robotsTxt(req) {
   ].join('\n');
 }
 
-module.exports = { renderProductPage, renderHomePage, sitemapXml, sitemapIndexXml, sitemapPagesXml, sitemapProductsXml, SITEMAP_CHUNK, robotsTxt, productPath, baseUrl, isBesiHost, MARK };
+module.exports = { ASSET_VERSION, renderProductPage, renderHomePage, sitemapXml, sitemapIndexXml, sitemapPagesXml, sitemapProductsXml, SITEMAP_CHUNK, robotsTxt, productPath, baseUrl, isBesiHost, MARK };
