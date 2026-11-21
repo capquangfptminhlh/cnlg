@@ -5,9 +5,13 @@ website_os_entrypoint: AGENTS.md
 project_name: cnlg
 project_repo: capquangfptminhlh/cnlg
 compliance_status: REQUIRED
-observed_at: UNKNOWN
-source_commit_sha: UNKNOWN
-mandatory_read_complete: false
-bootstrap_decision: HOLD
+observed_at: "2026-11-21T00:36:10+07:00"
+source_commit_sha: 6d0b7c7c4d8458746f552704ce8d6fe517d9c847
+mandatory_read_complete: true
+bootstrap_decision: PASS
 enforcement_target: auto
 evidence_dir: .website-os/evidence
+manifest_version: 1.4.0
+seo_alpha_read_attestation: .website-os/evidence/seo-alpha-bootstrap.yml
+website_os_enforcement_engine_status: NOT_RUN
+seo_publication_status: HOLD

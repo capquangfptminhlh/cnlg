@@ -13,6 +13,8 @@ on:
       - '.github/workflows/storefront-check.yml'
   pull_request:
     paths:
+      - '.website-os.yml'
+      - '.website-os/evidence/**'
       - 'public/**'
       - 'server.js'
       - 'services/**'
