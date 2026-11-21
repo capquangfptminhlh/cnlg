@@ -41,7 +41,8 @@ body { background:#f7f8fb !important; color:var(--besi-v5-ink); }
   font-size:9px !important;min-height:24px;display:inline-flex;align-items:center;gap:6px
 }
 .market-main-banner .banner-overline{font-size:9.5px !important;letter-spacing:.035em !important}
-.market-main-banner h1,.market-banner-copy h1{
+.market-main-banner h1,.market-banner-copy h1,
+.market-main-banner .hero-h1,.market-banner-copy .hero-h1{
   font-size:clamp(26px,2.7vw,38px) !important;letter-spacing:-.052em !important;
   line-height:1.16 !important;font-weight:800 !important;margin:8px 0 6px !important
 }
@@ -194,7 +195,8 @@ body { background:#f7f8fb !important; color:var(--besi-v5-ink); }
   .market-main-banner .market-banner-copy{padding:15px 5px 12px 16px !important;max-width:70% !important}
   .market-main-banner .market-banner-label{font-size:7.4px !important;min-height:20px !important;padding:4px 7px !important}
   .market-main-banner .banner-overline{font-size:7.6px !important}
-  .market-main-banner h1,.market-banner-copy h1{font-size:clamp(19px,5.1vw,25px) !important;margin:5px 0 5px !important}
+  .market-main-banner h1,.market-banner-copy h1,
+  .market-main-banner .hero-h1,.market-banner-copy .hero-h1{font-size:clamp(19px,5.1vw,25px) !important;margin:5px 0 5px !important}
   .market-main-banner p{font-size:9px !important;line-height:1.4 !important;max-height:39px;overflow:hidden}
   .market-main-banner .banner-shop-btn{padding:6px 9px !important;font-size:9px !important;min-height:29px !important}
   .market-main-banner .premium-gallery.market-banner-art{transform:scale(.72) translateX(15%) !important;transform-origin:center right}
@@ -229,7 +231,8 @@ body { background:#f7f8fb !important; color:var(--besi-v5-ink); }
 @media(max-width:360px){
   .main-header .logo-text{font-size:20px !important}
   .market-main-banner .market-banner-copy{max-width:78% !important}
-  .market-main-banner h1{font-size:19px !important}
+  .market-main-banner h1,
+  .market-main-banner .hero-h1{font-size:19px !important}
   .market-main-banner .premium-gallery.market-banner-art{opacity:.5 !important}
 }
 @media(prefers-reduced-motion:reduce){

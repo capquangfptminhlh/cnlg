@@ -83,13 +83,16 @@ body { background:var(--shop-bg); }
 }
 .market-banner-label i { font-size:15px; }
 .banner-overline { display:block; font-weight:1000; color:#fffbe9; font-size:clamp(21px,2.6vw,37px); line-height:1.1; letter-spacing:-1px; text-shadow:0 3px 0 rgba(179,40,23,.21); transform:skew(-5deg); }
-.market-banner-copy h1 {
+.market-banner-copy h1 ,
+.market-banner-copy .hero-h1 {
   color:#fff; font-size:clamp(25px,3.15vw,43px); line-height:1.16; font-weight:900;
   letter-spacing:-1.4px; text-shadow:0 3px 2px rgba(149,37,31,.14);
   margin:5px 0 9px; transform:skew(-4deg);
 }
-.market-banner-copy h1 em { font-style:normal; color:#ffec90; }
-.market-banner-copy h1 span { display:block; color:#fff6a7; white-space:nowrap; }
+.market-banner-copy h1 em ,
+.market-banner-copy .hero-h1 em { font-style:normal; color:#ffec90; }
+.market-banner-copy h1 span ,
+.market-banner-copy .hero-h1 span { display:block; color:#fff6a7; white-space:nowrap; }
 .market-banner-copy p {
   font-size:11px; color:#fff; background:rgba(151,33,29,.13); padding:5px 11px;
   display:inline-block; border-radius:15px; font-weight:650; margin:0 0 13px;
@@ -288,7 +291,8 @@ body { background:var(--shop-bg); }
   .market-banner-copy { padding:23px 12px 15px 19px; max-width:80%; }
   .market-banner-label { font-size:10px; margin-bottom:11px; }
   .banner-overline { font-size:24px; letter-spacing:-.5px; }
-  .market-banner-copy h1 { font-size:27px; letter-spacing:-.8px; margin:6px 0; }
+  .market-banner-copy h1 ,
+  .market-banner-copy .hero-h1 { font-size:27px; letter-spacing:-.8px; margin:6px 0; }
   .market-banner-copy p { font-size:9px; margin-bottom:13px; }
   .banner-shop-btn { padding:9px 13px; font-size:10px; }
   .banner-catalog-count { font-size:9px; margin-top:8px; }
@@ -338,7 +342,8 @@ body { background:var(--shop-bg); }
   .market-main-banner { min-height:228px; }
   .market-banner-copy { padding-top:21px; max-width:84%; }
   .banner-overline { font-size:21px; }
-  .market-banner-copy h1 { font-size:23px; }
+  .market-banner-copy h1 ,
+  .market-banner-copy .hero-h1 { font-size:23px; }
   .banner-catalog-count { font-size:8px; }
   .market-mini-promo { min-height:82px; padding:8px; }
   .market-mini-promo strong { font-size:10px; }

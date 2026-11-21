@@ -35,6 +35,7 @@ const watchdog = require('./services/dropbuyWatchdog');
 const vault = require('./services/credentialVault');
 const customerMessage = require('./services/customerMessage');
 const catalogImage = require('./services/catalogImage');
+const seoPages = require('./services/seoPages');
 const imageOptimizer = require('./services/imageOptimizer');
 const taobaoPublic = require('./services/taobaoPublic');
 const taobaoPriceShipping = require('./services/taobaoPriceShipping');
@@ -177,8 +178,31 @@ app.use(postRef.capture);
 const customerPriceRules = () => customerPricing.normalizeRules(readConfig().customerPricing);
 app.use(['/api/products', '/api/flash-sale', '/api/besi/products'], customerPricing.priceResponses(() => readConfig().customerPricing));
 // --- Trang có SEO (render phía server) – đặt trước static để "/" không trả index.html trần ---
+// ───────── Trang chủ & trang danh sách: dựng sẵn nội dung cho Google / AI (app.js vẽ lại khi chạy) ─────────
+const SSR_PER_PAGE = 40;
+const guestPrice = list => { const rules = customerPriceRules(); return list.map(p => customerPricing.retailizeItem(p, rules)); };
+const ssrPage = req => Math.min(500, Math.max(1, parseInt(req.query.page, 10) || 1));
+// Có tham số lọc/sắp xếp (không phải ?page=) → trang trùng nội dung: không cho lập chỉ mục
+const hasFilterQuery = req => Object.keys(req.query || {}).some(k => k !== 'page');
+function categoryCrumbs(cat) {
+  const byId = new Map(cachedCategoriesList.map(c => [Number(c.id), c]));
+  const chain = [];
+  for (let c = cat, guard = 0; c && guard < 6; c = byId.get(Number(c.parent_id)), guard++) chain.unshift(c);
+  return [{ name: 'Trang chủ', url: '/' }, ...chain.map(c => ({ name: c.name, url: seoPages.categoryPath(c) }))];
+}
+
 app.get('/', (req, res) => {
-  res.type('html').send(seo.renderHomePage(req, readConfig(), storeCatalog.getProducts().length));
+  ensureCatalogCaches();
+  const base = seo.baseUrl(req);
+  const items = guestPrice(cachedDefaultMixed.slice(0, SSR_PER_PAGE));
+  res.type('html').send(seo.renderHomePage(req, readConfig(), storeCatalog.getProducts().length, {
+    // Link cũ /?q=…&brand=…: giữ canonical như cũ nhưng không lập chỉ mục (trùng trang tìm kiếm)
+    canonicalPath: hasFilterQuery(req) ? undefined : '/',
+    robots: hasFilterQuery(req) ? 'noindex, follow' : undefined,
+    gridHtml: seoPages.cardsHtml(items),
+    footerHtml: cachedFooterHtml,
+    ld: seoPages.ldScript([seoPages.orgLd(base), seoPages.websiteLd(base), seoPages.itemListLd(base, items)])
+  }));
 });
 // Link gọn của trang danh sách: /tim-kiem/<tu-khoa>, /danh-muc/<id>-<ten>, /thuong-hieu/<ten> (ghép được)
 const plainVi = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
@@ -201,14 +225,68 @@ function restoreAccents(plain) {
   return plain;
 }
 app.get(/^\/(?:(?:danh-muc|thuong-hieu|tim-kiem)\/[^/]{1,120}\/?){1,3}$/, (req, res) => {
+  ensureCatalogCaches();
   const seg = req.path.split('/').filter(Boolean).map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } });
   const at = key => { const i = seg.indexOf(key); return i >= 0 ? seg[i + 1] || '' : ''; };
   const q = at('tim-kiem') ? restoreAccents(at('tim-kiem').replace(/-/g, ' ')) : '';
   const brandSlug = at('thuong-hieu');
-  const brand = brandSlug ? (storeCatalog.getProducts().find(p => p.brand && plainVi(p.brand).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') === brandSlug)?.brand || brandSlug.replace(/-/g, ' ')) : '';
+  const brand = brandSlug ? (cachedBrandsList.find(b => seoPages.slug(b.name) === brandSlug)?.name || storeCatalog.getProducts().find(p => p.brand && seoPages.slug(p.brand) === brandSlug)?.brand || brandSlug.replace(/-/g, ' ')) : '';
   const catId = Number((at('danh-muc').match(/^\d+/) || [])[0]);
-  const category = catId ? storeCatalog.getCategories().find(c => Number(c.id) === catId)?.name || '' : '';
-  res.type('html').send(seo.renderHomePage(req, readConfig(), storeCatalog.getProducts().length, { q, brand, category: stripSupplierText(category) }));
+  const cat = catId ? cachedCategoriesList.find(c => Number(c.id) === catId) : null;
+  const base = seo.baseUrl(req);
+  const page = ssrPage(req);
+  const filters = ['danh-muc', 'thuong-hieu', 'tim-kiem'].filter(k => at(k)).length;
+  const extra = { q, brand, category: cat ? cat.name : '', footerHtml: cachedFooterHtml, page };
+
+  if (q || filters > 1 || (catId && !cat)) {
+    // Kết quả tìm kiếm / bộ lọc ghép: hữu ích cho khách nhưng trùng nội dung → không lập chỉ mục, vẫn cho đi theo link
+    extra.robots = 'noindex, follow';
+    extra.canonicalPath = req.path;
+    if (q) extra.headHtml = seoPages.listingHeadHtml({ path: req.path, crumbs: [{ name: 'Trang chủ', url: '/' }, { name: `Tìm "${q}"` }], h1: `Kết quả tìm kiếm "${q}"` });
+    return res.type('html').send(seo.renderHomePage(req, readConfig(), storeCatalog.getProducts().length, extra));
+  }
+
+  let list;
+  let path;
+  let crumbs;
+  let h1;
+  let intro;
+  let links = [];
+  if (cat) {
+    const ids = categoryIdsFor(catId);
+    list = cachedSellable.filter(p => ids.has(p.category_id) || (p.category_ids && p.category_ids.some(c => ids.has(c))));
+    path = seoPages.categoryPath(cat);
+    crumbs = categoryCrumbs(cat);
+    h1 = cat.name;
+    links = cachedCategoriesList.filter(c => Number(c.parent_id) === catId && c.product_count > 0).map(c => ({ name: c.name, url: seoPages.categoryPath(c) }));
+  } else {
+    list = cachedSellable.filter(p => p.brand && seoPages.slug(p.brand) === brandSlug);
+    path = seoPages.brandPath(brand);
+    crumbs = [{ name: 'Trang chủ', url: '/' }, { name: `Thương hiệu ${brand}` }];
+    h1 = `${brand} chính hãng`;
+  }
+  list = mixSources(list);
+  list = [...list.filter(p => p.in_stock !== false), ...list.filter(p => p.in_stock === false)];
+  const totalPages = Math.max(1, Math.ceil(list.length / SSR_PER_PAGE));
+  const items = guestPrice(list.slice((page - 1) * SSR_PER_PAGE, page * SSR_PER_PAGE));
+  const minPrice = items.length ? Math.min(...items.map(p => Number(p.price) || 0).filter(x => x > 0)) : 0;
+  intro = `${list.length.toLocaleString('vi-VN')} sản phẩm ${h1}${minPrice ? `, giá từ ${seoPages.money(minPrice)}` : ''}. Mua lẻ 1 món vẫn giá tốt, giao hàng toàn quốc, kiểm tra hàng trước khi thanh toán.`;
+
+  extra.canonicalPath = path + (page > 1 ? `?page=${page}` : '');
+  if (page > 1) extra.prevPath = path + (page > 2 ? `?page=${page - 1}` : '');
+  if (page < totalPages) extra.nextPath = `${path}?page=${page + 1}`;
+  if (hasFilterQuery(req) || page > totalPages || !list.length) extra.robots = 'noindex, follow';
+  extra.headHtml = seoPages.listingHeadHtml({ path, crumbs, h1: page > 1 ? `${h1} – Trang ${page}` : h1, intro, links });
+  extra.gridHtml = seoPages.cardsHtml(items);
+  extra.pagerHtml = seoPages.pagerHtml(path, page, totalPages);
+  extra.ogImage = items[0] ? seoPages.imageOf(items[0]) : undefined;
+  extra.ld = seoPages.ldScript([
+    seoPages.orgLd(base),
+    { '@type': 'CollectionPage', '@id': `${base}${path}#page`, name: h1, url: base + extra.canonicalPath, inLanguage: 'vi-VN', isPartOf: { '@id': `${base}/#website` } },
+    seoPages.breadcrumbLd(base, crumbs),
+    seoPages.itemListLd(base, items, (page - 1) * SSR_PER_PAGE)
+  ]);
+  res.type('html').send(seo.renderHomePage(req, readConfig(), storeCatalog.getProducts().length, extra));
 });
 
 // Taobao is a separate BESI browsing tab; private staged products never enter the
@@ -460,13 +538,43 @@ app.get('/sp/:slugId', async (req, res) => {
       const f = path.join(DATA_DIR, 'products_detail', `${id}.json`);
       if (fs.existsSync(f)) detail = JSON.parse(fs.readFileSync(f, 'utf8'));
     } catch (e) {}
-    res.type('html').send(seo.renderProductPage(req, customerPricing.retailizeItem(product, customerPriceRules()), detail, readConfig()));
+    ensureCatalogCaches();
+    const shown = customerPricing.retailizeDeep({ ...product }, customerPriceRules());
+    const cat = cachedCategoriesList.find(c => Number(c.id) === Number(product.category_id)) || null;
+    const crumbs = [...(cat ? categoryCrumbs(cat) : [{ name: 'Trang chủ', url: '/' }]), { name: stripSupplierText(product.name) }];
+    // SP liên quan: cùng danh mục; quá ít (< 6) thì lùi lên danh mục cha
+    let related = [];
+    const byId = new Map(cachedCategoriesList.map(c => [Number(c.id), c]));
+    for (let c = cat, guard = 0; c && related.length < 6 && guard < 6; c = byId.get(Number(c.parent_id)), guard++) {
+      const ids = categoryIdsFor(Number(c.id));
+      related = mixSources(cachedSellable.filter(p => p.id !== product.id && p.in_stock !== false && (ids.has(p.category_id) || (p.category_ids && p.category_ids.some(x => ids.has(x))))));
+    }
+    related = guestPrice(related.slice(0, 12));
+    let descHtml = '';
+    try { descHtml = detail?.description ? stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(detail.description))) : ''; } catch (e) {}
+    res.type('html').send(seo.renderProductPage(req, shown, detail, readConfig(), {
+      crumbs, category: cat, footerHtml: cachedFooterHtml,
+      articleHtml: seoPages.productArticleHtml({ product: shown, crumbs, descHtml, related, category: cat })
+    }));
   } catch (err) {
     res.redirect(302, '/');
   }
 });
 
-app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemapXml(req, storeCatalog.getProducts().filter(p => Number(p.price) > 0 && !p.removed_from_dropbuy && scraper.hasRealPhoto(p)))));
+// Sitemap: chỉ mục → trang (chủ, danh mục, thương hiệu) + SP còn hàng (bài cha sau gộp phân loại), 5.000 link/tệp
+const sitemapProducts = () => { ensureCatalogCaches(); return cachedSellable.filter(p => p.in_stock !== false); };
+app.get('/sitemap.xml', (req, res) => res.type('application/xml').set('Cache-Control', 'public, max-age=3600').send(seo.sitemapIndexXml(req, sitemapProducts().length)));
+app.get('/sitemap-pages.xml', (req, res) => {
+  ensureCatalogCaches();
+  res.type('application/xml').set('Cache-Control', 'public, max-age=3600').send(seo.sitemapPagesXml(req,
+    cachedCategoriesList.filter(c => c.product_count > 0),
+    cachedBrandsList.filter(b => b.count >= 3)));
+});
+app.get(/^\/sitemap-products-(\d{1,3})\.xml$/, (req, res) => {
+  const xml = seo.sitemapProductsXml(req, sitemapProducts(), Number(req.params[0]));
+  if (!xml) return res.sendStatus(404);
+  res.type('application/xml').set('Cache-Control', 'public, max-age=3600').send(xml);
+});
 app.get('/favicon.ico', (req, res) => res.type('image/svg+xml').set('Cache-Control', 'public, max-age=86400').sendFile(path.join(__dirname, 'public', 'favicon.svg')));
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(seo.robotsTxt(req)));
 
@@ -597,6 +705,9 @@ let cachedBrandsJson = null;
 let cachedCategoriesJson = null;
 let cachedDefaultMixed = null;
 let cachedBrandSet = new Set();
+let cachedCategoriesList = [];
+let cachedBrandsList = [];
+let cachedFooterHtml = '';
 let cachedCategoryIdsMap = new Map();
 let cachedSpecsIndex = null;
 let cachedCategoryFacetsIndex = null;
@@ -682,6 +793,7 @@ function ensureCatalogCaches() {
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
   cachedBrandsJson = JSON.stringify({ success: true, data: brands });
+  cachedBrandsList = brands;
 
   // 4. Chuỗi JSON danh mục kèm số lượng SP (phục vụ /api/categories trong 0.1ms)
   const withCount = rawCategories.map(c => {
@@ -692,6 +804,11 @@ function ensureCatalogCaches() {
     return { ...pub, icon: c.icon ? catalogImage.maskMediaUrl(c.icon) : c.icon, product_count: n };
   });
   cachedCategoriesJson = JSON.stringify({ success: true, data: withCount });
+  cachedCategoriesList = withCount.map(c => ({ ...c, name: stripSupplierText(c.name) })).filter(c => c.name);
+  cachedFooterHtml = seoPages.footerLinksHtml(
+    cachedCategoriesList.filter(c => !c.parent_id && c.product_count > 0).sort((a, b) => b.product_count - a.product_count).slice(0, 24),
+    cachedBrandsList.filter(b => b.count >= 3).slice(0, 30)
+  );
 
   // 5. Danh sách SP mặc định trang chủ (đã xen kẽ nguồn sỉ & ưu tiên còn hàng)
   const mixed = mixSources(sellable);

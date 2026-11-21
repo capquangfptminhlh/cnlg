@@ -205,7 +205,8 @@ test('BESI host uses correct SEO metadata while legacy host keeps its branding',
   const cfg={store:{name:'Hoàng Minh Store',slogan:'Slogan cũ'}};
   const besi=seo.renderHomePage(req('besi.com.vn'),cfg,25400);
   assert.match(besi,/<meta property="og:site_name" content="BESI">/);
-  assert.match(besi,/<meta property="og:image" content="https:\/\/besi\.com\.vn\/besi-logo\.svg">/);
+  // Ảnh chia sẻ PNG 1200×630 (Zalo / Facebook không hiển thị ảnh SVG)
+  assert.match(besi,/<meta property="og:image" content="https:\/\/besi\.com\.vn\/og-besi\.png">/);
   assert.match(besi,/<meta name="description" content="BESI tập hợp 25\.400 sản phẩm/);
   assert.doesNotMatch(besi,/<meta property="og:site_name" content="Hoàng Minh Store">/);
   const www=seo.renderHomePage(req('www.besi.com.vn'),cfg,25400);

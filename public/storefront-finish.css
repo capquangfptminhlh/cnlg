@@ -71,7 +71,8 @@ button, a, input, select { touch-action:manipulation; }
     color:#eb593f;font-size:8px !important;
     letter-spacing:1.1px;margin-bottom:5px;
   }
-  .market-banner-copy h1 {
+  .market-banner-copy h1 ,
+  .market-banner-copy .hero-h1 {
     font-size:21px !important;
     line-height:1.2;letter-spacing:-1.15px;
     margin-bottom:7px;max-width:235px;
@@ -175,7 +176,8 @@ button, a, input, select { touch-action:manipulation; }
      the first actual product below the fold. Use the bottom bar and filters. */
   .market-discovery .market-shortcuts { display: none; }
   .market-banner-copy{max-width:67%;padding:18px 8px 9px 12px;}
-  .market-banner-copy h1{font-size:19px !important;}
+  .market-banner-copy h1,
+  .market-banner-copy .hero-h1{font-size:19px !important;}
   .market-banner-copy p{font-size:8px;}
   .premium-gallery.market-banner-art{width:39%;}
   .premium-product-shot.primary{width:73px;height:88px;right:19%;}

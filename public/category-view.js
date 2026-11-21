@@ -40,6 +40,8 @@
   function renderHead() {
     const cat = catById(state.currentCategory);
     if (!cat) { head.hidden = true; return; }
+    // Tiêu đề dựng sẵn ở máy chủ (cho Google) – giao diện đã có tiêu đề danh mục riêng → bỏ bản trùng
+    document.getElementById('ssrHead')?.remove();
     const parent = cat.parent_id ? catById(cat.parent_id) : null;
     const root = parent || cat;
     const kids = cats().filter(c => c.parent_id === root.id && (c.product_count ?? 1) > 0).sort((a, b) => (b.product_count || 0) - (a.product_count || 0));

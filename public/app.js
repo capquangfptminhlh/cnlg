@@ -1799,6 +1799,9 @@ window.buildFilterUrl = buildFilterUrl;
 
 function syncFilterUrl({ push = false } = {}) {
   const targetUrl = buildFilterUrl();
+  // Tiêu đề danh mục / thương hiệu dựng sẵn ở máy chủ chỉ đúng cho trang ban đầu: khách lọc sang trang khác thì gỡ
+  const ssrHead = document.getElementById('ssrHead');
+  if (ssrHead && targetUrl.split('?')[0] !== ssrHead.dataset.path) ssrHead.remove();
   const currentUrl = location.pathname + location.search;
   if (currentUrl !== targetUrl) {
     if (push) {
@@ -1810,6 +1813,18 @@ function syncFilterUrl({ push = false } = {}) {
   updateShareButton();
 }
 window.syncFilterUrl = syncFilterUrl;
+
+// Bài SP dựng sẵn ở máy chủ (cho Google / AI): khách đóng popup SP là về trang danh sách → gỡ bài đó
+(() => {
+  const article = document.getElementById('ssrProduct');
+  const modal = document.getElementById('productDetailModal');
+  if (!article || !modal) return;
+  let seenOpen = modal.classList.contains('open');
+  new MutationObserver((_, obs) => {
+    if (modal.classList.contains('open')) { seenOpen = true; return; }
+    if (seenOpen) { article.remove(); obs.disconnect(); }
+  }).observe(modal, { attributes: true, attributeFilter: ['class'] });
+})();
 
 function updateShareButton() {
   const btn = document.getElementById('shareFilterBtn');

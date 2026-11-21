@@ -22,8 +22,10 @@
 .market-main-banner .premium-orbit { border-color: rgba(255, 255, 255, .22) !important; opacity: .8; }
 .market-main-banner .market-banner-label { color: #fff !important; background: rgba(255, 255, 255, .16) !important; border-color: rgba(255, 255, 255, .3) !important; }
 .market-main-banner .banner-overline { color: #ffe1a8 !important; letter-spacing: .14em; }
-.market-main-banner h1 { color: #fff !important; text-shadow: 0 2px 0 rgba(150, 30, 10, .25); }
-.market-main-banner h1 em, .market-main-banner h1 span { color: #ffe08a !important; -webkit-text-fill-color: #ffe08a; }
+.market-main-banner h1 ,
+.market-main-banner .hero-h1 { color: #fff !important; text-shadow: 0 2px 0 rgba(150, 30, 10, .25); }
+.market-main-banner h1 em, .market-main-banner h1 span ,
+.market-main-banner .hero-h1 em, .market-main-banner .hero-h1 span { color: #ffe08a !important; -webkit-text-fill-color: #ffe08a; }
 .market-main-banner p { color: rgba(255, 255, 255, .92) !important; }
 .market-main-banner .banner-shop-btn {
   background: #fff !important; color: #e8401f !important; border: 0 !important;
@@ -321,7 +323,8 @@ body, button, input, select, textarea {
   text-shadow: none !important;
   margin-bottom: 6px !important;
 }
-.market-main-banner h1, .market-banner-copy h1 {
+.market-main-banner h1, .market-banner-copy h1 ,
+.market-main-banner .hero-h1, .market-banner-copy .hero-h1 {
   font-family: var(--font) !important;
   font-size: clamp(24px, 2.7vw, 36px) !important;
   font-weight: 800 !important;

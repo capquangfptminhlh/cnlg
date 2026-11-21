@@ -55,7 +55,8 @@
  cursor:pointer;white-space:nowrap
 }
 .besi-pick-buy:hover{background:#f4512c;border-color:#f4512c;color:#fff}
-.market-main-banner h1,.market-banner-copy h1{
+.market-main-banner h1,.market-banner-copy h1,
+.market-main-banner .hero-h1,.market-banner-copy .hero-h1{
  letter-spacing:-.05em !important;
 }
 .market-main-banner .market-banner-copy{max-width:72% !important}
@@ -97,7 +98,8 @@
 }
 @media(max-width:360px){
  .market-main-banner .market-banner-copy{max-width:86% !important}
- .market-main-banner h1{font-size:18px !important}
+ .market-main-banner h1,
+ .market-main-banner .hero-h1{font-size:18px !important}
  .besi-pick-list .besi-pick{flex-basis:203px;width:203px}
 }
 @media(prefers-reduced-motion:reduce){

@@ -188,14 +188,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border-radius: 999px !important; font-weight: 750 !important;
 }
 .market-main-banner .banner-overline { color: #fff5dd !important; font-size: 11px !important; letter-spacing: .08em !important; }
-.market-main-banner h1, .market-banner-copy h1 {
+.market-main-banner h1, .market-banner-copy h1 ,
+.market-main-banner .hero-h1, .market-banner-copy .hero-h1 {
   font-size: clamp(32px, 3.25vw, 47px) !important;
   line-height: 1.18 !important;
   font-weight: 800 !important; letter-spacing: -.055em !important;
   text-shadow: none !important;
   color: #fff !important; margin: 12px 0 !important;
 }
-.market-main-banner h1 span, .market-main-banner h1 em {
+.market-main-banner h1 span, .market-main-banner h1 em ,
+.market-main-banner .hero-h1 span, .market-main-banner .hero-h1 em {
   color: #fff !important;
   -webkit-text-fill-color: #fff !important;
   font-style: normal;
@@ -369,7 +371,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   }
   .market-main-banner .market-banner-label { font-size: 8px !important; padding: 5px 9px !important; }
   .market-main-banner .banner-overline { font-size: 8px !important; letter-spacing: .02em !important; }
-  .market-main-banner h1, .market-banner-copy h1 {
+  .market-main-banner h1, .market-banner-copy h1 ,
+  .market-main-banner .hero-h1, .market-banner-copy .hero-h1 {
     font-size: clamp(21px, 5.2vw, 28px) !important;
     line-height: 1.18 !important; margin: 6px 0 7px !important;
   }
@@ -409,7 +412,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .main-header .logo-text { font-size: 19px !important; }
   .main-header .search-submit { min-width: 64px; }
   .market-main-banner .market-banner-copy { max-width: 76% !important; }
-  .market-main-banner h1 { font-size: 21px !important; }
+  .market-main-banner h1 ,
+  .market-main-banner .hero-h1 { font-size: 21px !important; }
   #productGrid .card-details { padding: 8px !important; }
 }
 @media (prefers-reduced-motion: reduce) {

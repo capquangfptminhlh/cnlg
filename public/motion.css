@@ -66,7 +66,8 @@ body.shop-scrolled .main-header { padding-top:10px; padding-bottom:10px; box-sha
 .market-main-banner[data-slide="1"] { background:radial-gradient(ellipse at 24% 80%,#fce1a0 0%,transparent 29%),linear-gradient(111deg,#f96c44,#ed4c33 49%,#e62f44); }
 .market-main-banner[data-slide="2"] { background:radial-gradient(ellipse at 24% 80%,#a7d5ff 0%,transparent 27%),linear-gradient(111deg,#368ccf,#3b7ad5 48%,#7354c7); }
 .market-main-banner[data-slide="2"] .banner-shop-btn { color:#345ac5; }
-.market-main-banner[data-slide="2"] .market-banner-copy h1 em { color:#fff2a5; }
+.market-main-banner[data-slide="2"] .market-banner-copy h1 em ,
+.market-main-banner[data-slide="2"] .market-banner-copy .hero-h1 em { color:#fff2a5; }
 .market-main-banner[data-slide="2"] .banner-bag.bag-one { background:linear-gradient(120deg,#fff1ac,#ffa844); }
 .market-main-banner[data-slide="0"] .banner-shop-btn { color:#ed4029; }
 .hero-animated-in .market-banner-copy > *:not(.banner-slides) { animation:marketBannerTextIn .65s var(--motion-ease) both; }

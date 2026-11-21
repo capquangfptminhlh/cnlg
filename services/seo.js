@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { maskMediaUrl } = require('./catalogImage');
 const { stripSupplierText } = require('./security');
+const pages = require('./seoPages');
 
 /**
  * Trang sản phẩm có URL thật /sp/<id>-<slug> cho Google và ảnh xem trước khi chia sẻ (Facebook, Zalo...).
@@ -35,7 +36,8 @@ function bustAssets(html) {
 function getTemplate() {
   const mtime = fs.statSync(INDEX_FILE).mtimeMs;
   if (!template || mtime !== templateMtime) {
-    template = bustAssets(fs.readFileSync(INDEX_FILE, 'utf8'));
+    // Chuẩn hoá xuống dòng (máy Windows checkout ra CRLF) để các mốc chèn nội dung luôn khớp
+    template = bustAssets(fs.readFileSync(INDEX_FILE, 'utf8').replace(/\r\n/g, '\n'));
     templateMtime = mtime;
   }
   return template;
@@ -54,8 +56,28 @@ function baseUrl(req) {
   return `${viaHttps ? 'https' : req.protocol}://${host}`;
 }
 
-function productPath(p) {
-  return `/sp/${p.id}-${String(p.slug || '').slice(0, 80)}`;
+const productPath = pages.productPath;
+
+/**
+ * Chèn nội dung dựng sẵn vào index.html:
+ *  head   → cuối <head> · top → đầu <main> · grid → #productGrid · pager → #pagination · footer → trong <footer>
+ *  demoteHero: trang không phải trang chủ → khẩu hiệu "Giá tốt mỗi ngày" thôi làm H1 (H1 là tên SP / danh mục)
+ */
+const MARK = {
+  main: '<main class="container main-layout" id="catalog">',
+  grid: '<div class="product-grid" id="productGrid">\n      <!-- Injected via JS -->\n    </div>',
+  pager: '<div class="pagination-wrapper flex-center" id="pagination">\n      <!-- Injected via JS -->\n    </div>',
+  footer: '<footer class="main-footer">',
+  heroH1: /<h1>(Giá tốt mỗi ngày\.[\s\S]*?)<\/h1>/
+};
+function inject(html, { head = '', top = '', grid = '', pager = '', footer = '', demoteHero = false } = {}) {
+  let out = html.replace(/<title>[\s\S]*?<\/title>/, '').replace('</head>', `${head}\n</head>`);
+  if (top) out = out.replace(MARK.main, `${MARK.main}\n${top}`);
+  if (grid) out = out.replace(MARK.grid, `<div class="product-grid" id="productGrid">${grid}</div>`);
+  if (pager) out = out.replace(MARK.pager, `<div class="pagination-wrapper flex-center" id="pagination">${pager}</div>`);
+  if (footer) out = out.replace(MARK.footer, `${MARK.footer}\n${footer}`);
+  if (demoteHero) out = out.replace(MARK.heroH1, '<div class="hero-h1" role="heading" aria-level="2">$1</div>');
+  return out;
 }
 
 // BESI storefront metadata must be correct even if legacy store configuration
@@ -68,12 +90,14 @@ function storeName(config, req) {
 }
 
 /** HTML trang sản phẩm (index.html + thẻ SEO / OpenGraph tối ưu cho Zalo, Facebook, Messenger) */
-function renderProductPage(req, product, detail, config) {
+function renderProductPage(req, product, detail, config, extra = {}) {
   const base = baseUrl(req);
   const url = base + productPath(product);
   const name = storeName(config, req);
   const priceText = `${Number(product.price).toLocaleString('vi-VN')} đ`;
-  const desc = stripSupplierText(stripHtml(detail?.description).slice(0, 160) || `${product.name} – Giá: ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, kiểm tra trước khi thanh toán.'}`);
+  // Mô tả: tên + giá + tình trạng trước (đúng ý người tìm), rồi đoạn đầu mô tả SP
+  const lead = `${product.name}${product.brand ? ` chính hãng ${product.brand}` : ''}, giá ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, kiểm tra trước khi thanh toán.'}`;
+  const desc = stripSupplierText(`${lead} ${stripHtml(detail?.description)}`).slice(0, 158).replace(/\s+\S*$/, '') + '…';
   
   // Ưu tiên ảnh chuẩn 256x256 / 500px (< 150KB) để Zalo/Facebook bot tải ngay lập tức không bị timeout
   const chosenImg = product.image || product.image_hd;
@@ -81,31 +105,21 @@ function renderProductPage(req, product, detail, config) {
   const image = maskedImg && maskedImg.startsWith('/') ? base + maskedImg : maskedImg;
   const mimeType = /\.(jpe?g|jfif)$/i.test(image) ? 'image/jpeg' : /\.webp$/i.test(image) ? 'image/webp' : /\.gif$/i.test(image) ? 'image/gif' : 'image/png';
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.name,
-    image: [image],
-    sku: product.sku,
-    description: desc,
-    brand: { '@type': 'Brand', name },
-    category: product.category_name || undefined,
-    offers: {
-      '@type': 'Offer',
-      url,
-      priceCurrency: 'VND',
-      price: product.price,
-      availability: product.in_stock === false ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
-      seller: { '@type': 'Organization', name }
-    }
-  };
+  const crumbs = extra.crumbs || [{ name: 'Trang chủ', url: '/' }, { name: product.name }];
+  const ld = pages.ldScript([
+    pages.orgLd(base),
+    pages.productLd(base, product, { description: stripSupplierText(stripHtml(detail?.description)) || desc, category: extra.category }),
+    pages.breadcrumbLd(base, crumbs)
+  ]);
   const head = `
   <title>${escAttr(product.name)} | ${escAttr(name)}</title>
   <meta name="description" content="${escAttr(desc)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="${escAttr(url)}">
   
   <!-- Open Graph / Zalo / Facebook -->
   <meta property="og:type" content="website">
+  <meta property="og:locale" content="vi_VN">
   <meta property="og:site_name" content="${escAttr(name)}">
   <meta property="og:url" content="${escAttr(url)}">
   <meta property="og:title" content="${escAttr(product.name)}">
@@ -125,11 +139,9 @@ function renderProductPage(req, product, detail, config) {
   <meta name="twitter:description" content="${escAttr(`${priceText} – ${desc}`)}">
   <meta name="twitter:image" content="${escAttr(image)}">
 
-  <script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>
+  ${ld}
   <script>window.__INITIAL_PRODUCT_ID__ = ${Number(product.id)};</script>`;
-  return getTemplate()
-    .replace(/<title>[\s\S]*?<\/title>/, '')
-    .replace('</head>', `${head}\n</head>`);
+  return inject(getTemplate(), { head, top: extra.articleHtml || '', footer: extra.footerHtml || '', demoteHero: true });
 }
 
 /** HTML trang chủ kèm meta mô tả cửa hàng (tự động đổi theo từ khoá tìm kiếm / bộ lọc) */
@@ -160,34 +172,94 @@ function renderHomePage(req, config, total, extra = {}) {
     desc = `Danh mục ${category} tại ${name}: hàng chính hãng từ nhiều tổng kho, kiểm tra trước khi nhận, giao hàng toàn quốc.`;
   }
 
+  if (extra.page > 1) {
+    pageTitle = `${pageTitle} – Trang ${extra.page}`;
+    desc = `Trang ${extra.page}: ${desc}`;
+  }
   const base = baseUrl(req);
-  const canonicalUrl = `${base}${req.originalUrl || '/'}`;
+  // Canonical: link chuẩn của trang (không kèm ?sort=, ?min=…), giữ ?page=N
+  const canonicalUrl = `${base}${extra.canonicalPath || req.originalUrl || '/'}`;
+  // Ảnh chia sẻ PNG (Zalo / Facebook không hiện SVG); tên miền cũ giữ logo cũ
+  const ogImage = pages.abs(base, extra.ogImage || (isBesiHost(req) ? '/og-besi.png' : '/logo.svg'));
+  const robots = extra.robots || 'index, follow, max-image-preview:large';
   const head = `
   <title>${escAttr(pageTitle)}</title>
   <meta name="description" content="${escAttr(desc)}">
-  <link rel="canonical" href="${escAttr(canonicalUrl)}">
+  <meta name="robots" content="${escAttr(robots)}">
+  <link rel="canonical" href="${escAttr(canonicalUrl)}">${extra.prevPath ? `
+  <link rel="prev" href="${escAttr(base + extra.prevPath)}">` : ''}${extra.nextPath ? `
+  <link rel="next" href="${escAttr(base + extra.nextPath)}">` : ''}
   <meta property="og:type" content="website">
+  <meta property="og:locale" content="vi_VN">
   <meta property="og:site_name" content="${escAttr(name)}">
   <meta property="og:title" content="${escAttr(ogTitle)}">
   <meta property="og:description" content="${escAttr(desc)}">
-  <meta property="og:image" content="${escAttr(base + (isBesiHost(req) ? '/besi-logo.svg' : '/logo.svg'))}">
-  <meta property="og:url" content="${escAttr(canonicalUrl)}">${q ? `
-  <meta name="besi:q" content="${escAttr(q)}">` : ''}`;
-  return getTemplate()
-    .replace(/<title>[\s\S]*?<\/title>/, '')
-    .replace('</head>', `${head}\n</head>`);
+  <meta property="og:image" content="${escAttr(ogImage)}">
+  <meta property="og:url" content="${escAttr(canonicalUrl)}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escAttr(ogTitle)}">
+  <meta name="twitter:description" content="${escAttr(desc)}">
+  <meta name="twitter:image" content="${escAttr(ogImage)}">${q ? `
+  <meta name="besi:q" content="${escAttr(q)}">` : ''}
+  ${extra.ld || ''}`;
+  return inject(getTemplate(), {
+    head, top: extra.headHtml || '', grid: extra.gridHtml || '', pager: extra.pagerHtml || '',
+    footer: extra.footerHtml || '', demoteHero: !!extra.headHtml
+  });
 }
 
+const SITEMAP_CHUNK = 5000;
+const xmlEsc = v => escAttr(v).replace(/'/g, '&apos;');
+const urlset = rows => `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${rows.join('\n')}\n</urlset>\n`;
+const day = v => String(v || new Date().toISOString()).slice(0, 10);
+
+/** /sitemap.xml = chỉ mục: trang (chủ, danh mục, thương hiệu) + SP chia nhiều tệp */
+function sitemapIndexXml(req, productCount) {
+  const base = baseUrl(req);
+  const today = day();
+  const files = ['/sitemap-pages.xml'];
+  for (let i = 1; i <= Math.max(1, Math.ceil(productCount / SITEMAP_CHUNK)); i++) files.push(`/sitemap-products-${i}.xml`);
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${files.map(f => `  <sitemap><loc>${xmlEsc(base + f)}</loc><lastmod>${today}</lastmod></sitemap>`).join('\n')}\n</sitemapindex>\n`;
+}
+
+function sitemapPagesXml(req, categories, brands) {
+  const base = baseUrl(req);
+  const rows = [`  <url><loc>${base}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`]
+    .concat(categories.map(c => `  <url><loc>${xmlEsc(base + pages.categoryPath(c))}</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`))
+    .concat(brands.map(b => `  <url><loc>${xmlEsc(base + pages.brandPath(b.name))}</loc><changefreq>daily</changefreq><priority>0.6</priority></url>`));
+  return urlset(rows);
+}
+
+/** chunk bắt đầu từ 1; null nếu ngoài phạm vi */
+function sitemapProductsXml(req, products, chunk) {
+  const base = baseUrl(req);
+  const list = products.slice((chunk - 1) * SITEMAP_CHUNK, chunk * SITEMAP_CHUNK);
+  if (chunk < 1 || !list.length) return null;
+  return urlset(list.map(p => `  <url><loc>${xmlEsc(base + productPath(p))}</loc><lastmod>${day(p.updated_at)}</lastmod><changefreq>daily</changefreq></url>`));
+}
+
+// Giữ cho mã cũ / test cũ: 1 tệp gồm trang chủ + mọi SP còn hàng
 function sitemapXml(req, products) {
   const base = baseUrl(req);
-  const urls = [`  <url><loc>${base}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`]
-    .concat(products.filter(p => p.in_stock !== false).map(p =>
-      `  <url><loc>${escAttr(base + productPath(p))}</loc><lastmod>${String(p.updated_at || new Date().toISOString()).slice(0, 10)}</lastmod><changefreq>daily</changefreq></url>`));
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
+  return urlset([`  <url><loc>${base}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`]
+    .concat(products.filter(p => p.in_stock !== false).map(p => `  <url><loc>${xmlEsc(base + productPath(p))}</loc><lastmod>${day(p.updated_at)}</lastmod><changefreq>daily</changefreq></url>`)));
 }
 
 function robotsTxt(req) {
-  return `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`;
+  return [
+    'User-agent: *',
+    'Allow: /',
+    // Phần riêng tư / không có giá trị tìm kiếm
+    'Disallow: /api/account/',
+    'Disallow: /api/orders/',
+    // Bộ lọc giá / sắp xếp tạo vô số link trùng nội dung
+    'Disallow: /*?*sort=',
+    'Disallow: /*?*min=',
+    'Disallow: /*?*max=',
+    '',
+    `Sitemap: ${baseUrl(req)}/sitemap.xml`,
+    ''
+  ].join('\n');
 }
 
-module.exports = { renderProductPage, renderHomePage, sitemapXml, robotsTxt, productPath, baseUrl };
+module.exports = { renderProductPage, renderHomePage, sitemapXml, sitemapIndexXml, sitemapPagesXml, sitemapProductsXml, SITEMAP_CHUNK, robotsTxt, productPath, baseUrl, isBesiHost, MARK };
