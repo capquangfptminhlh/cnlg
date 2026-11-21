@@ -1,0 +1,40 @@
+/* BESI – lớp "gọn & ít hiệu ứng" (nạp cuối cùng, thắng các file giao diện cũ).
+   Chủ shop chốt 21/11/2026: bố cục kiểu sàn TMĐT, chỉ thương hiệu BESI, hiệu ứng ít và tinh tế. */
+
+/* ── Hiệu ứng: nhấp nháy / trôi nổi / quét sáng chỉ chạy 1 lần thay vì lặp mãi ── */
+*, *::before, *::after { animation-iteration-count: 1 !important; }
+/* Giữ chuyển động báo "đang tải" (xoay, khung chờ shimmer) */
+.fa-spin, .fa-spinner, .fa-circle-notch,
+[class*="skeleton"], [class*="skeleton"]::before, [class*="skeleton"]::after,
+.cat-skeleton, .cat-skeleton *, .loading, .loading * { animation-iteration-count: infinite !important; }
+
+/* ── Bộ lọc nâng cao: ẩn mặc định, mở bằng nút trên thanh sắp xếp ── */
+body:not(.show-adv-filters) #advFilters > .besi-universal-finder,
+body:not(.show-adv-filters) #advFilters > .besi-category-finder,
+body:not(.show-adv-filters) #advFilters > .besi-spec-finder { display: none !important; }
+#advFilters { display: contents; }
+body.show-adv-filters #advFilters > .besi-universal-finder { margin-top: 4px; }
+
+.btn-adv-filter {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid #f1c9b9; background: #fff; color: #e5481f;
+  font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1; cursor: pointer; white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.btn-adv-filter:hover { background: #fff4ee; }
+.btn-adv-filter.active { background: #ff5a2c; border-color: #ff5a2c; color: #fff; }
+
+
+/* ── Thẻ SP: dòng "Bảo hành · Sẵn kho" xuống dòng thay vì bị cắt chữ ── */
+.luxury-card .card-meta { display: flex !important; flex-wrap: wrap; align-items: center; gap: 4px 6px; max-width: 100%; overflow: visible; }
+.luxury-card .card-meta > * { min-width: 0; max-width: 100%; white-space: normal; }
+
+/* ── Thanh tiêu đề danh sách trên điện thoại: tiêu đề 1 hàng riêng, các nút xuống hàng dưới ── */
+@media (max-width: 700px) {
+  .filter-bar .filter-left { display: flex !important; flex-wrap: wrap !important; align-items: center; gap: 8px !important; width: 100%; }
+  .filter-bar .filter-left > .premium-catalog-heading { flex: 1 1 100% !important; min-width: 0; }
+  .filter-bar .filter-left > .premium-catalog-heading .catalog-title { font-size: 20px !important; line-height: 1.25 !important; }
+  .filter-bar .filter-left > :not(.premium-catalog-heading) { flex: 0 0 auto; }
+  .btn-adv-filter { height: 32px; padding: 0 12px; font-size: 12.5px; }
+}

@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="/besi-universal.css">
   <link rel="stylesheet" href="/taobao-nav.css">
   <link rel="stylesheet" href="/seo-ssr.css">
+  <link rel="stylesheet" href="/besi-clean.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -165,6 +166,51 @@
   <main class="container main-layout" id="catalog">
     
 
+    <div class="brand-bar" id="brandBar" aria-label="Lọc theo thương hiệu">
+      <div class="brand-bar-header">
+        <span class="brand-bar-title"><i class="fa-solid fa-tags"></i> Khám phá theo thương hiệu</span>
+        <span class="brand-bar-sub">Khám phá các thương hiệu và nhóm sản phẩm trên BESI</span>
+      </div>
+      <div class="brand-pills-wrap" id="brandPills">
+        <button type="button" class="brand-pill active" data-brand="all"><i class="fa-solid fa-border-all"></i> Tất cả thương hiệu</button>
+      </div>
+    </div>
+
+    <!-- Filter & Sort Bar -->
+    <div class="filter-bar">
+      <div class="filter-left">
+        <div class="premium-catalog-heading"><span class="premium-heading-kicker">CHỌN MÓN ƯNG Ý · XEM GIÁ THẬT</span><h2 class="catalog-title" id="catalogTitle">Sản phẩm dành cho bạn</h2></div>
+        <span class="catalog-badge" id="catalogCount">Đang tải...</span>
+        <button type="button" class="btn-adv-filter" id="advFilterBtn" aria-expanded="false" aria-controls="advFilters"><i class="fa-solid fa-sliders"></i> Bộ lọc nâng cao</button>
+        <button id="shareFilterBtn" class="btn-share-filter" type="button" title="Sao chép link danh sách này để gửi cho khách" aria-label="Sao chép link gửi khách"><i class="fa-solid fa-share-nodes"></i> <span>Sao chép link gửi khách</span></button>
+      </div>
+
+      <div class="filter-right">
+        <!-- Price range pills -->
+        <div class="price-filters">
+          <button class="price-pill active" data-min="" data-max="">Tất cả giá</button>
+          <button class="price-pill pill-flash" data-flash="1" data-min="" data-max=""><i class="fa-solid fa-bolt"></i> Flash Sale</button>
+          <button class="price-pill pill-hot" data-min="0" data-max="99000"><i class="fa-solid fa-fire"></i> &lt; 99K</button>
+          <button class="price-pill" data-min="0" data-max="500000">&lt; 500K</button>
+          <button class="price-pill" data-min="500000" data-max="1000000">500K - 1TR</button>
+          <button class="price-pill" data-min="1000000" data-max="2000000">1TR - 2TR</button>
+          <button class="price-pill" data-min="2000000" data-max="">&gt; 2TR</button>
+        </div>
+
+        <!-- Sort dropdown -->
+        <div class="sort-wrapper">
+          <select id="sortSelect" class="custom-select">
+            <option value="default">Sắp xếp: Đề xuất giá tốt</option>
+            <option value="discount-desc">🔥 Ưu đãi nổi bật</option>
+            <option value="price-asc">Giá: Thấp đến Cao</option>
+            <option value="price-desc">Giá: Cao đến Thấp</option>
+            <option value="name-asc">Tên: A - Z</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="adv-filters" id="advFilters">
     <!-- Universal discovery: works for EVERY populated catalog category. -->
     <section class="besi-universal-finder" id="besiUniversalFinder" aria-label="Tìm kiếm và lọc mọi ngành hàng">
       <div class="besi-universal-heading">
@@ -391,47 +437,6 @@
     </section>
 
     <!-- Brand Filter Bar -->
-    <div class="brand-bar" id="brandBar" aria-label="Lọc theo thương hiệu">
-      <div class="brand-bar-header">
-        <span class="brand-bar-title"><i class="fa-solid fa-tags"></i> Khám phá theo thương hiệu</span>
-        <span class="brand-bar-sub">Khám phá các thương hiệu và nhóm sản phẩm trên BESI</span>
-      </div>
-      <div class="brand-pills-wrap" id="brandPills">
-        <button type="button" class="brand-pill active" data-brand="all"><i class="fa-solid fa-border-all"></i> Tất cả thương hiệu</button>
-      </div>
-    </div>
-
-    <!-- Filter & Sort Bar -->
-    <div class="filter-bar">
-      <div class="filter-left">
-        <div class="premium-catalog-heading"><span class="premium-heading-kicker">CHỌN MÓN ƯNG Ý · XEM GIÁ THẬT</span><h2 class="catalog-title" id="catalogTitle">Sản phẩm dành cho bạn</h2></div>
-        <span class="catalog-badge" id="catalogCount">Đang tải...</span>
-        <button id="shareFilterBtn" class="btn-share-filter" type="button" title="Sao chép link danh sách này để gửi cho khách" aria-label="Sao chép link gửi khách"><i class="fa-solid fa-share-nodes"></i> <span>Sao chép link gửi khách</span></button>
-      </div>
-
-      <div class="filter-right">
-        <!-- Price range pills -->
-        <div class="price-filters">
-          <button class="price-pill active" data-min="" data-max="">Tất cả giá</button>
-          <button class="price-pill pill-flash" data-flash="1" data-min="" data-max=""><i class="fa-solid fa-bolt"></i> Flash Sale</button>
-          <button class="price-pill pill-hot" data-min="0" data-max="99000"><i class="fa-solid fa-fire"></i> &lt; 99K</button>
-          <button class="price-pill" data-min="0" data-max="500000">&lt; 500K</button>
-          <button class="price-pill" data-min="500000" data-max="1000000">500K - 1TR</button>
-          <button class="price-pill" data-min="1000000" data-max="2000000">1TR - 2TR</button>
-          <button class="price-pill" data-min="2000000" data-max="">&gt; 2TR</button>
-        </div>
-
-        <!-- Sort dropdown -->
-        <div class="sort-wrapper">
-          <select id="sortSelect" class="custom-select">
-            <option value="default">Sắp xếp: Đề xuất giá tốt</option>
-            <option value="discount-desc">🔥 Ưu đãi nổi bật</option>
-            <option value="price-asc">Giá: Thấp đến Cao</option>
-            <option value="price-desc">Giá: Cao đến Thấp</option>
-            <option value="name-asc">Tên: A - Z</option>
-          </select>
-        </div>
-      </div>
     </div>
 
     <!-- Product Grid -->
@@ -671,7 +676,7 @@
         </div>
 
         <div class="qr-codes-info">
-          <div>Mã Đơn Hoàng Minh: <strong id="qrHmCode">...</strong></div>
+          <div>Mã đơn: <strong id="qrHmCode">...</strong></div>
         </div>
 
         <div class="qr-content-grid">

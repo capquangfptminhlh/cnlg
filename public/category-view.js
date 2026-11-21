@@ -95,7 +95,7 @@
     end.innerHTML = inView
       ? `<i class="fa-solid fa-circle-check"></i> Đã hiển thị hết ${fmt(total)} sản phẩm của <strong>${escH(catById(id).name)}</strong>`
       : `<i class="fa-solid fa-circle-check"></i> Đã hiển thị hết ${fmt(total)} sản phẩm`;
-    document.title = inView ? `${catById(id).name} | Tổng Kho Giá Sỉ Hoàng Minh` : 'Hoàng Minh Store | Tổng Kho Giá Sỉ • Flash Sale Phụ Kiện, Công Nghệ & Gia Dụng';
+    document.title = inView ? `${catById(id).name} | ${window.STORE_BRAND || 'BESI'}` : (window.HOME_TITLE || document.title);
   }
 
   // --- Chọn danh mục (dùng chung cho danh mục bên trái, chip, bảng Danh mục, đường dẫn, danh mục con) ---

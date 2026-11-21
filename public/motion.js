@@ -23,18 +23,18 @@
   // Real, keyboard accessible banner carousel — informational messages only;
   // never pretend a promotion, review score or discount exists.
   const slides = [
-    {label:'TỔNG KHO GIÁ SỈ HOÀNG MINH',icon:'fa-bolt',over:'SHOP & ĐẠI LÝ · ĐĂNG NHẬP XEM GIÁ SỈ TẬN GỐC',
-      headline:'Giá sỉ tận kho,<span><em>rẻ vô địch!</em></span>',
-      description:'Nhập trực tiếp tổng kho không qua trung gian — tiết kiệm tới 70% mỗi đơn hàng.',
-      cta:'Săn Giá Sỉ Ngay',ctaIcon:'fa-bolt',href:'#flashSaleSection'},
-    {label:'ĐẠI TIỆC FLASH SALE KHUNG GIỜ',icon:'fa-fire-flame-curved',over:'HƠN 1.900+ DEAL ĐANG NỔ GIÁ SỐC',
-      headline:'Deal hời mỗi giờ,<span><em>chốt kẻo lỡ!</em></span>',
-      description:'Tự động quét tồn kho & hạ giá sỉ theo thời gian thực — luôn rẻ bậc nhất thị trường.',
-      cta:'Vào Khung Giờ Săn Sale',ctaIcon:'fa-fire',href:'#flashSaleSection'},
-    {label:'ĐỒNG KIỂM TOÀN QUỐC · AN TÂM 100%',icon:'fa-shield-halved',over:'NHẬN HÀNG KIỂM TRA · MỚI TRẢ TIỀN',
+    {label:'BESI · MUA LẺ GIÁ TỐT',icon:'fa-bolt',over:'HÀNG TỪ NHIỀU TỔNG KHO · KHÁCH SỈ ĐĂNG NHẬP XEM GIÁ SỈ',
+      headline:'Mua 1 món,<span><em>vẫn giá tốt.</em></span>',
+      description:'Giá và tồn kho cập nhật tự động từ kho; giá bạn thấy là giá đang bán.',
+      cta:'Xem sản phẩm',ctaIcon:'fa-arrow-right',href:'#catalog'},
+    {label:'FLASH SALE THEO KHUNG GIỜ',icon:'fa-fire-flame-curved',over:'DEAL ĐỔI MỖI 3 GIỜ',
+      headline:'Deal mới mỗi khung giờ,<span><em>giảm giá thật.</em></span>',
+      description:'Sản phẩm giảm so với giá niêm yết, đổi theo từng khung giờ trong ngày.',
+      cta:'Xem Flash Sale',ctaIcon:'fa-fire',href:'#flashSaleSection'},
+    {label:'KIỂM TRA HÀNG · TRẢ TIỀN KHI NHẬN',icon:'fa-shield-halved',over:'ĐỔI TRẢ 7 NGÀY NẾU LỖI HOẶC GIAO SAI',
       headline:'Mở hộp kiểm tra,<span><em>ưng mới nhận!</em></span>',
-      description:'Hàng chuẩn chính hãng, báo cước vận chuyển thật siêu rẻ tới từng phường/xã.',
-      cta:'Xem Bảng Giá Sỉ',ctaIcon:'fa-arrow-right',href:'#catalog'}
+      description:'Phí ship hiện trước khi đặt hàng; cửa hàng chịu phí đổi trả khi hàng lỗi.',
+      cta:'Chính sách đổi trả',ctaIcon:'fa-arrow-right',href:'/chinh-sach-doi-tra'}
   ];
   if (hero) {
     const heading=hero.querySelector('.market-banner-copy h1');

@@ -1,4 +1,4 @@
-/* HOÀNG MINH — premium storefront progressive enhancement.
+/* BESI — premium storefront progressive enhancement.
  * Existing checkout, prices, wishlist and real API logic stay in app.js.
  * Replaces the white boxes left by unavailable remote images with a clear
  * product-name placeholder, never an unrelated photo or fictional rating. */
@@ -27,7 +27,7 @@
     icon.className='fa-solid fa-box-open';
     icon.setAttribute('aria-hidden','true');
     const title=document.createElement('strong');
-    title.textContent='Hoàng Minh Store';
+    title.textContent=window.STORE_BRAND||'BESI';
     const hint=document.createElement('small');
     hint.textContent='Ảnh đang cập nhật';
     fallback.append(icon,title,hint);

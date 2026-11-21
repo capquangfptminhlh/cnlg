@@ -885,11 +885,17 @@ closeDetailModalBtn.addEventListener('click', () => {
 });
 
 // --- Link sản phẩm thật: /sp/<id>-<slug> (server trả sẵn tiêu đề, ảnh xem trước, dữ liệu cho Google) ---
-const HOME_TITLE = 'Hoàng Minh Store | Tổng Kho Giá Sỉ • Flash Sale Phụ Kiện, Công Nghệ & Gia Dụng';
+// besi.com.vn: mọi chữ hiển thị là BESI; tên miền cũ giữ thương hiệu cũ
+const STORE_BRAND = /(^|\.)besi\.com\.vn$/i.test(location.hostname) ? 'BESI' : 'Hoàng Minh Store';
+const HOME_TITLE = STORE_BRAND === 'BESI'
+  ? 'BESI | Sàn mua lẻ giá tốt, nhập sỉ từ nhiều tổng kho'
+  : 'Hoàng Minh Store | Tổng Kho Giá Sỉ • Flash Sale Phụ Kiện, Công Nghệ & Gia Dụng';
+window.STORE_BRAND = STORE_BRAND;
+window.HOME_TITLE = HOME_TITLE;
 function setProductHash(prod) {
   const url = `/sp/${prod.id}-${String(prod.slug || '').slice(0, 80)}`;
   if (location.pathname !== url) history.pushState({ productId: prod.id }, '', url);
-  document.title = `${prod.name} | Hoàng Minh Store`;
+  document.title = `${prod.name} | ${STORE_BRAND}`;
 }
 function clearProductHash() {
   const targetUrl = typeof buildFilterUrl === 'function' ? buildFilterUrl() : '/';
@@ -1803,6 +1809,28 @@ function syncFilterUrl({ push = false } = {}) {
   updateShareButton();
 }
 window.syncFilterUrl = syncFilterUrl;
+
+// "Bộ lọc nâng cao": 3 khối lọc (toàn sàn / ngành hàng / thông số) ẩn mặc định để sản phẩm hiện ngay
+(() => {
+  const btn = document.getElementById('advFilterBtn');
+  const box = document.getElementById('advFilters');
+  if (!btn || !box) return;
+  const set = open => {
+    document.body.classList.toggle('show-adv-filters', open);
+    btn.setAttribute('aria-expanded', String(open));
+    btn.classList.toggle('active', open);
+  };
+  btn.addEventListener('click', () => {
+    const open = !document.body.classList.contains('show-adv-filters');
+    set(open);
+    // khung bọc dùng display:contents (không có hộp riêng) → cuộn tới khối lọc đầu tiên
+    if (open) box.querySelector('section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  // Kết quả lọc nâng cao đang hiện (khách vừa dùng) → giữ khung mở
+  new MutationObserver(() => {
+    if (box.querySelector('[id$="Results"]:not([hidden])')) set(true);
+  }).observe(box, { attributes: true, subtree: true, attributeFilter: ['hidden'] });
+})();
 
 // Bài SP dựng sẵn ở máy chủ (cho Google / AI): khách đóng popup SP là về trang danh sách → gỡ bài đó
 (() => {
