@@ -33,3 +33,25 @@ test('lưu: làm sạch HTML, chặn bản quá ngắn khi đăng, ẩn được
   copy.save(999001, { status: 'hidden' }, sanitizeHtml);
   assert.equal(copy.published(999001), null);
 });
+
+test('trang SP: tóm tắt đã duyệt thành meta description (kèm giá, tình trạng); không có thì giữ cách cũ', () => {
+  const seo = require('../services/seo');
+  const req = { protocol: 'https', socket: { remoteAddress: '127.0.0.1' }, get: h => (h.toLowerCase() === 'host' ? 'besi.com.vn' : '') };
+  const product = { id: 106512, name: 'Giá đỡ K72', slug: 'gia-do-k72', price: 22000, image: '/logo.svg', in_stock: true };
+  const meta = html => html.match(/<meta name="description" content="([^"]*)">/)[1];
+  const withSum = meta(seo.renderProductPage(req, product, { description: '<p>Mô tả gốc</p>' }, {}, { summary: 'Giá đỡ kim loại xoay 360 độ.' }));
+  assert.equal(withSum, 'Giá đỡ kim loại xoay 360 độ. Giá 22.000 đ, còn hàng, giao toàn quốc.');
+  const without = meta(seo.renderProductPage(req, product, { description: '<p>Mô tả gốc</p>' }, {}));
+  assert.match(without, /^Giá đỡ K72, giá 22\.000 đ\./);
+  const long = meta(seo.renderProductPage(req, product, {}, {}, { summary: 'chữ '.repeat(80) }));
+  assert.ok(long.length <= 160 && long.endsWith('…'));
+});
+
+test('trang SP: tóm tắt dài thì không ghép giá để tránh bị cắt cụt', () => {
+  const seo = require('../services/seo');
+  const req = { protocol: 'https', socket: { remoteAddress: '127.0.0.1' }, get: () => 'besi.com.vn' };
+  const product = { id: 1, name: 'X', slug: 'x', price: 22000, image: '/logo.svg', in_stock: true };
+  const s = 'Giá đỡ điện thoại K72 bằng kim loại, chân xoay 360 độ, có rãnh tản nhiệt, dùng được cho mọi dòng điện thoại. Giá rẻ, tiện đặt trên bàn làm việc.';
+  const html = seo.renderProductPage(req, product, {}, {}, { summary: s });
+  assert.equal(html.match(/<meta name="description" content="([^"]*)">/)[1], s);
+});

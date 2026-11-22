@@ -133,7 +133,14 @@ function renderProductPage(req, product, detail, config, extra = {}) {
   const priceText = `${Number(product.price).toLocaleString('vi-VN')} đ`;
   // Mô tả: tên + giá + tình trạng trước (đúng ý người tìm), rồi đoạn đầu mô tả SP
   const lead = `${product.name}${product.brand ? ` chính hãng ${product.brand}` : ''}, giá ${priceText}. ${product.in_stock === false ? 'Tạm hết hàng.' : 'Còn hàng, giao toàn quốc, kiểm tra trước khi thanh toán.'}`;
-  const desc = stripSupplierText(`${lead} ${stripHtml(detail?.description)}`).slice(0, 158).replace(/\s+\S*$/, '') + '…';
+  // Có câu tóm tắt chủ shop đã duyệt (services/productCopy.js) → dùng nó, kèm giá + tình trạng
+  const summary = String(extra.summary || '').replace(/\s+/g, ' ').trim();
+  // (thêm giá + tình trạng nếu còn chỗ; không đủ chỗ thì giữ nguyên câu tóm tắt, không cắt cụt giá)
+  const withPrice = summary && `${summary.replace(/[.…]*$/, '.')} Giá ${priceText}, ${product.in_stock === false ? 'tạm hết hàng.' : 'còn hàng, giao toàn quốc.'}`;
+  const raw = stripSupplierText(summary
+    ? (withPrice.length <= 160 ? withPrice : summary)
+    : `${lead} ${stripHtml(detail?.description)}`);
+  const desc = raw.length <= 160 ? raw : raw.slice(0, 158).replace(/\s+\S*$/, '') + '…';
   
   // Ưu tiên ảnh chuẩn 256x256 / 500px (< 150KB) để Zalo/Facebook bot tải ngay lập tức không bị timeout
   const chosenImg = product.image || product.image_hd;

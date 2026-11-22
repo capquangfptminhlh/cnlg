@@ -675,7 +675,7 @@ app.get('/sp/:slugId', async (req, res) => {
     try { descHtml = detail?.description ? stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(detail.description))) : ''; } catch (e) {}
     const rv = reviews.forProduct(productIdsOf(product), { limit: 5 });
     res.type('html').send(seo.renderProductPage(req, shown, detail, readConfig(), {
-      crumbs, category: cat, footerHtml: cachedFooterHtml, reviews: rv,
+      crumbs, category: cat, footerHtml: cachedFooterHtml, reviews: rv, summary: ownCopy ? ownCopy.summary : '',
       articleHtml: seoPages.productArticleHtml({ product: shown, crumbs, descHtml, related, category: cat, qaHtml: infoPages.productQaHtml(shown, readConfig()) })
     }));
   } catch (err) {
