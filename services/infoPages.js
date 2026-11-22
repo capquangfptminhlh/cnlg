@@ -197,6 +197,8 @@ const PAGES = {
         <li><strong>Khi đặt hàng:</strong> họ tên, số điện thoại, địa chỉ nhận hàng và ghi chú – để giao hàng và liên hệ về đơn.</li>
         <li><strong>Tài khoản khách sỉ:</strong> số điện thoại, họ tên, tên shop. Mật khẩu được mã hoá một chiều; cửa hàng không đọc được mật khẩu của bạn.</li>
         <li><strong>Trên trình duyệt của bạn:</strong> giỏ hàng và danh sách đơn đã đặt được lưu ngay trên máy bạn; cookie đăng nhập khách sỉ; cookie ghi nhận bạn đến từ bài giới thiệu nào (lưu 7 ngày).</li>
+        <li><strong>Thống kê ẩn danh:</strong> số lượt xem trang, xem sản phẩm, thêm giỏ, mở bước đặt hàng – gắn với một mã phiên ngẫu nhiên, không kèm tên, số điện thoại hay địa chỉ IP – để cửa hàng biết cần cải thiện bước nào.</li>
+        <li><strong>Đánh giá sản phẩm:</strong> số sao và nhận xét bạn gửi sau khi nhận hàng; trên web chỉ hiện tên đã che bớt (ví dụ "Tuấn N."), không hiện số điện thoại.</li>
       </ul>
       <h2>Chúng tôi dùng thông tin để</h2>
       <ul>

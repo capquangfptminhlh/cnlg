@@ -110,3 +110,26 @@
   .info-dl dd { margin-bottom: 8px; }
   .ssr-footer-links { grid-template-columns: 1fr; }
 }
+
+/* Trang đánh giá đơn hàng (/danh-gia/…) */
+.review-main { grid-template-columns: minmax(0, 720px); justify-content: center; }
+.rv-item { border: 1px solid #edf0f4; border-radius: 14px; padding: 14px; margin-bottom: 12px; background: #fff; }
+.rv-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.rv-head img { width: 56px; height: 56px; object-fit: contain; border-radius: 10px; background: #f6f8fc; flex: none; }
+.rv-head strong { display: block; font-size: 15px; line-height: 1.35; color: #111827; }
+.rv-head small { color: #6b7280; }
+.rv-stars { display: flex; align-items: center; gap: 4px; margin-bottom: 10px; }
+.rv-stars label { cursor: pointer; font-size: 28px; color: #d1d5db; line-height: 1; }
+.rv-stars input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.rv-stars .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.rv-stars:has(input[value="1"]:checked) label:nth-of-type(-n+1) i,
+.rv-stars:has(input[value="2"]:checked) label:nth-of-type(-n+2) i,
+.rv-stars:has(input[value="3"]:checked) label:nth-of-type(-n+3) i,
+.rv-stars:has(input[value="4"]:checked) label:nth-of-type(-n+4) i,
+.rv-stars:has(input[value="5"]:checked) label:nth-of-type(-n+5) i { color: #f59e0b; }
+.rv-stars input:focus-visible + i { outline: 2px solid #ff8a65; outline-offset: 2px; border-radius: 4px; }
+.rv-word { margin-left: 8px; font-size: 14px; font-weight: 600; color: #b45309; }
+.rv-item textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px; font: inherit; font-size: 14px; resize: vertical; }
+.rv-submit { width: 100%; height: 48px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #ff6a3d, #f2471d); color: #fff; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.rv-submit:disabled { opacity: .6; }
+.rv-err { color: #dc2626; margin-top: 8px; }

@@ -37,6 +37,9 @@ const customerMessage = require('./services/customerMessage');
 const catalogImage = require('./services/catalogImage');
 const seoPages = require('./services/seoPages');
 const infoPages = require('./services/infoPages');
+const funnel = require('./services/funnel');
+const reviews = require('./services/reviews');
+const reviewPage = require('./services/reviewPage');
 const imageOptimizer = require('./services/imageOptimizer');
 const taobaoPublic = require('./services/taobaoPublic');
 const taobaoPriceShipping = require('./services/taobaoPriceShipping');
@@ -317,6 +320,72 @@ app.get('/llms.txt', (req, res) => {
   }));
 });
 
+// ───────── Phễu mua hàng ẩn danh (services/funnel.js) ─────────
+app.post('/api/t', rateLimit('funnel', 10 * 60e3, 600), (req, res) => {
+  funnel.record(String(req.body?.s || ''), String(req.body?.sid || ''), { userAgent: req.get('user-agent') || '' });
+  res.status(204).end();
+});
+app.get('/api/admin/funnel', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store').json({ success: true, data: funnel.report({ days: Number(req.query.days) || 7 }) });
+});
+
+// ───────── Đánh giá thật từ khách đã nhận hàng (services/reviews.js) ─────────
+app.get(/^\/danh-gia\/(HM[A-Z0-9]{6,10})\/?$/, (req, res) => {
+  res.type('html').set('Cache-Control', 'no-store').set('X-Robots-Tag', 'noindex, nofollow')
+    .send(reviewPage.renderReviewPage({ orderId: req.params[0], assetVersion: seo.ASSET_VERSION }));
+});
+app.get('/api/reviews/order/:id', rateLimit('review-read', 10 * 60e3, 60), (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const order = orderStore.getOrderById(String(req.params.id || '').toUpperCase());
+  if (!canAccessOrder(req, order)) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
+  const can = reviews.canReview(order);
+  res.json({ success: true, data: { order_id: order.id, can_review: can, items: can ? reviews.pendingItems(order).map(i => ({ ...i, name: stripSupplierText(i.name), image: catalogImage.maskMediaUrl(i.image) })) : [] } });
+});
+app.post('/api/reviews/order/:id', rateLimit('review-write', 10 * 60e3, 10), (req, res) => {
+  const order = orderStore.getOrderById(String(req.params.id || '').toUpperCase());
+  if (!canAccessOrder(req, order)) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
+  try {
+    const created = reviews.submit(order, req.body?.items);
+    emitAdmin(io, 'ADMIN_REVIEWS_CHANGED', { count: created.length });
+    notify.alert(`Có ${created.length} đánh giá mới chờ duyệt (đơn ${order.id}). Duyệt ở Admin → Đánh giá.`).catch(() => {});
+    res.json({ success: true, data: { created: created.length } });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+// Đánh giá đã duyệt + số đã bán thật của 1 SP (gồm các phân loại đã gộp)
+function productIdsOf(p) {
+  return [...new Set([p.id, ...(p.variants || []).flatMap(v => [v.product_id, ...(v.all_ids || [])])].map(Number).filter(Number.isSafeInteger))];
+}
+let soldCache = { at: 0, map: new Map() };
+function soldMap() {
+  if (Date.now() - soldCache.at > 5 * 60e3) soldCache = { at: Date.now(), map: reviews.soldCounts(orderStore.getOrders()) };
+  return soldCache.map;
+}
+app.get('/api/products/:id/reviews', (req, res) => {
+  const p = storeCatalog.findProduct(Number(req.params.id));
+  if (!p) return res.status(404).json({ success: false, error: 'Không tìm thấy sản phẩm' });
+  const ids = productIdsOf(p);
+  const sold = ids.reduce((s, id) => s + (soldMap().get(id) || 0), 0);
+  res.set('Cache-Control', 'public, max-age=60').json({ success: true, data: { ...reviews.forProduct(ids, { limit: 5 }), sold } });
+});
+app.get('/api/admin/reviews', requireAdmin, (req, res) => {
+  const st = String(req.query.status || 'pending');
+  const list = reviews.getAll().filter(r => st === 'all' || r.status === st).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 300);
+  const counts = Object.fromEntries(reviews.STATUSES.map(k => [k, reviews.getAll().filter(r => r.status === k).length]));
+  res.set('Cache-Control', 'no-store').json({ success: true, data: list, counts });
+});
+app.post('/api/admin/reviews/:id/status', requireAdmin, (req, res) => {
+  try {
+    const r = reviews.setStatus(String(req.params.id), String(req.body?.status || ''));
+    if (!r) return res.status(404).json({ success: false, error: 'Không tìm thấy đánh giá.' });
+    emitAdmin(io, 'ADMIN_REVIEWS_CHANGED', { id: r.id });
+    res.json({ success: true, data: r });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // Taobao is a separate BESI browsing tab; private staged products never enter the
 // main product catalog, cart, orders, and public APIs.
 app.get('/taobao', (req,res) => res.type('html').set('X-Robots-Tag','noindex, follow')
@@ -580,8 +649,9 @@ app.get('/sp/:slugId', async (req, res) => {
     related = guestPrice(related.slice(0, 12));
     let descHtml = '';
     try { descHtml = detail?.description ? stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(detail.description))) : ''; } catch (e) {}
+    const rv = reviews.forProduct(productIdsOf(product), { limit: 5 });
     res.type('html').send(seo.renderProductPage(req, shown, detail, readConfig(), {
-      crumbs, category: cat, footerHtml: cachedFooterHtml,
+      crumbs, category: cat, footerHtml: cachedFooterHtml, reviews: rv,
       articleHtml: seoPages.productArticleHtml({ product: shown, crumbs, descHtml, related, category: cat, qaHtml: infoPages.productQaHtml(shown, readConfig()) })
     }));
   } catch (err) {
@@ -1864,7 +1934,8 @@ app.get('/api/orders/:id/track', rateLimit('track', 10 * 60e3, 30), (req, res) =
     order.completed_at && { status: 'COMPLETED', at: order.completed_at, label: 'Giao hàng thành công' },
     order.cancelled_at && { status: 'CANCELLED', at: order.cancelled_at, label: customerSafe(order.cancel_reason) || 'Đã huỷ' }
   ].filter(Boolean);
-  res.set('Cache-Control', 'private, no-store').json({ success: true, data: { ...publicOrder(order), address: order.customer?.address, timeline, access_key: customers.orderKey(order.id) } });
+  const key = customers.orderKey(order.id);
+  res.set('Cache-Control', 'private, no-store').json({ success: true, data: { ...publicOrder(order), address: order.customer?.address, timeline, access_key: key, review_url: reviews.canReview(order) ? `/danh-gia/${encodeURIComponent(order.id)}?k=${key}` : null } });
 });
 
 /** Xác nhận đã nhận tiền (admin bấm tay hoặc webhook ngân hàng) – dùng chung để ghi nguồn & báo Telegram */
@@ -2017,7 +2088,11 @@ app.get('/api/admin/orders/:id/customer-message', requireAdmin, (req, res) => {
   if (!order) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
   const base = seo.baseUrl(req);
   const cfg = readConfig();
-  const msg = customerMessage.buildCustomerMessage(order, { storeName: cfg.store?.name || 'Hoàng Minh Store', trackUrl: `${base}/?tra-cuu=${encodeURIComponent(order.id)}` });
+  const msg = customerMessage.buildCustomerMessage(order, {
+    storeName: seo.isBesiHost(req) ? 'BESI' : (cfg.store?.name || 'Hoàng Minh Store'),
+    trackUrl: `${base}/?tra-cuu=${encodeURIComponent(order.id)}`,
+    reviewUrl: reviews.canReview(order) ? `${base}/danh-gia/${encodeURIComponent(order.id)}?k=${customers.orderKey(order.id)}` : null
+  });
   res.json({ success: true, data: { ...msg, zalo: customerMessage.zaloLink(order.customer?.phone), phone: order.customer?.phone || null, local_link: !process.env.PUBLIC_BASE_URL } });
 });
 
@@ -2830,6 +2905,7 @@ if (require.main === module) {
     orderExpiry.startOrderExpiry(io, readConfig);
     backup.startBackups();
     imageOptimizer.startPruning();
+    funnel.start();
     watchdog.startWatchdog(io);
     notify.startZaloBotPolling();
 

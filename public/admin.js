@@ -154,6 +154,7 @@ const MODULE_META = {
   'shipping': ['Cấu hình Vận chuyển', 'Thiết lập phí ship thật theo Phường/Xã từ kho DropBuy và hạn thanh toán'],
   'payments': ['Ngân hàng & Đối soát CK', 'Cấu hình tài khoản nhận tiền VietQR và lịch sử Webhook SePay / Casso'],
   'dropbuy': ['Kết nối Kho DropBuy', 'Quản lý tài khoản đại lý DropBuy, đồng bộ Realtime và kiểm tra kết nối API'],
+  'reviews': ['Đánh giá của khách', 'Duyệt đánh giá thật từ khách đã nhận hàng trước khi hiện trên web'],
   'customers': ['Khách sỉ & Giá lẻ', 'Duyệt tài khoản khách sỉ (đăng nhập mới thấy giá sỉ) và đặt % giá lẻ cho khách chưa đăng nhập'],
   'store-info': ['Thông tin cửa hàng', 'Tên đăng ký, mã số thuế, địa chỉ, hotline, Zalo… hiện trên trang Giới thiệu, Liên hệ, chính sách và dữ liệu cho Google / AI'],
   'techmall': ['Kho TechMall.vn & Giá riêng', 'Đăng nhập đại lý TechMall lấy giá sỉ, cài đặt % lãi riêng và đồng bộ realtime 5 phút/lần']
@@ -192,6 +193,7 @@ function switchAdminModule(modName, pushHash = true) {
   if (target === 'techmall') loadTechmallAll();
   if (target === 'customers') loadCustomers();
   if (target === 'store-info') loadStoreInfo();
+  if (target === 'reviews') loadReviews();
 }
 
 // ───────────── Thông tin cửa hàng (trang Giới thiệu / Liên hệ / chính sách) ─────────────
@@ -1354,6 +1356,90 @@ loadPayments();
 
 
 // ============================ DOANH THU & LÃI ============================
+// ───────────── Phễu mua hàng ─────────────
+let funnelDays = 7;
+async function loadFunnel() {
+  const body = document.getElementById('funnelBody');
+  if (!body) return;
+  try {
+    const json = await (await adminFetch(`/api/admin/funnel?days=${funnelDays}`)).json();
+    if (!json.success) throw new Error(json.error);
+    const d = json.data;
+    const top = Math.max(1, d.steps[0].sessions);
+    body.innerHTML = d.steps[0].sessions === 0
+      ? '<p class="help-text">Chưa có số liệu – phễu bắt đầu đếm từ khi bản cập nhật này chạy.</p>'
+      : `<div class="funnel-rows">${d.steps.map((s, i) => `
+          <div class="funnel-row">
+            <div class="funnel-label">${s.label}</div>
+            <div class="funnel-bar"><span style="width:${Math.max(2, (s.sessions / top) * 100)}%"></span></div>
+            <div class="funnel-num"><b>${s.sessions.toLocaleString('vi-VN')}</b>${i ? `<small class="${s.rate_from_prev != null && s.rate_from_prev < 30 ? 'is-low' : ''}">${s.rate_from_prev ?? 0}% từ bước trước</small>` : '<small>khách</small>'}</div>
+          </div>`).join('')}</div>
+        <p class="help-text" style="margin-top:8px;">Tỉ lệ đặt hàng / khách vào web: <b>${d.overall_rate ?? 0}%</b> trong ${d.days} ngày.</p>`;
+  } catch (e) {
+    body.innerHTML = `<p style="color:#ef4444;">${esc(e.message)}</p>`;
+  }
+}
+document.getElementById('funnelDays')?.addEventListener('click', e => {
+  const b = e.target.closest('[data-funnel-days]');
+  if (!b) return;
+  funnelDays = Number(b.dataset.funnelDays);
+  document.querySelectorAll('[data-funnel-days]').forEach(x => x.classList.toggle('active', x === b));
+  loadFunnel();
+});
+
+// ───────────── Đánh giá của khách ─────────────
+let reviewFilter = 'pending';
+const RV_LABEL = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Đã ẩn', all: 'Tất cả' };
+async function loadReviews() {
+  const box = document.getElementById('reviewList');
+  try {
+    const json = await (await adminFetch(`/api/admin/reviews?status=${reviewFilter}`)).json();
+    if (!json.success) throw new Error(json.error);
+    const c = json.counts || {};
+    setReviewBadge(c.pending || 0);
+    document.getElementById('reviewPills').innerHTML = ['pending', 'approved', 'rejected', 'all'].map(k =>
+      `<button type="button" class="order-pill${reviewFilter === k ? ' active' : ''}" data-rv-filter="${k}">${RV_LABEL[k]} <span>${k === 'all' ? (c.pending || 0) + (c.approved || 0) + (c.rejected || 0) : (c[k] || 0)}</span></button>`).join('');
+    box.innerHTML = json.data.length ? json.data.map(r => `
+      <div class="rv-admin-item">
+        <div class="rv-admin-head"><span class="rv-admin-stars">${'★'.repeat(r.rating)}<span>${'★'.repeat(5 - r.rating)}</span></span>
+          <b>${esc(r.name)}</b> · <span>${esc(r.product_name || '')}</span> · <small>Đơn ${esc(r.order_id)} · ${new Date(r.created_at).toLocaleString('vi-VN')}</small></div>
+        ${r.comment ? `<p>${esc(r.comment)}</p>` : '<p class="help-text">(không viết nhận xét)</p>'}
+        <div class="rv-admin-actions">
+          ${r.status !== 'approved' ? `<button type="button" class="btn btn-primary" data-rv-id="${esc(r.id)}" data-rv-status="approved">Duyệt</button>` : ''}
+          ${r.status !== 'rejected' ? `<button type="button" class="btn btn-outline" data-rv-id="${esc(r.id)}" data-rv-status="rejected">Ẩn</button>` : ''}
+          <span class="help-text">${RV_LABEL[r.status]}</span>
+        </div>
+      </div>`).join('') : '<p class="help-text">Chưa có đánh giá nào ở mục này.</p>';
+  } catch (e) {
+    box.innerHTML = `<p style="color:#ef4444;">${esc(e.message)}</p>`;
+  }
+}
+function setReviewBadge(n) {
+  const b = document.getElementById('navBadgeReviews');
+  if (b) { b.textContent = n; b.style.display = n ? '' : 'none'; }
+}
+document.getElementById('reviewPills')?.addEventListener('click', e => {
+  const b = e.target.closest('[data-rv-filter]');
+  if (b) { reviewFilter = b.dataset.rvFilter; loadReviews(); }
+});
+document.getElementById('reviewList')?.addEventListener('click', async e => {
+  const b = e.target.closest('[data-rv-id]');
+  if (!b) return;
+  b.disabled = true;
+  try {
+    const json = await (await adminFetch(`/api/admin/reviews/${encodeURIComponent(b.dataset.rvId)}/status`, { method: 'POST', body: JSON.stringify({ status: b.dataset.rvStatus }) })).json();
+    if (!json.success) throw new Error(json.error);
+    loadReviews();
+  } catch (err) {
+    uiAlert('Không cập nhật được: ' + err.message);
+    b.disabled = false;
+  }
+});
+socket.on('ADMIN_REVIEWS_CHANGED', () => {
+  if (document.querySelector('.admin-module-pane[data-module="reviews"]')?.classList.contains('active')) loadReviews();
+  else adminFetch('/api/admin/reviews?status=pending').then(r => r.json()).then(j => j.success && setReviewBadge(j.counts.pending || 0)).catch(() => {});
+});
+
 async function loadReport() {
   try {
     const json = await (await adminFetch('/api/admin/report?days=30')).json();
@@ -1406,6 +1492,8 @@ document.getElementById('backupNowBtn').addEventListener('click', async () => {
 
 socket.on('ADMIN_ORDER_CHANGED', () => loadReport());
 loadReport();
+loadFunnel();
+adminFetch('/api/admin/reviews?status=pending').then(r => r.json()).then(j => j.success && setReviewBadge(j.counts.pending || 0)).catch(() => {});
 loadBackupInfo();
 
 

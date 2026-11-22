@@ -180,7 +180,7 @@
         <div class="acct-oi acct-ometa"><span>${o.payment_method === 'COD' ? 'Thanh toán khi nhận hàng' : 'Chuyển khoản'}${o.price_tier === 'wholesale' ? ' · giá sỉ' : o.price_tier === 'retail' ? ' · giá lẻ' : ''}</span><span>Giao tới: ${esc([o.address, o.customer?.ward_name, o.customer?.province].filter(Boolean).join(', '))}</span></div>
         ${o.cancel_reason ? `<div class="acct-oi acct-ometa"><span>Lý do huỷ: ${esc(o.cancel_reason)}</span></div>` : ''}
         ${track}
-        <div class="acct-oactions"><button type="button" class="btn-primary" data-reorder="${esc(o.id)}"><i class="fa-solid fa-rotate-right"></i> Mua lại đơn này</button></div>
+        <div class="acct-oactions">${o.status === 'COMPLETED' && o.access_key ? `<a class="btn-ghost" href="/danh-gia/${encodeURIComponent(o.id)}?k=${encodeURIComponent(o.access_key)}"><i class="fa-solid fa-star"></i> Đánh giá</a>` : ''}<button type="button" class="btn-primary" data-reorder="${esc(o.id)}"><i class="fa-solid fa-rotate-right"></i> Mua lại đơn này</button></div>
       </div>
     </details>`;
   }

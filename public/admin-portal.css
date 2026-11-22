@@ -1328,3 +1328,22 @@ button:disabled {
 .cust-create-actions .help-text { margin-right: auto; }
 @media (max-width: 760px) { .cust-create { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 480px) { .cust-create { grid-template-columns: 1fr; } }
+
+/* Phễu mua hàng */
+.funnel-rows { display: flex; flex-direction: column; gap: 8px; }
+.funnel-row { display: grid; grid-template-columns: 170px minmax(0, 1fr) 150px; gap: 12px; align-items: center; }
+.funnel-label { font-weight: 600; color: #334155; }
+.funnel-bar { height: 22px; background: #f1f5f9; border-radius: 8px; overflow: hidden; }
+.funnel-bar span { display: block; height: 100%; background: linear-gradient(90deg, #ff8a5c, #f2471d); border-radius: 8px; }
+.funnel-num b { font-size: 16px; color: #0f172a; margin-right: 6px; }
+.funnel-num small { color: #64748b; }
+.funnel-num small.is-low { color: #dc2626; font-weight: 700; }
+@media (max-width: 760px) { .funnel-row { grid-template-columns: 1fr; gap: 4px; } }
+
+/* Đánh giá của khách */
+.rv-admin-item { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+.rv-admin-head { font-size: 13px; color: #475569; }
+.rv-admin-stars { color: #f59e0b; letter-spacing: 1px; margin-right: 6px; }
+.rv-admin-stars span { color: #cbd5e1; }
+.rv-admin-item p { margin: 6px 0; color: #0f172a; }
+.rv-admin-actions { display: flex; gap: 8px; align-items: center; }

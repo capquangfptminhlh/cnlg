@@ -653,6 +653,7 @@ function renderDetailModal(prod) {
             <label class="detail-eta-to">Giao tới <select id="detailEtaProvince" aria-label="Tỉnh/thành nhận hàng"><option value="">Chọn tỉnh/thành</option></select></label></div>
         </div>` : ''}
 
+        <div class="detail-social" id="detailSocial" hidden></div>
         <ul class="detail-trust" aria-label="Cam kết khi mua">
           <li><i class="fa-solid fa-box-open" aria-hidden="true"></i><span><b>Kiểm tra hàng</b> rồi mới trả tiền</span></li>
           <li><i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span><b>Đổi trả 7 ngày</b> nếu lỗi, giao sai</span></li>
@@ -698,9 +699,28 @@ function renderDetailModal(prod) {
     </div>` : ''}
   `;
   loadDetailEta(prod.id);
+  loadDetailReviews(prod.id);
 
   setupGallerySwipe(gallery.length, activeIndex);
   window.dispatchEvent(new CustomEvent('storefront:detail-open', { detail: { id: prod.id } }));
+}
+
+// Đánh giá THẬT đã duyệt + số đã bán từ đơn thật; không có thì không hiện gì (không bịa)
+async function loadDetailReviews(productId) {
+  const box = document.getElementById('detailSocial');
+  if (!box) return;
+  const j = await fetch(`/api/products/${encodeURIComponent(productId)}/reviews`).then(r => r.json()).catch(() => null);
+  if (document.getElementById('detailSocial') !== box || !j || !j.success) return;
+  const d = j.data;
+  const starsOf = n => '<span class="rv-mini-stars" aria-hidden="true">' + [1, 2, 3, 4, 5].map(i => `<i class="fa-${i <= Math.round(n) ? 'solid' : 'regular'} fa-star"></i>`).join('') + '</span>';
+  const parts = [];
+  if (d.count > 0) parts.push(`<span class="ds-rating">${starsOf(d.average)} <b>${String(d.average).replace('.', ',')}</b> (${d.count} đánh giá)</span>`);
+  if (d.sold >= 5) parts.push(`<span class="ds-sold">Đã bán <b>${Number(d.sold).toLocaleString('vi-VN')}</b></span>`);
+  if (!parts.length) return;
+  box.innerHTML = `<div class="ds-line">${parts.join('<span class="ds-dot">·</span>')}</div>` +
+    (d.items.length ? `<details class="ds-reviews"><summary>Xem đánh giá của khách</summary>${d.items.map(r => `
+      <div class="ds-review"><div class="ds-review-head">${starsOf(r.rating)} <b>${esc(r.name)}</b> <small>${new Date(r.created_at).toLocaleDateString('vi-VN')}</small></div>${r.comment ? `<p>${esc(r.comment)}</p>` : ''}</div>`).join('')}</details>` : '');
+  box.hidden = false;
 }
 
 // Ngày giao dự kiến trên trang SP; tỉnh chọn ở đây cũng là tỉnh mặc định ở bước đặt hàng
@@ -931,6 +951,26 @@ const HOME_TITLE = STORE_BRAND === 'BESI'
   ? 'BESI | Sàn mua lẻ giá tốt, nhập sỉ từ nhiều tổng kho'
   : 'Hoàng Minh Store | Tổng Kho Giá Sỉ • Flash Sale Phụ Kiện, Công Nghệ & Gia Dụng';
 window.STORE_BRAND = STORE_BRAND;
+
+// Phễu mua hàng ẩn danh (services/funnel.js): không gửi tên, SĐT hay địa chỉ – chỉ tên bước + mã phiên ngẫu nhiên
+const FUNNEL_SID = (() => {
+  try {
+    let s = sessionStorage.getItem('hm_sid');
+    if (!s) { s = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); sessionStorage.setItem('hm_sid', s); }
+    return s;
+  } catch (e) { return ''; }
+})();
+function trackStep(step) {
+  if (!FUNNEL_SID) return;
+  const body = JSON.stringify({ s: step, sid: FUNNEL_SID });
+  try {
+    if (navigator.sendBeacon && navigator.sendBeacon('/api/t', new Blob([body], { type: 'application/json' }))) return;
+    fetch('/api/t', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+  } catch (e) {}
+}
+window.trackStep = trackStep;
+trackStep('view');
+window.addEventListener('storefront:detail-open', () => trackStep('product'));
 window.HOME_TITLE = HOME_TITLE;
 function setProductHash(prod) {
   const url = `/sp/${prod.id}-${String(prod.slug || '').slice(0, 80)}`;
@@ -1018,6 +1058,7 @@ function cartLine(p, quantity, variant = null) {
 }
 
 function addLineToCart(line) {
+  trackStep('cart');
   const existing = state.cart.find(i => i.key === line.key);
   if (existing) {
     existing.quantity = Math.min(50, existing.quantity + line.quantity);
@@ -1361,6 +1402,7 @@ wardSelect.addEventListener('change', updateCheckoutSummary);
 document.getElementById('retryShippingQuote').addEventListener('click', updateCheckoutSummary);
 
 function openCheckoutModal() {
+  trackStep('checkout');
   closeCartDrawer();
   checkoutModal.classList.add('open');
   if (provinceSelect.value && wardSelect.disabled) loadWards(provinceSelect.value);
@@ -1430,6 +1472,7 @@ checkoutForm.addEventListener('submit', async e => {
 
     checkoutModal.classList.remove('open');
     rememberOrder(json.orderId, customer.phone);
+    trackStep('order');
     if (json.payment_method === 'COD') {
       state.cart = [];
       updateCartUI();
@@ -2187,6 +2230,7 @@ async function trackOrder(id, phone) {
         <div style="font-size:12px; color:#94a3b8;">Thanh toán: ${o.payment_method === 'COD' ? 'khi nhận hàng (COD)' : 'chuyển khoản'}</div>
         ${deliveryBlock(o)}
         ${o.shipping_ref_code ? shipmentBlock(o) : ''}
+        ${o.review_url ? `<a class="btn-review-order" href="${esc(o.review_url)}"><i class="fa-solid fa-star"></i> Đánh giá sản phẩm trong đơn</a>` : ''}
         <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(148,163,184,0.2); display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;"><span style="font-size:12px; color:#94a3b8;">Nhận mã vận đơn & hành trình tự động qua Zalo:</span><button type="button" class="btn-ghost" style="font-size:12px; padding:6px 10px; color:#38bdf8; border-color:rgba(56,189,248,0.35);" onclick="openZaloBotForOrder('${esc(o.id)}')"><i class="fa-solid fa-bell"></i> Kết nối Zalo Bot (#${esc(o.id)})</button></div>
         ${o.status === 'PENDING_PAYMENT' && o.payment ? `<button type="button" class="btn-primary-block" style="margin-top:12px;" onclick="resumePayment('${esc(o.id)}')"><i class="fa-solid fa-qrcode"></i> Mở Mã QR Để Thanh Toán</button>` : ''}
       </div>`;

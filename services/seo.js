@@ -145,7 +145,7 @@ function renderProductPage(req, product, detail, config, extra = {}) {
   const ld = pages.ldScript([
     infoPages.organizationLd(base, config),
     infoPages.returnPolicyLd(base),
-    pages.productLd(base, product, { description: stripSupplierText(stripHtml(detail?.description)) || desc, category: extra.category }),
+    pages.productLd(base, product, { description: stripSupplierText(stripHtml(detail?.description)) || desc, category: extra.category, reviews: extra.reviews }),
     pages.breadcrumbLd(base, crumbs)
   ]);
   const head = `

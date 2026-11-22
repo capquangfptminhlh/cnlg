@@ -46,6 +46,12 @@
           <span class="tab-badge" id="navBadgeCustomers" style="display:none;">0</span>
         </button>
 
+        <button type="button" class="admin-tab-btn" data-target="reviews" onclick="switchAdminModule('reviews')">
+          <i class="fa-solid fa-star-half-stroke"></i>
+          <span>Đánh giá</span>
+          <span class="tab-badge" id="navBadgeReviews" style="display:none;">0</span>
+        </button>
+
         <div class="sidebar-group-label">Hàng hoá &amp; Giá bán</div>
         <button type="button" class="admin-tab-btn" data-target="pricing-rules" onclick="switchAdminModule('pricing-rules')">
           <i class="fa-solid fa-percent"></i>
@@ -157,6 +163,20 @@
                 <div class="stat-val" id="statWaiting">0</div>
               </div>
             </div>
+          </div>
+
+          <div class="admin-card" id="funnelSection">
+            <div class="flex-between" style="flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+              <div>
+                <h3><i class="fa-solid fa-filter"></i> Phễu mua hàng</h3>
+                <p class="help-text" style="margin:2px 0 0;">Số khách (phiên ẩn danh, không gắn tên/SĐT) đi tới từng bước. Bước nào tụt mạnh là chỗ cần sửa.</p>
+              </div>
+              <div class="order-filter-pills" id="funnelDays">
+                <button type="button" class="order-pill active" data-funnel-days="7">7 ngày</button>
+                <button type="button" class="order-pill" data-funnel-days="30">30 ngày</button>
+              </div>
+            </div>
+            <div id="funnelBody"><p class="help-text">Đang tải…</p></div>
           </div>
 
           <div class="admin-card" id="reportSection">
@@ -466,6 +486,19 @@
         <!-- =================================================================
              MODULE 6: CẤU HÌNH VẬN CHUYỂN & HẠN ĐƠN (shipping)
              ================================================================= -->
+        <section class="admin-module-pane" data-module="reviews">
+          <div class="admin-card">
+            <div class="flex-between" style="flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+              <div>
+                <h3><i class="fa-solid fa-star-half-stroke"></i> Đánh giá của khách</h3>
+                <p class="help-text" style="margin:2px 0 0;">Chỉ khách có đơn đã giao mới gửi được (link trong tin nhắn Zalo / trang tra cứu đơn). Bấm <b>Duyệt</b> để hiện trên trang sản phẩm và Google.</p>
+              </div>
+              <div class="order-filter-pills" id="reviewPills"></div>
+            </div>
+            <div id="reviewList"><p class="help-text">Đang tải…</p></div>
+          </div>
+        </section>
+
         <section class="admin-module-pane" data-module="store-info">
           <div class="admin-card">
             <h3><i class="fa-solid fa-id-card"></i> Thông tin cửa hàng hiện trên web</h3>

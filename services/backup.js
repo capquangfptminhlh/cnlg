@@ -12,7 +12,9 @@ const FILES = () => [
   process.env.HM_PAYMENTS_FILE || path.join(DATA_DIR, 'payments.json'),
   path.join(DATA_DIR, 'config.json'),
   // tài khoản khách sỉ (mật khẩu đã băm); mất file này khách phải đăng ký lại, admin duyệt lại
-  path.join(process.env.HM_CUSTOMERS_DIR || DATA_DIR, 'customers.json')
+  path.join(process.env.HM_CUSTOMERS_DIR || DATA_DIR, 'customers.json'),
+  // đánh giá thật của khách – mất là không lấy lại được
+  process.env.HM_REVIEWS_FILE || path.join(DATA_DIR, 'reviews.json')
 ];
 
 // Ngày theo giờ Việt Nam (UTC+7) để mỗi bản sao lưu khớp với một ngày bán hàng

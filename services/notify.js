@@ -127,7 +127,10 @@ const normPhone = v => String(v || '').replace(/\D/g, '').replace(/^84/, '0');
 function buildOrderMessageForCustomer(order) {
   const base = siteBaseUrl();
   const trackUrl = `${base}/?tra-cuu=${encodeURIComponent(order.id)}`;
-  const msg = customerMessage.buildCustomerMessage(order, { storeName: 'Hoàng Minh Store', trackUrl });
+  const isBesi = /besi\.com\.vn/i.test(base);
+  const done = order.status === 'COMPLETED' && !order.is_test;
+  const reviewUrl = done ? `${base}/danh-gia/${encodeURIComponent(order.id)}?k=${require('./customers').orderKey(order.id)}` : null;
+  const msg = customerMessage.buildCustomerMessage(order, { storeName: isBesi ? 'BESI' : 'Hoàng Minh Store', trackUrl, reviewUrl });
   const waybill = order.dropbuy_sync?.shipping_ref_code ? String(order.dropbuy_sync.shipping_ref_code).split(',')[0].trim() : '';
   return { ...msg, stageKey: `${msg.stage}:${waybill}` };
 }

@@ -117,3 +117,79 @@ body.show-adv-filters #advFilters > .besi-universal-finder { margin-top: 4px; }
 .checkout-form .ward-filter { width: 100%; margin-bottom: 6px; padding: 9px 12px; border: 1px solid #e5e7eb; border-radius: 10px; font: inherit; font-size: 14px; background: #f9fafb; }
 .checkout-form .ward-filter:focus { outline: none; border-color: #ff8a65; background: #fff; }
 .checkout-form .ward-filter:disabled { display: none; }
+
+/* ═════════ Đợt 3 – đánh giá thật ═════════ */
+.detail-social { margin: 8px 0 2px; font-size: 13.5px; color: #4b5563; }
+.detail-social .ds-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.detail-social .ds-dot { color: #d1d5db; }
+.detail-social b { color: #111827; }
+.rv-mini-stars { color: #f59e0b; font-size: 12px; letter-spacing: 1px; }
+.rv-mini-stars .fa-regular { color: #d1d5db; }
+.ds-reviews { margin-top: 8px; border: 1px solid #edf0f4; border-radius: 12px; padding: 8px 12px; background: #fff; }
+.ds-reviews summary { cursor: pointer; font-weight: 600; color: #e5481f; }
+.ds-review { padding: 8px 0; border-top: 1px solid #f3f4f6; }
+.ds-review:first-of-type { border-top: 0; }
+.ds-review-head small { color: #9ca3af; }
+.ds-review p { margin: 4px 0 0; color: #374151; }
+.btn-review-order { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; height: 44px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; font-weight: 700; text-decoration: none; }
+
+/* ═════════ Đợt 3 – quy chuẩn màu / chữ / bo góc BESI ═════════
+   Thang chữ: 11 (nhãn nhỏ) · 12 (chú thích) · 13.5 (chữ giao diện) · 15 (nội dung, giá thẻ) · 18 (tiêu đề nhỏ) · 24 (tiêu đề mục)
+   Màu: cam thương hiệu #ff5a2c · cam đậm (giá, chữ nhấn) #e5481f · chữ chính #111827 · chữ phụ #4b5563 · chữ mờ #6b7280 · viền #edf0f4
+   Bo góc: thẻ 14px · nút/ô 10px · viên thuốc 999px */
+:root {
+  --besi-orange: #ff5a2c; --besi-orange-strong: #e5481f; --besi-ink: #111827; --besi-ink-2: #4b5563; --besi-muted: #6b7280; --besi-line: #edf0f4;
+  --besi-fs-xs: 11px; --besi-fs-sm: 12px; --besi-fs-ui: 13.5px; --besi-fs-md: 15px; --besi-fs-lg: 18px; --besi-fs-xl: 24px;
+  --besi-r-card: 14px; --besi-r-ctl: 10px;
+}
+
+/* Không còn chữ dưới 11px (trước có 8–10px: khó đọc trên điện thoại) */
+.top-perks span, .top-links .admin-link { font-size: var(--besi-fs-sm) !important; }
+.logo-stack .logo-sub { font-size: 10.5px !important; }
+.cart-count-badge { font-size: var(--besi-fs-xs) !important; }
+.market-links a, .market-links button { font-size: var(--besi-fs-ui) !important; }
+.market-banner-copy .market-banner-label, .market-banner-copy .banner-overline { font-size: var(--besi-fs-xs) !important; }
+.market-banner-copy .banner-catalog-count { font-size: var(--besi-fs-sm) !important; }
+.market-shortcut > span { font-size: var(--besi-fs-sm) !important; }
+.shortcut-icon .shortcut-pop { font-size: 9.5px !important; }
+.besi-pick .besi-pick-title { font-size: var(--besi-fs-sm) !important; }
+.besi-pick .besi-pick-buy { font-size: var(--besi-fs-sm) !important; }
+.si-guarantee-item strong { font-size: var(--besi-fs-ui) !important; }
+.si-guarantee-item small { font-size: var(--besi-fs-sm) !important; }
+.cat-scroll .cat-btn, .cat-scroll .cat-btn-name { font-size: var(--besi-fs-ui) !important; }
+.brand-bar-title { font-size: var(--besi-fs-ui) !important; }
+.brand-pills-wrap .brand-pill { font-size: var(--besi-fs-ui) !important; }
+.brand-pill .brand-pill-count { font-size: var(--besi-fs-xs) !important; }
+.premium-heading-kicker { font-size: var(--besi-fs-xs) !important; }
+.filter-left .catalog-badge { font-size: var(--besi-fs-sm) !important; }
+.price-filters .price-pill { font-size: var(--besi-fs-sm) !important; }
+.card-tag { font-size: var(--besi-fs-xs) !important; }
+.price-old-row .price-strike { font-size: var(--besi-fs-sm) !important; }
+.premium-image-fallback small { font-size: var(--besi-fs-xs) !important; }
+.market-footer-offer button, .drawer-footer .drawer-note { font-size: var(--besi-fs-sm) !important; }
+.mobile-bottom-nav a span, .mobile-bottom-nav button span { font-size: var(--besi-fs-xs) !important; }
+@media (max-width: 700px) {
+  .market-banner-copy p { font-size: var(--besi-fs-sm) !important; }
+  .market-banner-copy .banner-shop-btn { font-size: var(--besi-fs-sm) !important; }
+  .market-shortcut > span { font-size: var(--besi-fs-xs) !important; }
+  .market-links a, .market-links button, .cat-scroll .cat-btn, .cat-scroll .cat-btn-name { font-size: var(--besi-fs-sm) !important; }
+}
+
+/* Thẻ SP thống nhất: tên 14px chữ chính, giá cam đậm 15–17px, nút 13.5px */
+.luxury-card .card-title { font-size: 14px !important; line-height: 1.4 !important; color: var(--besi-ink) !important; }
+.luxury-card .price-highlight, .fs-card .fs-price { color: var(--besi-orange-strong) !important; }
+.luxury-card .btn-buy-instant { font-size: var(--besi-fs-ui) !important; font-weight: 700 !important; }
+.luxury-card, .fs-card, .featured-card { border-radius: var(--besi-r-card) !important; }
+.luxury-card .btn-buy-instant, .luxury-card .btn-add-mini, .fs-card .fs-buy-btn, .fs-card .fs-cart-btn { border-radius: var(--besi-r-ctl) !important; }
+.price-pill, .brand-pill, .cat-scroll .cat-btn { border-radius: 999px !important; }
+
+/* Chữ phụ / mờ dùng chung 2 màu thay vì hàng chục sắc xám */
+.brand-bar-sub, .catalog-badge, .si-guarantee-item small, .market-shortcut > span, .drawer-note, .help-text-muted { color: var(--besi-muted) !important; }
+
+/* Thắng các luật cũ dùng #productGrid / .brand-bar … !important (10px) */
+#productGrid .luxury-card .btn-buy-instant { font-size: var(--besi-fs-ui) !important; }
+#productGrid .price-old-row .price-strike { font-size: var(--besi-fs-sm) !important; }
+.brand-bar .brand-bar-header .brand-bar-title { font-size: var(--besi-fs-ui) !important; }
+.si-save-chip, .fs-si-pill { font-size: var(--besi-fs-xs) !important; }
+.card-corner-off small { font-size: 9.5px !important; }
+@media (max-width: 700px) { #productGrid .luxury-card .btn-buy-instant { font-size: 13px !important; } }

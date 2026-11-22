@@ -23,7 +23,7 @@ function carrierOf(order) {
  * @param {{ storeName?: string, trackUrl: string }} opts  trackUrl = link mở sẵn ô tra cứu đơn này
  * @returns {{ stage: string, text: string }}
  */
-function buildCustomerMessage(order, { storeName = 'Hoàng Minh Store', trackUrl }) {
+function buildCustomerMessage(order, { storeName = 'Hoàng Minh Store', trackUrl, reviewUrl = null }) {
   const c = order.customer || {};
   const greet = `${storeName} xin chào anh/chị ${c.name || ''}`.trim() + '.';
   const items = (order.items || []).map(i => `- ${i.name}${i.variant_name ? ` (${i.variant_name})` : ''} x${i.quantity}`).join('\n');
@@ -42,7 +42,8 @@ function buildCustomerMessage(order, { storeName = 'Hoàng Minh Store', trackUrl
     body = `Rất tiếc, đơn ${order.id} đã được huỷ${safeReason(order.cancel_reason) ? ` (${safeReason(order.cancel_reason)})` : ''}. Nếu anh/chị vẫn cần sản phẩm, shop sẵn sàng hỗ trợ đặt lại ạ.`;
   } else if (order.status === 'COMPLETED') {
     stage = 'completed';
-    body = `Đơn ${order.id} đã giao thành công. Cảm ơn anh/chị đã mua hàng! Nếu có gì chưa hài lòng, anh/chị nhắn shop để được hỗ trợ ạ.`;
+    body = `Đơn ${order.id} đã giao thành công. Cảm ơn anh/chị đã mua hàng! Nếu có gì chưa hài lòng, anh/chị nhắn shop để được hỗ trợ ạ.`
+      + (reviewUrl ? `\nAnh/chị dành 30 giây đánh giá sản phẩm giúp shop nhé: ${reviewUrl}` : '');
   } else if (order.status === 'PROCESSING' && waybill) {
     stage = 'shipping';
     body = [

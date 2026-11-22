@@ -139,7 +139,7 @@ const itemListLd = (base, products, offset = 0) => ({
   itemListElement: products.map((p, i) => ({ '@type': 'ListItem', position: offset + i + 1, url: abs(base, productPath(p)), name: cleanName(p.name) }))
 });
 
-function productLd(base, p, { description, category } = {}) {
+function productLd(base, p, { description, category, reviews } = {}) {
   const url = abs(base, productPath(p));
   const variants = Array.isArray(p.variants) && p.variants.length > 1 ? p.variants : [];
   const inStock = p.in_stock !== false;
@@ -163,6 +163,13 @@ function productLd(base, p, { description, category } = {}) {
     ...(description ? { description: description.slice(0, 500) } : {}),
     ...(p.brand ? { brand: { '@type': 'Brand', name: p.brand } } : {}),
     ...(category ? { category: cleanName(category.name) } : {}),
+    ...(reviews && reviews.count > 0 ? {
+      aggregateRating: { '@type': 'AggregateRating', ratingValue: reviews.average, reviewCount: reviews.count, bestRating: 5, worstRating: 1 },
+      review: reviews.items.map(r => ({
+        '@type': 'Review', author: { '@type': 'Person', name: r.name }, datePublished: String(r.created_at).slice(0, 10),
+        reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 }, ...(r.comment ? { reviewBody: r.comment } : {})
+      }))
+    } : {}),
     offers
   };
 }
