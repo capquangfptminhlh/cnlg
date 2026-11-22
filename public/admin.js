@@ -154,6 +154,7 @@ const MODULE_META = {
   'shipping': ['Cấu hình Vận chuyển', 'Thiết lập phí ship thật theo Phường/Xã từ kho DropBuy và hạn thanh toán'],
   'payments': ['Ngân hàng & Đối soát CK', 'Cấu hình tài khoản nhận tiền VietQR và lịch sử Webhook SePay / Casso'],
   'dropbuy': ['Kết nối Kho DropBuy', 'Quản lý tài khoản đại lý DropBuy, đồng bộ Realtime và kiểm tra kết nối API'],
+  'product-copy': ['Mô tả sản phẩm', 'Duyệt mô tả riêng của BESI cho sản phẩm bán chạy trước khi hiện trên web'],
   'reviews': ['Đánh giá của khách', 'Duyệt đánh giá thật từ khách đã nhận hàng trước khi hiện trên web'],
   'customers': ['Khách sỉ & Giá lẻ', 'Duyệt tài khoản khách sỉ (đăng nhập mới thấy giá sỉ) và đặt % giá lẻ cho khách chưa đăng nhập'],
   'store-info': ['Thông tin cửa hàng', 'Tên đăng ký, mã số thuế, địa chỉ, hotline, Zalo… hiện trên trang Giới thiệu, Liên hệ, chính sách và dữ liệu cho Google / AI'],
@@ -194,6 +195,7 @@ function switchAdminModule(modName, pushHash = true) {
   if (target === 'customers') loadCustomers();
   if (target === 'store-info') loadStoreInfo();
   if (target === 'reviews') loadReviews();
+  if (target === 'product-copy') loadProductCopy();
 }
 
 // ───────────── Thông tin cửa hàng (trang Giới thiệu / Liên hệ / chính sách) ─────────────
@@ -1387,6 +1389,57 @@ document.getElementById('funnelDays')?.addEventListener('click', e => {
   loadFunnel();
 });
 
+// ───────────── Mô tả riêng cho SP ─────────────
+const COPY_LABEL = { draft: 'Nháp – chưa hiện', published: 'Đang hiện trên web', hidden: 'Đã ẩn' };
+let copyItems = [];
+async function loadProductCopy() {
+  const box = document.getElementById('copyList');
+  try {
+    const json = await (await adminFetch('/api/admin/product-copy')).json();
+    if (!json.success) throw new Error(json.error);
+    copyItems = json.data;
+    setCopyBadge(copyItems.filter(c => c.status === 'draft').length);
+    box.innerHTML = copyItems.length ? copyItems.map(c => `
+      <details class="copy-item" data-copy-id="${c.id}">
+        <summary><b>${esc(c.name || '#' + c.id)}</b> <span class="copy-st copy-${c.status}">${COPY_LABEL[c.status] || c.status}</span>${c.in_catalog ? '' : ' <span class="copy-st copy-hidden">SP không còn bán</span>'}</summary>
+        <div class="copy-body">
+          ${c.path ? `<a href="${esc(c.path)}" target="_blank" rel="noopener" class="help-text">Mở trang sản phẩm ↗</a>` : ''}
+          <label class="form-group">Tóm tắt (1–2 câu, hiện trên Google)<input type="text" data-copy-summary maxlength="300" value="${esc(c.summary)}"></label>
+          <div class="copy-preview">${c.html}</div>
+          <details><summary class="help-text">Sửa chữ (HTML đơn giản)</summary><textarea data-copy-html rows="14">${esc(c.html)}</textarea></details>
+          <div class="copy-actions">
+            ${c.status !== 'published' ? '<button type="button" class="btn btn-primary" data-copy-save="published">Duyệt &amp; đăng</button>' : '<button type="button" class="btn btn-primary" data-copy-save="published">Lưu thay đổi</button>'}
+            ${c.status === 'published' ? '<button type="button" class="btn btn-outline" data-copy-save="hidden">Ẩn khỏi web</button>' : ''}
+            ${c.status !== 'draft' ? '' : '<button type="button" class="btn btn-outline" data-copy-save="draft">Lưu nháp</button>'}
+          </div>
+        </div>
+      </details>`).join('') : '<p class="help-text">Chưa có mô tả nào.</p>';
+  } catch (e) {
+    box.innerHTML = `<p style="color:#ef4444;">${esc(e.message)}</p>`;
+  }
+}
+function setCopyBadge(n) {
+  const b = document.getElementById('navBadgeCopy');
+  if (b) { b.textContent = n; b.style.display = n ? '' : 'none'; }
+}
+document.getElementById('copyList')?.addEventListener('click', async e => {
+  const btn = e.target.closest('[data-copy-save]');
+  if (!btn) return;
+  const item = btn.closest('[data-copy-id]');
+  const id = item.dataset.copyId;
+  const body = { status: btn.dataset.copySave, html: item.querySelector('[data-copy-html]').value, summary: item.querySelector('[data-copy-summary]').value };
+  btn.disabled = true;
+  try {
+    const json = await (await adminFetch(`/api/admin/product-copy/${encodeURIComponent(id)}`, { method: 'POST', body: JSON.stringify(body) })).json();
+    if (!json.success) throw new Error(json.error);
+    uiAlert(body.status === 'published' ? 'Đã đăng – mô tả hiện trên trang sản phẩm.' : body.status === 'hidden' ? 'Đã ẩn khỏi web.' : 'Đã lưu nháp.');
+    loadProductCopy();
+  } catch (err) {
+    uiAlert('Không lưu được: ' + err.message);
+    btn.disabled = false;
+  }
+});
+
 // ───────────── Đánh giá của khách ─────────────
 let reviewFilter = 'pending';
 const RV_LABEL = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Đã ẩn', all: 'Tất cả' };
@@ -1493,6 +1546,7 @@ document.getElementById('backupNowBtn').addEventListener('click', async () => {
 socket.on('ADMIN_ORDER_CHANGED', () => loadReport());
 loadReport();
 loadFunnel();
+adminFetch('/api/admin/product-copy').then(r => r.json()).then(j => j.success && setCopyBadge(j.data.filter(c => c.status === 'draft').length)).catch(() => {});
 adminFetch('/api/admin/reviews?status=pending').then(r => r.json()).then(j => j.success && setReviewBadge(j.counts.pending || 0)).catch(() => {});
 loadBackupInfo();
 

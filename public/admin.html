@@ -53,6 +53,11 @@
         </button>
 
         <div class="sidebar-group-label">Hàng hoá &amp; Giá bán</div>
+        <button type="button" class="admin-tab-btn" data-target="product-copy" onclick="switchAdminModule('product-copy')">
+          <i class="fa-solid fa-pen-nib"></i>
+          <span>Mô tả sản phẩm</span>
+          <span class="tab-badge" id="navBadgeCopy" style="display:none;">0</span>
+        </button>
         <button type="button" class="admin-tab-btn" data-target="pricing-rules" onclick="switchAdminModule('pricing-rules')">
           <i class="fa-solid fa-percent"></i>
           <span>Công thức Tính giá</span>
@@ -486,6 +491,14 @@
         <!-- =================================================================
              MODULE 6: CẤU HÌNH VẬN CHUYỂN & HẠN ĐƠN (shipping)
              ================================================================= -->
+        <section class="admin-module-pane" data-module="product-copy">
+          <div class="admin-card">
+            <h3><i class="fa-solid fa-pen-nib"></i> Mô tả riêng cho sản phẩm</h3>
+            <p class="help-text" style="margin:2px 0 14px;">Mô tả do BESI viết (khác mô tả chép từ nguồn) giúp Google xếp hạng tốt hơn và khách dễ chọn hơn. Bản <b>Nháp</b> chỉ bạn thấy; bấm <b>Duyệt &amp; đăng</b> mới hiện trên web, phía trên thông số gốc của nhà sản xuất. Có thể sửa chữ trước khi đăng.</p>
+            <div id="copyList"><p class="help-text">Đang tải…</p></div>
+          </div>
+        </section>
+
         <section class="admin-module-pane" data-module="reviews">
           <div class="admin-card">
             <div class="flex-between" style="flex-wrap:wrap; gap:12px; margin-bottom:12px;">

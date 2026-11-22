@@ -193,3 +193,10 @@ body.show-adv-filters #advFilters > .besi-universal-finder { margin-top: 4px; }
 .si-save-chip, .fs-si-pill { font-size: var(--besi-fs-xs) !important; }
 .card-corner-off small { font-size: 9.5px !important; }
 @media (max-width: 700px) { #productGrid .luxury-card .btn-buy-instant { font-size: 13px !important; } }
+
+/* Mô tả riêng của BESI (đứng trước thông số gốc) */
+.besi-copy { font-size: 15px; line-height: 1.7; color: #1f2937; }
+.besi-copy h3 { font-size: 17px; margin: 16px 0 6px; color: #111827; }
+.besi-copy ul { padding-left: 20px; margin: 6px 0; }
+.besi-copy li { margin: 3px 0; }
+.desc-origin-title { font-size: 15px; margin: 22px 0 8px; padding-top: 14px; border-top: 1px dashed #e5e7eb; color: #6b7280; }

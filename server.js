@@ -40,6 +40,7 @@ const infoPages = require('./services/infoPages');
 const funnel = require('./services/funnel');
 const reviews = require('./services/reviews');
 const reviewPage = require('./services/reviewPage');
+const productCopy = require('./services/productCopy');
 const imageOptimizer = require('./services/imageOptimizer');
 const taobaoPublic = require('./services/taobaoPublic');
 const taobaoPriceShipping = require('./services/taobaoPriceShipping');
@@ -318,6 +319,27 @@ app.get('/llms.txt', (req, res) => {
     categories: cachedCategoriesList.filter(c => !c.parent_id && c.product_count > 0).sort((a, b) => b.product_count - a.product_count).slice(0, 30),
     brands: cachedBrandsList.filter(b => b.count >= 3).slice(0, 40)
   }));
+});
+
+// ───────── Mô tả riêng của BESI cho từng SP (services/productCopy.js) ─────────
+app.get('/api/admin/product-copy', requireAdmin, (req, res) => {
+  const list = Object.values(productCopy.all()).map(c => {
+    const p = storeCatalog.findProduct(c.id);
+    return { id: c.id, name: p ? stripSupplierText(p.name) : (c.name || ''), path: p ? seo.productPath(p) : null, in_catalog: !!p,
+      status: c.status, source: c.source, summary: c.summary || '', html: c.html || '', updated_at: c.updated_at || null };
+  }).sort((a, b) => (a.status === b.status ? a.name.localeCompare(b.name, 'vi') : a.status === 'draft' ? -1 : 1));
+  res.set('Cache-Control', 'no-store').json({ success: true, data: list });
+});
+app.post('/api/admin/product-copy/:id', requireAdmin, (req, res) => {
+  try {
+    const p = storeCatalog.findProduct(Number(req.params.id));
+    if (!p) return res.status(404).json({ success: false, error: 'Không tìm thấy sản phẩm.' });
+    const c = productCopy.save(p.id, { ...req.body, name: stripSupplierText(p.name) }, sanitizeHtml);
+    productDetailCache.delete(p.id);
+    res.json({ success: true, data: c });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
 });
 
 // ───────── Phễu mua hàng ẩn danh (services/funnel.js) ─────────
@@ -636,6 +658,8 @@ app.get('/sp/:slugId', async (req, res) => {
       if (fs.existsSync(f)) detail = JSON.parse(fs.readFileSync(f, 'utf8'));
     } catch (e) {}
     ensureCatalogCaches();
+    const ownCopy = productCopy.published(product.id);
+    if (ownCopy) detail = { ...(detail || {}), description: productCopy.compose(ownCopy, detail?.description || '') };
     const shown = customerPricing.retailizeDeep({ ...product }, customerPriceRules());
     const cat = cachedCategoriesList.find(c => Number(c.id) === Number(product.category_id)) || null;
     const crumbs = [...(cat ? categoryCrumbs(cat) : [{ name: 'Trang chủ', url: '/' }]), { name: stripSupplierText(product.name) }];
@@ -1524,6 +1548,18 @@ function setProductDetailCache(id, data) {
   }
   productDetailCache.set(id, { data, at: Date.now() });
 }
+
+app.use(/^\/api\/products\/(\d+)$/, (req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const parent = storeCatalog.findProduct(Number(req.params[0]));
+  const copy = parent ? productCopy.published(parent.id) : null;
+  if (!copy) return next();
+  const send = res.json.bind(res);
+  res.json = body => (body && body.success && body.data && typeof body.data.description === 'string'
+    ? send({ ...body, data: { ...body.data, description: productCopy.compose(copy, body.data.description) } })
+    : send(body));
+  next();
+});
 
 app.get('/api/products/:id', async (req, res) => {
   try {
