@@ -1590,6 +1590,17 @@ app.get('/api/checkout/options', (req, res) => {
   res.json({ success: true, data: paymentOptions() });
 });
 
+// Ngày giao dự kiến trên trang SP (trước khi khách điền địa chỉ): tỉnh kho đã biết (nguồn sỉ khác)
+// hoặc khoảng chung; ngày thật theo kho + phường hiện ở bước đặt hàng.
+app.get('/api/delivery-eta', rateLimit('eta', 60e3, 120), (req, res) => {
+  const province = String(req.query.province || '').trim();
+  if (!shipping.regionOf(province)) return res.status(400).json({ success: false, error: 'Tỉnh/thành không hợp lệ.' });
+  const id = Number(req.query.product_id);
+  const src = Number.isSafeInteger(id) ? storeCatalog.sourceOf(id) : null;
+  const eta = deliveryEta.estimate({ fromProvince: src?.def?.originProvince || null, toProvince: province });
+  res.set('Cache-Control', 'public, max-age=300').json({ success: true, data: { text: eta.text, min_days: eta.min_days, max_days: eta.max_days } });
+});
+
 app.get('/api/shipping/provinces', (req, res) => {
   res.json({ success: true, data: shipping.PROVINCES.map(([name, region]) => ({ name, region, region_label: shipping.REGION_LABEL[region] })) });
 });

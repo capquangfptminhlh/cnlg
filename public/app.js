@@ -614,7 +614,7 @@ function renderDetailModal(prod) {
       <div class="detail-info">
         <div class="detail-head-row">
           <div class="detail-brand-badge">
-            ${prod.brand ? `<i class="fa-solid fa-gem"></i> Thương hiệu: <strong>${esc(prod.brand.toLowerCase() === 'ulanzi' ? 'Ulanzi' : prod.brand)}</strong>` : `<i class="fa-solid fa-store"></i> Hoàng Minh Store`}${prod.is_mall ? ' · Sản phẩm Mall' : ''}
+            ${prod.brand ? `<i class="fa-solid fa-gem"></i> Thương hiệu: <strong>${esc(prod.brand.toLowerCase() === 'ulanzi' ? 'Ulanzi' : prod.brand)}</strong>` : `<i class="fa-solid fa-store"></i> ${esc(STORE_BRAND)}`}${prod.is_mall ? ' · Sản phẩm Mall' : ''}
           </div>
           <button type="button" class="detail-copy-link" onclick="copyProductLink()"><i class="fa-solid fa-link"></i> Sao chép link</button>
         </div>
@@ -637,20 +637,20 @@ function renderDetailModal(prod) {
           ${discount > 0 ? `<span class="saving-tag">Tiết kiệm ${discount}%</span>` : ''}
         </div>
 
-        <div class="detail-warranty-badge">
-          <i class="fa-solid fa-shield-halved"></i> <span>Chính sách bảo hành: <strong>${esc(activeWarranty)}</strong></span>
-          <small>${/^Không/i.test(activeWarranty) ? '• Đồng kiểm khi nhận' : '• Chính hãng NSX'}</small>
-        </div>
+        ${!soldOut ? `<div class="detail-eta" id="detailEta">
+          <i class="fa-solid fa-truck-fast" aria-hidden="true"></i>
+          <div><span id="detailEtaText">Đang tính ngày giao…</span>
+            <label class="detail-eta-to">Giao tới <select id="detailEtaProvince" aria-label="Tỉnh/thành nhận hàng"><option value="">Chọn tỉnh/thành</option></select></label></div>
+        </div>` : ''}
 
+        <ul class="detail-trust" aria-label="Cam kết khi mua">
+          <li><i class="fa-solid fa-box-open" aria-hidden="true"></i><span><b>Kiểm tra hàng</b> rồi mới trả tiền</span></li>
+          <li><i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span><b>Đổi trả 7 ngày</b> nếu lỗi, giao sai</span></li>
+          <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span><b>${esc(/^Không/i.test(activeWarranty) ? 'Đồng kiểm khi nhận' : activeWarranty)}</b></span></li>
+        </ul>
 
         ${renderVariantPicker(prod)}
         ${needsChoice && !v ? '<div class="variant-hint"><i class="fa-solid fa-hand-pointer"></i> Vui lòng chọn phân loại</div>' : ''}
-
-        <div class="detail-features-list">
-          <div><i class="fa-solid fa-shield-halved"></i> Chính sách bảo hành: <strong>${esc(activeWarranty.replace(/^Bảo hành\s+/i, ''))}</strong>${/^Không/i.test(activeWarranty) ? ' (Đồng kiểm khi nhận hàng)' : ' (Chính hãng theo tiêu chuẩn NSX)'}</div>
-          <div><i class="fa-solid fa-truck-fast"></i> Giao hàng toàn quốc, được đồng kiểm khi nhận${v?.weight_gram ? ` · ${(v.weight_gram / 1000).toLocaleString('vi-VN')} kg` : ''}</div>
-          <div><i class="fa-solid fa-hand-holding-dollar"></i> ${typeof payOptions !== 'undefined' && payOptions.bank?.enabled ? 'Thanh toán khi nhận hàng (COD) hoặc chuyển khoản' : 'Thanh toán khi nhận hàng (COD) – kiểm tra hàng rồi mới trả tiền'}</div>
-        </div>
 
         <div class="detail-qty-row">
           <span style="font-weight: 700; color: #cbd5e1;">Số lượng mua:</span>
@@ -664,7 +664,7 @@ function renderDetailModal(prod) {
 
         <div class="detail-actions-row">
           <button class="btn-order-now-large${soldOut ? '' : ' is-urgent-buy'}" onclick="buyFromModalNow()" ${canBuy ? '' : 'disabled'}>
-            ${soldOut ? '<i class="fa-solid fa-ban"></i> Tạm hết hàng' : (isWholesaleView() ? '<span class="urgent-buy-main"><i class="fa-solid fa-bolt"></i> MUA NGAY GIÁ SỈ — CHỐT KẺO HẾT!</span>' : '<span class="urgent-buy-main"><i class="fa-solid fa-bolt"></i> MUA NGAY — CHỐT KẺO HẾT!</span>') + '<small class="urgent-buy-sub">🔥 Sắp cháy kho • Giữ suất ưu đãi ngay</small>'}
+            ${soldOut ? '<i class="fa-solid fa-ban"></i> Tạm hết hàng' : `<span class="urgent-buy-main"><i class="fa-solid fa-bolt"></i> ${isWholesaleView() ? 'Mua ngay giá sỉ' : 'Mua ngay'}</span>`}
           </button>
           <button class="btn-add-cart-large" onclick="addFromModalToCart()" ${canBuy ? '' : 'disabled'}>
             <i class="fa-solid fa-cart-plus"></i> Thêm vào giỏ
@@ -681,10 +681,40 @@ function renderDetailModal(prod) {
         ${prod.description || 'Chưa có thông số chi tiết.'}
       </div>
     </div>
+    ${!soldOut ? `<div class="detail-sticky-buy">
+      <div class="dsb-price"><strong>${formatPrice(price)}</strong>${original && original > price ? `<del>${formatPrice(original)}</del>` : ''}</div>
+      <button type="button" class="dsb-cart" onclick="addFromModalToCart()" ${canBuy ? '' : 'disabled'} aria-label="Thêm vào giỏ"><i class="fa-solid fa-cart-plus"></i></button>
+      <button type="button" class="dsb-buy" onclick="buyFromModalNow()" ${canBuy ? '' : 'disabled'}>${needsChoice && !v ? 'Chọn phân loại' : (isWholesaleView() ? 'Mua ngay giá sỉ' : 'Mua ngay')}</button>
+    </div>` : ''}
   `;
+  loadDetailEta(prod.id);
 
   setupGallerySwipe(gallery.length, activeIndex);
   window.dispatchEvent(new CustomEvent('storefront:detail-open', { detail: { id: prod.id } }));
+}
+
+// Ngày giao dự kiến trên trang SP; tỉnh chọn ở đây cũng là tỉnh mặc định ở bước đặt hàng
+let provinceListPromise = null;
+const provinceList = () => (provinceListPromise ||= fetch('/api/shipping/provinces').then(r => r.json()).then(j => (j.success ? j.data.map(p => p.name) : [])).catch(() => { provinceListPromise = null; return []; }));
+async function loadDetailEta(productId) {
+  const sel = document.getElementById('detailEtaProvince');
+  const txt = document.getElementById('detailEtaText');
+  if (!sel || !txt) return;
+  const names = await provinceList();
+  if (document.getElementById('detailEtaProvince') !== sel) return;
+  sel.innerHTML = '<option value="">Chọn tỉnh/thành</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  try { sel.value = localStorage.getItem(PROVINCE_KEY) || ''; } catch (e) {}
+  const run = async () => {
+    const pv = sel.value;
+    if (!pv) { txt.innerHTML = 'Chọn nơi nhận để xem <b>ngày giao dự kiến</b>'; return; }
+    try { localStorage.setItem(PROVINCE_KEY, pv); } catch (e) {}
+    txt.textContent = 'Đang tính ngày giao…';
+    const j = await fetch(`/api/delivery-eta?product_id=${encodeURIComponent(productId)}&province=${encodeURIComponent(pv)}`).then(r => r.json()).catch(() => null);
+    if (document.getElementById('detailEtaText') !== txt) return;
+    txt.innerHTML = j && j.success ? `<b>${esc(j.data.text)}</b>` : 'Giao 1–5 ngày tuỳ khu vực';
+  };
+  sel.onchange = run;
+  run();
 }
 
 function syncGalleryUI(index, shouldScrollTrack = true) {
@@ -1200,10 +1230,15 @@ function updatePayButton() {
   const cod = selectedPayMethod() === 'COD';
   const readiness = paymentReadiness();
   submitOrderBtn.disabled = !readiness.allowed;
+  const why = checkoutShippingStatus === 'missing'
+    ? (provinceSelect.value ? 'Chọn phường/xã để tính phí ship' : 'Chọn tỉnh/thành để tính phí ship')
+    : checkoutShippingStatus === 'pending' ? 'Đang tính phí ship…'
+      : checkoutShippingStatus === 'error' ? 'Chưa tính được phí ship' : 'Chưa thể đặt hàng';
+  const total = checkoutEstimatedTotal > 0 ? ` · ${formatPrice(checkoutEstimatedTotal)}` : '';
   submitOrderBtn.innerHTML = !readiness.allowed
-    ? '<i class="fa-solid fa-circle-exclamation"></i> Chưa thể đặt hàng'
-    : cod ? '<i class="fa-solid fa-check"></i> Đặt hàng – trả tiền khi nhận'
-      : '<i class="fa-solid fa-qrcode"></i> Đặt hàng & nhận mã QR';
+    ? `<i class="fa-solid ${checkoutShippingStatus === 'pending' ? 'fa-spinner fa-spin' : 'fa-location-dot'}"></i> ${why}`
+    : cod ? `<i class="fa-solid fa-check"></i> Đặt hàng${total}`
+      : `<i class="fa-solid fa-qrcode"></i> Đặt hàng & nhận mã QR${total}`;
   const note = document.getElementById('payMethodNote');
   note.innerText = readiness.note;
   note.style.color = readiness.allowed ? '#66768d' : '#c2410c';

@@ -38,3 +38,51 @@ body.show-adv-filters #advFilters > .besi-universal-finder { margin-top: 4px; }
   .filter-bar .filter-left > :not(.premium-catalog-heading) { flex: 0 0 auto; }
   .btn-adv-filter { height: 32px; padding: 0 12px; font-size: 12.5px; }
 }
+
+/* ═════════ Đợt 1 – chốt đơn nhanh ═════════ */
+
+/* Ngày giao dự kiến ngay dưới giá */
+.detail-eta { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; font-size: 14px; line-height: 1.45; }
+.detail-eta > i { color: #16a34a; font-size: 18px; margin-top: 1px; }
+.detail-eta b { color: #166534; }
+.detail-eta-to { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12.5px; color: #4b5563; }
+.detail-eta-to select { max-width: 190px; height: 28px; padding: 0 6px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; font: inherit; font-size: 12.5px; color: #111827; }
+
+/* Hàng cam kết: kiểm tra hàng · đổi trả · bảo hành */
+.detail-trust { list-style: none; margin: 10px 0 12px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.detail-trust li { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid #edf0f4; border-radius: 12px; background: #fff; font-size: 12.5px; line-height: 1.35; color: #4b5563; }
+.detail-trust i { color: #ff5a2c; font-size: 16px; flex: none; }
+.detail-trust b { color: #111827; font-weight: 700; }
+
+/* Nút mua: chữ gọn, không còn dòng "sắp cháy kho" */
+.btn-order-now-large .urgent-buy-sub { display: none !important; }
+.btn-order-now-large.is-urgent-buy::after { content: none !important; }
+
+/* Thanh mua dính đáy – chỉ điện thoại */
+.detail-sticky-buy { display: none; }
+@media (max-width: 700px) {
+  .detail-trust { grid-template-columns: 1fr; gap: 6px; }
+  .detail-actions-row { display: none !important; }
+  .detail-sticky-buy {
+    display: flex; align-items: center; gap: 8px;
+    position: sticky; bottom: 0; z-index: 5; margin: 12px 0 0; border-radius: 14px 14px 0 0;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom)) 16px;
+    background: #fff; border-top: 1px solid #edf0f4; box-shadow: 0 -10px 24px -16px rgba(15, 23, 42, .35);
+  }
+  .dsb-price { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+  .dsb-price strong { color: #ef4d31; font-size: 18px; font-weight: 800; }
+  .dsb-price del { color: #9ca3af; font-size: 12px; }
+  .dsb-cart, .dsb-buy { height: 46px; border-radius: 12px; font: inherit; font-weight: 700; cursor: pointer; }
+  .dsb-cart { width: 50px; flex: none; border: 1.5px solid #ffb9a3; background: #fff4ee; color: #ef4d31; font-size: 18px; }
+  .dsb-buy { flex: 1.3; border: 0; background: linear-gradient(180deg, #ff6a3d, #f2471d); color: #fff; font-size: 16px; }
+  .dsb-cart:disabled, .dsb-buy:disabled { opacity: .45; cursor: not-allowed; }
+}
+
+/* Đặt hàng: nút + tổng tiền luôn thấy ở đáy hộp */
+.checkout-dialog .checkout-actions {
+  position: sticky; bottom: 0; z-index: 3; margin-top: 12px;
+  padding: 12px 0 calc(4px + env(safe-area-inset-bottom)); background: #fff;
+  box-shadow: 0 -10px 20px -16px rgba(15, 23, 42, .35);
+}
+.checkout-dialog #submitOrderBtn { flex: 1; min-height: 48px; font-size: 15.5px; font-weight: 800; }
+.checkout-dialog #submitOrderBtn:disabled { background: #fde3da; color: #b4532f; opacity: 1; }
