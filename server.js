@@ -334,7 +334,9 @@ app.post('/api/admin/product-copy/:id', requireAdmin, (req, res) => {
   try {
     const p = storeCatalog.findProduct(Number(req.params.id));
     if (!p) return res.status(404).json({ success: false, error: 'Không tìm thấy sản phẩm.' });
-    const c = productCopy.save(p.id, { ...req.body, name: stripSupplierText(p.name) }, sanitizeHtml);
+    // Bài lưu theo đúng mã được hỏi nếu đã có (mã đó có thể đã bị gộp vào SP cha mã khác – vd. cùng hàng ở kho khác)
+    const key = productCopy.all()[String(Number(req.params.id))] ? Number(req.params.id) : p.id;
+    const c = productCopy.save(key, { ...req.body, name: stripSupplierText(p.name) }, sanitizeHtml);
     productDetailCache.delete(p.id);
     res.json({ success: true, data: c });
   } catch (err) {
@@ -378,6 +380,14 @@ app.post('/api/reviews/order/:id', rateLimit('review-write', 10 * 60e3, 10), (re
 // Đánh giá đã duyệt + số đã bán thật của 1 SP (gồm các phân loại đã gộp)
 function productIdsOf(p) {
   return [...new Set([p.id, ...(p.variants || []).flatMap(v => [v.product_id, ...(v.all_ids || [])])].map(Number).filter(Number.isSafeInteger))];
+}
+/** Mô tả riêng đã duyệt của SP: theo mã cha, mã khách mở, rồi mọi mã cùng nhóm (phân loại / kho trùng). */
+function copyOf(p, askedId) {
+  for (const id of [p.id, askedId, ...productIdsOf(p)]) {
+    const c = id ? productCopy.published(id) : null;
+    if (c) return c;
+  }
+  return null;
 }
 let soldCache = { at: 0, map: new Map() };
 function soldMap() {
@@ -658,7 +668,7 @@ app.get('/sp/:slugId', async (req, res) => {
       if (fs.existsSync(f)) detail = JSON.parse(fs.readFileSync(f, 'utf8'));
     } catch (e) {}
     ensureCatalogCaches();
-    const ownCopy = productCopy.published(product.id);
+    const ownCopy = copyOf(product, id);
     if (ownCopy) detail = { ...(detail || {}), description: productCopy.compose(ownCopy, detail?.description || '') };
     const shown = customerPricing.retailizeDeep({ ...product }, customerPriceRules());
     const cat = cachedCategoriesList.find(c => Number(c.id) === Number(product.category_id)) || null;
@@ -1552,7 +1562,7 @@ function setProductDetailCache(id, data) {
 app.use(/^\/api\/products\/(\d+)$/, (req, res, next) => {
   if (req.method !== 'GET') return next();
   const parent = storeCatalog.findProduct(Number(req.params[0]));
-  const copy = parent ? productCopy.published(parent.id) : null;
+  const copy = parent ? copyOf(parent, Number(req.params[0])) : null;
   if (!copy) return next();
   const send = res.json.bind(res);
   res.json = body => (body && body.success && body.data && typeof body.data.description === 'string'
