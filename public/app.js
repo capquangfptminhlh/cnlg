@@ -307,6 +307,17 @@ function productStockBadge(p) {
   }
   return `<span class="stock-pill is-in" title="Hàng sẵn tại kho, sẵn sàng giao toàn quốc"><i class="fa-solid fa-boxes-stacked"></i> Sẵn kho: <b>Còn hàng</b></span>`;
 }
+/** Dòng chữ nhỏ trên thẻ SP: "BH 6 tháng · Còn 7" (đủ chỗ trên điện thoại, không bị cắt) */
+function shortWarranty(w) {
+  const t = String(w || '').trim();
+  if (!t || /^không/i.test(t)) return 'Đồng kiểm';
+  return t.replace(/^bảo hành\s*/i, 'BH ').replace(/chính hãng/i, 'chính hãng').slice(0, 22);
+}
+function cardStockText(p) {
+  if (p.in_stock === false) return '<span class="card-stock is-out">Hết hàng</span>';
+  const qty = p.stock != null ? p.stock : (p.stock_qty != null ? p.stock_qty : null);
+  return `<span class="card-stock">${qty != null && Number(qty) > 0 ? `Còn <b>${Number(qty).toLocaleString('vi-VN')}</b>` : '<b>Còn hàng</b>'}</span>`;
+}
 /** Khách sỉ đã duyệt (đăng nhập) – máy chủ đã trả đúng giá; chỉ để chữ trên thẻ nói đúng loại giá. */
 const isWholesaleView = () => document.body.dataset.tier === 'wholesale';
 window.addEventListener('storefront:tier', () => { if (state.products.length) renderProducts(); });
@@ -314,7 +325,6 @@ window.addEventListener('storefront:tier', () => { if (state.products.length) re
 function productBadges(p) {
   if (p.in_stock === false) return `<span class="card-tag tag-out">Hết hàng</span>`;
   if (p.is_flash_sale) return `<span class="card-tag tag-flash"><i class="fa-solid fa-bolt"></i> FLASH SALE</span>`;
-  if (p.discount_percent >= 35) return `<span class="card-tag tag-deal"><i class="fa-solid fa-fire"></i> ${isWholesaleView() ? 'GIÁ SỈ' : 'GIẢM'} -${p.discount_percent}%</span>`;
   if (p.is_mall) return `<span class="card-tag tag-mall"><i class="fa-solid fa-circle-check"></i> Chính hãng</span>`;
   return isWholesaleView() ? `<span class="card-tag tag-si"><i class="fa-solid fa-tag"></i> GIÁ SỈ KHO</span>` : '';
 }
@@ -366,8 +376,8 @@ function productCardHtml(p) {
         </div>
 
         <div class="card-meta">
-          <span><i class="fa-solid fa-shield-halved"></i> ${esc(p.warranty || 'Không bảo hành')}</span>
-          ${productStockBadge(p)}
+          <span title="${esc(p.warranty || 'Không bảo hành')}">${esc(shortWarranty(p.warranty))}</span>
+          ${cardStockText(p)}
         </div>
 
         <div class="card-actions-row">
@@ -1177,19 +1187,35 @@ let payOptionsLoaded = false;
 let checkoutEstimatedTotal = 0;
 let checkoutShippingStatus = 'missing';
 
+// Gõ để tìm phường/xã: lọc danh sách, khớp đúng 1 thì chọn luôn
+let wardOptions = [];
+const wardFilter = document.getElementById('custWardFilter');
+wardFilter?.addEventListener('input', () => {
+  const n = plainText(wardFilter.value).replace(/^(phuong|xa|thi tran|dac khu)\s+/, '');
+  const keep = wardSelect.value;
+  const list = n ? wardOptions.filter(w => plainText(w.name).includes(n)) : wardOptions;
+  wardSelect.innerHTML = `<option value="">${list.length ? (n ? `-- ${list.length} kết quả --` : '-- Chọn Phường / Xã --') : 'Không thấy – thử gõ ngắn hơn'}</option>` +
+    list.map(w => `<option value="${w.id}">${esc(w.name)}</option>`).join('');
+  if (list.length === 1) wardSelect.value = String(list[0].id);
+  else if (list.some(w => String(w.id) === keep)) wardSelect.value = keep;
+  if (wardSelect.value !== keep) updateCheckoutSummary();
+});
+
 async function loadWards(province, keep) {
   if (!province) {
     wardSelect.innerHTML = '<option value="">-- Chọn Tỉnh / Thành phố trước --</option>';
-    wardSelect.disabled = true;
+    wardSelect.disabled = true; if (wardFilter) { wardFilter.disabled = true; wardFilter.value = ""; }
     return;
   }
-  wardSelect.disabled = true;
+  wardSelect.disabled = true; if (wardFilter) wardFilter.disabled = true;
   wardSelect.innerHTML = '<option value="">Đang tải phường/xã...</option>';
   try {
     const json = await (await fetch(`/api/address/wards?province=${encodeURIComponent(province)}`)).json();
     if (!json.success) throw new Error(json.error);
     if (provinceSelect.value !== province) return;
     wardSelect.innerHTML = '<option value="">-- Chọn Phường / Xã --</option>' + json.data.wards.map(w => `<option value="${w.id}">${esc(w.name)}</option>`).join('');
+    wardOptions = json.data.wards;
+    if (wardFilter) { wardFilter.value = ''; wardFilter.disabled = false; }
     wardSelect.disabled = false;
     if (keep) wardSelect.value = keep;
   } catch (e) {
@@ -1637,11 +1663,54 @@ function showSearchSuggestions(){
   searchDropdown.classList.remove('hidden');
   searchInput.setAttribute('aria-expanded', 'true');
 }
+// Tìm gần đây (lưu trên máy khách) + danh mục phổ biến – hiện khi bấm vào ô tìm mà chưa gõ
+const RECENT_Q_KEY = 'hm_recent_q';
+const plainText = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').trim();
+function recentSearches() {
+  try { const a = JSON.parse(localStorage.getItem(RECENT_Q_KEY) || '[]'); return Array.isArray(a) ? a.filter(x => typeof x === 'string').slice(0, 8) : []; } catch (e) { return []; }
+}
+function rememberSearch(q) {
+  const v = String(q || '').trim().slice(0, 60);
+  if (v.length < 2) return;
+  try { localStorage.setItem(RECENT_Q_KEY, JSON.stringify([v, ...recentSearches().filter(x => plainText(x) !== plainText(v))].slice(0, 8))); } catch (e) {}
+}
+const catHref = c => `/danh-muc/${c.id}-${slugifyQuery(c.name)}`;
+function renderSearchStart() {
+  const recent = recentSearches();
+  const cats = (state.categories || []).filter(c => !c.parent_id && (c.product_count ?? 1) > 0)
+    .sort((a, b) => (b.product_count || 0) - (a.product_count || 0)).slice(0, 8);
+  if (!recent.length && !cats.length) { hideSearchSuggestions(); return; }
+  searchDropdown.innerHTML =
+    (recent.length ? `<div class="sg-head"><span>Tìm gần đây</span><button type="button" class="sg-clear" data-recent-clear>Xoá</button></div>
+      <div class="sg-chips">${recent.map(q => `<button type="button" class="sg-chip" data-recent="${esc(q)}"><i class="fa-solid fa-clock-rotate-left"></i> ${esc(q)}</button>`).join('')}</div>` : '') +
+    (cats.length ? `<div class="sg-head"><span>Danh mục phổ biến</span></div>
+      <div class="sg-chips">${cats.map(c => `<a class="sg-chip" href="${esc(catHref(c))}" data-cat-go="${esc(c.id)}"><i class="fa-solid ${typeof categoryIcon === 'function' ? categoryIcon(c.name) : 'fa-tag'}"></i> ${esc(c.name)}</a>`).join('')}</div>` : '');
+  showSearchSuggestions();
+}
+function matchingFacets(q) {
+  const n = plainText(q);
+  const cats = (state.categories || []).filter(c => (c.product_count ?? 1) > 0 && plainText(c.name).includes(n))
+    .sort((a, b) => (b.product_count || 0) - (a.product_count || 0)).slice(0, 3);
+  const brands = (state.brands || []).filter(b => plainText(b.name).includes(n)).slice(0, 2);
+  return cats.map(c => `<a class="sg-row" href="${esc(catHref(c))}" data-cat-go="${esc(c.id)}"><i class="fa-solid fa-layer-group"></i><span>Danh mục <b>${esc(c.name)}</b></span><small>${Number(c.product_count || 0).toLocaleString('vi-VN')} SP</small></a>`).join('') +
+    brands.map(b => `<button type="button" class="sg-row" data-brand-go="${esc(b.name)}"><i class="fa-solid fa-gem"></i><span>Thương hiệu <b>${esc(b.name)}</b></span><small>${Number(b.count || 0).toLocaleString('vi-VN')} SP</small></button>`).join('');
+}
+function applyBrand(name) {
+  const pill = [...document.querySelectorAll('#brandPills .brand-pill')].find(b => b.getAttribute('data-brand') === name);
+  if (pill) { pill.click(); return; }
+  state.currentBrand = name; state.currentPage = 1; state.searchQuery = ''; searchInput.value = '';
+  catalogTitle.innerText = `Thương hiệu ${name} chính hãng`;
+  syncFilterUrl({ push: true });
+  fetchProducts();
+}
+searchInput.addEventListener('focus', () => { if (!searchInput.value.trim()) renderSearchStart(); });
+
 searchInput.addEventListener('input',e=>{
   const q=e.target.value.trim();
   searchClearBtn.classList.toggle('hidden',q.length===0);
   const seq=++searchRequestSeq;
   clearTimeout(searchDebounceTimer);
+  if(!q){renderSearchStart();return;}
   if(q.length<2){hideSearchSuggestions();return;}
   searchDebounceTimer=setTimeout(async()=>{
     try{
@@ -1650,7 +1719,7 @@ searchInput.addEventListener('input',e=>{
       if(seq!==searchRequestSeq || searchInput.value.trim()!==q)return;
       if(json.success&&Array.isArray(json.data)&&json.data.length){
         rememberProducts(json.data);
-        searchDropdown.innerHTML=json.data.map(item=>{
+        searchDropdown.innerHTML=matchingFacets(q)+json.data.map(item=>{
           const id=Number(item.id);
           if(!Number.isSafeInteger(id)||id<1)return '';
           return '<button type="button" role="option" class="search-item-preview" data-preview-id="'+id+
@@ -1658,15 +1727,23 @@ searchInput.addEventListener('input',e=>{
             '<span class="search-item-info"><span class="search-item-title">'+esc(item.name)+
             '</span><span class="search-item-price">'+formatPrice(item.price)+(item.in_stock===false?' · Hết hàng':'')+
             '</span></span><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button>';
-        }).join('');
+        }).join('')+`<button type="button" class="sg-all" data-search-all><i class="fa-solid fa-magnifying-glass"></i> Xem tất cả kết quả cho “${esc(q)}”</button>`;
       }else{
-        searchDropdown.innerHTML='<div class="search-empty-state">Không tìm thấy sản phẩm phù hợp</div>';
+        const facets=matchingFacets(q);
+        searchDropdown.innerHTML=facets||'<div class="search-empty-state">Không tìm thấy sản phẩm phù hợp. Thử từ khoá ngắn hơn, ví dụ "sạc", "tai nghe".</div>';
       }
       showSearchSuggestions();
     }catch(_){if(seq===searchRequestSeq)hideSearchSuggestions();}
   },250);
 });
 searchDropdown.addEventListener('click',e=>{
+  const recent=e.target.closest('[data-recent]');
+  if(recent){searchInput.value=recent.dataset.recent;searchClearBtn.classList.remove('hidden');runSearch();return;}
+  if(e.target.closest('[data-recent-clear]')){try{localStorage.removeItem(RECENT_Q_KEY);}catch(_){}renderSearchStart();return;}
+  if(e.target.closest('[data-search-all]')){runSearch();return;}
+  const brand=e.target.closest('[data-brand-go]');
+  if(brand){hideSearchSuggestions();applyBrand(brand.dataset.brandGo);return;}
+  if(e.target.closest('[data-cat-go]')){searchRequestSeq++;searchInput.value='';searchClearBtn.classList.add('hidden');hideSearchSuggestions();return;}
   const btn=e.target.closest('[data-preview-id]');
   const id=Number(btn?.dataset.previewId);
   if(!Number.isSafeInteger(id)||id<1)return;
@@ -1716,6 +1793,7 @@ function runSearch(){
   clearTimeout(searchDebounceTimer);
   hideSearchSuggestions();
   state.searchQuery=searchInput.value.trim();
+  rememberSearch(state.searchQuery);
   state.currentPage=1;
   state.currentBrand='all';
   state.currentCategory='all';

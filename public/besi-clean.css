@@ -86,3 +86,34 @@ body.show-adv-filters #advFilters > .besi-universal-finder { margin-top: 4px; }
 }
 .checkout-dialog #submitOrderBtn { flex: 1; min-height: 48px; font-size: 15.5px; font-weight: 800; }
 .checkout-dialog #submitOrderBtn:disabled { background: #fde3da; color: #b4532f; opacity: 1; }
+
+/* ═════════ Đợt 2 – tìm nhanh ═════════ */
+
+/* Khung gợi ý tìm kiếm: tìm gần đây, danh mục phổ biến, danh mục/thương hiệu khớp, xem tất cả */
+.search-dropdown .sg-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 4px; font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .03em; }
+.search-dropdown .sg-clear { border: 0; background: none; color: #9ca3af; font: inherit; font-size: 12px; cursor: pointer; text-transform: none; }
+.search-dropdown .sg-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 14px 10px; }
+.search-dropdown .sg-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 11px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #374151; font: inherit; font-size: 13px; text-decoration: none; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-dropdown .sg-chip i { color: #ff5a2c; font-size: 12px; }
+.search-dropdown .sg-chip:hover { border-color: #ffb9a3; background: #fff7f3; }
+.search-dropdown .sg-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; border: 0; border-bottom: 1px solid #f3f4f6; background: #fff; color: #374151; font: inherit; font-size: 14px; text-align: left; text-decoration: none; cursor: pointer; }
+.search-dropdown .sg-row i { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 8px; background: #fff4ee; color: #ff5a2c; font-size: 13px; }
+.search-dropdown .sg-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-dropdown .sg-row b { color: #111827; }
+.search-dropdown .sg-row small { color: #9ca3af; font-size: 12px; }
+.search-dropdown .sg-row:hover, .search-dropdown .sg-all:hover { background: #fff7f3; }
+.search-dropdown .sg-all { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px 14px; border: 0; border-top: 1px solid #f3f4f6; background: #fff; color: #e5481f; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+
+/* Thẻ SP gọn: 1 nhãn góc ảnh; % giảm nằm cạnh giá; bỏ chip "Rẻ hơn…/Khách sỉ…"; bảo hành + kho 1 dòng chữ nhỏ */
+.luxury-card .card-corner-off,
+.luxury-card .si-save-chip { display: none !important; }
+.luxury-card .card-meta { display: flex !important; flex-wrap: nowrap !important; align-items: center; gap: 0 !important; overflow: hidden; font-size: 11.5px !important; color: #6b7280 !important; background: none !important; border: 0 !important; padding: 0 !important; }
+.luxury-card .card-meta > * { flex: 0 1 auto; min-width: 0; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; background: none !important; border: 0 !important; padding: 0 !important; color: #6b7280 !important; font-weight: 500 !important; font-size: 11.5px !important; }
+.luxury-card .card-meta > * + *::before { content: "·"; margin: 0 6px; color: #d1d5db; }
+.luxury-card .card-meta i { display: none; }
+.luxury-card .card-meta b, .luxury-card .card-meta strong { color: #059669 !important; font-weight: 600 !important; }
+
+/* Ô gõ tìm phường/xã */
+.checkout-form .ward-filter { width: 100%; margin-bottom: 6px; padding: 9px 12px; border: 1px solid #e5e7eb; border-radius: 10px; font: inherit; font-size: 14px; background: #f9fafb; }
+.checkout-form .ward-filter:focus { outline: none; border-color: #ff8a65; background: #fff; }
+.checkout-form .ward-filter:disabled { display: none; }
