@@ -33,13 +33,20 @@ const canonical = page?.body.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/i)?.
 const href = canonical?.match(/href=["']([^"']+)["']/i)?.[1];
 const canonicalOk = !!href && new URL(href, origin).href === article.href;
 const imageOk = !!img && /^image\//i.test(img.response.headers.get('content-type') || '') && img.response.status === 200;
-const sitemapOk = !!sitemap && sitemap.response.status === 200 && sitemap.body.includes(article.pathname);
+// Match an exact <loc>, not a substring (e.g. /post must not match /post-old).
+const sitemapLocs = sitemap?.body.match(/<loc\b[^>]*>[\s\S]*?<\/loc>/gi) || [];
+const sitemapUrls = sitemapLocs.map(tag => tag.replace(/^<loc\b[^>]*>/i, '').replace(/<\/loc>$/i, '').trim().replace(/&amp;/g, '&'));
+const sitemapOk = !!sitemap && sitemap.response.status === 200 && sitemapUrls.some(loc => {
+  try { return new URL(loc, origin).href === article.href; } catch { return false; }
+});
 const thumbnailOk = !!page && (page.body.includes(image.href) || page.body.includes(image.pathname));
+const finalUrlOk = !!page && new URL(page.response.url).href === article.href;
+const imageOriginOk = !!img && new URL(img.response.url).origin === origin;
 const expectedSha = process.env.EXPECTED_DEPLOY_SHA;
 const shaHeader = process.env.DEPLOY_SHA_HEADER;
 const actualSha = page?.response.headers.get(shaHeader || 'x-deploy-sha');
 const shaOk = !!expectedSha && !!actualSha && actualSha === expectedSha;
-const checks = { article200: page?.response.status === 200, image200: imageOk, imageReferenced: thumbnailOk, canonicalSelf: canonicalOk, sitemapContainsArticle: sitemapOk, deployShaVerified: shaOk };
+const checks = { article200: page?.response.status === 200, articleFinalUrl: finalUrlOk, image200: imageOk, imageSameOrigin: imageOriginOk, imageReferenced: thumbnailOk, canonicalSelf: canonicalOk, sitemapContainsArticle: sitemapOk, deployShaVerified: shaOk };
 console.log(JSON.stringify({ origin, article: article.href, image: image.href, checks, results, expectedSha: expectedSha || 'UNKNOWN', actualSha: actualSha || 'UNKNOWN' }, null, 2));
 if (!Object.values(checks).every(Boolean)) {
   console.error('HOLD: production readback incomplete; never count this article as published');
