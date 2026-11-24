@@ -23,6 +23,10 @@
   // Real, keyboard accessible banner carousel — informational messages only;
   // never pretend a promotion, review score or discount exists.
   const slides = [
+    {label:'KHÁM PHÁ BESI MARKETPLACE',icon:'fa-bolt',over:'MUA LẺ GIÁ TỐT · ĐA NGÀNH HÀNG',
+      headline:'Giá tốt mỗi ngày.<span><em>Mua ngay tại BESI.</em></span>',
+      description:'Khám phá hàng từ nhiều tổng kho, mua lẻ một món cũng được. Chọn hàng nhanh, giá rõ ràng.',
+      cta:'Xem sản phẩm &amp; giá',ctaIcon:'fa-arrow-right',href:'#catalog'},
     {label:'BESI · MUA LẺ GIÁ TỐT',icon:'fa-bolt',over:'HÀNG TỪ NHIỀU TỔNG KHO · KHÁCH SỈ ĐĂNG NHẬP XEM GIÁ SỈ',
       headline:'Mua 1 món,<span><em>vẫn giá tốt.</em></span>',
       description:'Giá và tồn kho cập nhật tự động từ kho; giá bạn thấy là giá đang bán.',
@@ -103,7 +107,7 @@
       hero.addEventListener('focusin',stop);hero.addEventListener('focusout',()=>setTimeout(start,0));
       document.addEventListener('visibilitychange',()=>document.hidden?stop():start());
       reducedMotion.addEventListener?.('change',()=>{if(reducedMotion.matches){clearTimers();hero.classList.remove('hero-animated-in','is-switching');applySlide(current,true);}else start();});
-      applySlide(0,true);
+      hero.dataset.slide='0'; // slide 0 đã có sẵn trong HTML – không ghi lại
       if(!reducedMotion.matches){hero.classList.add('hero-animated-in');start();}
     }
   }

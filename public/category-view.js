@@ -73,6 +73,8 @@
   let lastRenderedCatId = null;
   function syncView() {
     const id = String(state.currentCategory);
+    // Danh sách danh mục chưa tải xong: giữ nguyên bố cục máy chủ đã dựng (tránh hiện rồi ẩn → trang nhảy)
+    if (id !== 'all' && !state.searchQuery && !cats().length) return;
     const inView = id !== 'all' && !!catById(id) && !state.searchQuery;
     document.body.classList.toggle('is-category-view', inView);
     if (inView) {

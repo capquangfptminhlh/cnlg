@@ -23,8 +23,33 @@ const state = {
 const productCache = new Map();
 const CART_KEY = 'hm_cart_v1';
 
-// Initialize Socket.io
-const socket = io();
+// Socket.io (~40KB nén) tải SAU khi trang hiện xong → không làm chậm danh sách / khung chi tiết SP.
+// Trước khi tải xong: các lệnh on / emit được giữ lại rồi chạy đúng thứ tự.
+const socket = (() => {
+  const queue = [];
+  let real = null;
+  const shim = {
+    on(ev, fn) { if (real) real.on(ev, fn); else queue.push(['on', ev, fn]); return shim; },
+    emit(...args) { if (real) real.emit(...args); else queue.push(['emit', ...args]); return shim; }
+  };
+  const connect = () => {
+    if (real || typeof io !== 'function') return;
+    real = io();
+    for (const [method, ...args] of queue.splice(0)) real[method](...args);
+  };
+  if (typeof io === 'function') connect();
+  else {
+    const load = () => {
+      const s = document.createElement('script');
+      s.src = '/socket.io/socket.io.js';
+      s.onload = connect;
+      document.head.appendChild(s);
+    };
+    if (document.readyState === 'complete') setTimeout(load, 0);
+    else window.addEventListener('load', () => setTimeout(load, 0), { once: true });
+  }
+  return shim;
+})();
 
 // --- DOM Elements ---
 const categoriesContainer = document.getElementById('categoriesContainer');
@@ -430,6 +455,14 @@ function changePage(page) {
 
 // --- FULL PRODUCT DETAIL MODAL (Gallery + Video + Specs + Phân loại) ---
 let detailRequestVersion = 0;
+// Trang /sp/: máy chủ nhúng sẵn dữ liệu SP (không kèm mô tả) → vẽ khung chi tiết ngay, không chờ API
+let ssrBootData;
+function ssrBootProduct(id) {
+  if (ssrBootData === undefined) {
+    try { ssrBootData = JSON.parse(document.getElementById('ssrProductData')?.textContent || 'null'); } catch (e) { ssrBootData = null; }
+  }
+  return ssrBootData && Number(ssrBootData.id) === Number(id) ? ssrBootData : null;
+}
 async function openProductDetail(productId) {
   const requestVersion = ++detailRequestVersion;
   searchDropdown.classList.add('hidden');
@@ -439,7 +472,8 @@ async function openProductDetail(productId) {
   // Hiển thị tức thì (0ms) từ bộ nhớ đệm nếu sản phẩm vừa được bấm từ danh sách
   const numId = Number(productId);
   const initial = (typeof productCache !== 'undefined' && productCache.get(numId)) ||
-                  (state.products && state.products.find(p => p.id === numId));
+                  (state.products && state.products.find(p => p.id === numId)) ||
+                  ssrBootProduct(numId);
   if (initial) {
     state.activeDetailProduct = initial;
     setProductHash(initial);
@@ -1657,6 +1691,7 @@ function setLiveStamp(at) {
     catalogCount.insertAdjacentElement('afterend', el);
   }
   el.innerHTML = `<span class="live-dot"></span> Tồn kho & giá cập nhật lúc ${new Date(at).toLocaleTimeString('vi-VN')}`;
+  el.style.visibility = '';
 }
 
 fetch('/api/realtime/status').then(r => r.json()).then(j => j.success && setLiveStamp(j.data.stock?.lastOk || j.data.lastSyncTime)).catch(() => {});

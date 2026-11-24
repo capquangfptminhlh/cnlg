@@ -29,7 +29,6 @@
   <link rel="stylesheet" href="/taobao-nav.css">
   <link rel="stylesheet" href="/seo-ssr.css">
   <link rel="stylesheet" href="/besi-clean.css">
-  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
@@ -180,7 +179,8 @@
     <div class="filter-bar">
       <div class="filter-left">
         <div class="premium-catalog-heading"><span class="premium-heading-kicker">CHỌN MÓN ƯNG Ý · XEM GIÁ THẬT</span><h2 class="catalog-title" id="catalogTitle">Sản phẩm dành cho bạn</h2></div>
-        <span class="catalog-badge" id="catalogCount">Đang tải...</span>
+        <span class="catalog-badge" id="catalogCount">Đang tải...</span><i class="fl-break" aria-hidden="true"></i>
+        <span class="catalog-badge live-sync-badge" id="liveSyncStamp" style="visibility:hidden"><span class="live-dot"></span> Tồn kho &amp; giá cập nhật lúc --:--:--</span><i class="fl-break" aria-hidden="true"></i>
         <button type="button" class="btn-adv-filter" id="advFilterBtn" aria-expanded="false" aria-controls="advFilters"><i class="fa-solid fa-sliders"></i> Bộ lọc nâng cao</button>
         <button id="shareFilterBtn" class="btn-share-filter" type="button" title="Sao chép link danh sách này để gửi cho khách" aria-label="Sao chép link gửi khách"><i class="fa-solid fa-share-nodes"></i> <span>Sao chép link gửi khách</span></button>
       </div>

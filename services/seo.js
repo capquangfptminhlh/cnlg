@@ -106,8 +106,9 @@ const MARK = {
   footer: '<footer class="main-footer">',
   heroH1: /<h1>(Giá tốt mỗi ngày\.[\s\S]*?)<\/h1>/
 };
-function inject(html, { head = '', top = '', grid = '', pager = '', footer = '', demoteHero = false } = {}) {
+function inject(html, { head = '', top = '', grid = '', pager = '', footer = '', demoteHero = false, bodyClass = '' } = {}) {
   let out = html.replace(/<title>[\s\S]*?<\/title>/, '').replace('</head>', `${head}\n</head>`);
+  if (bodyClass) out = out.replace('<body>', `<body class="${escAttr(bodyClass)}">`);
   if (top) out = out.replace(MARK.main, `${MARK.main}\n${top}`);
   if (grid) out = out.replace(MARK.grid, `<div class="product-grid" id="productGrid">${grid}</div>`);
   if (pager) out = out.replace(MARK.pager, `<div class="pagination-wrapper flex-center" id="pagination">${pager}</div>`);
@@ -248,7 +249,7 @@ function renderHomePage(req, config, total, extra = {}) {
   ${extra.ld || ''}`;
   return inject(getTemplate(), {
     head, top: extra.headHtml || '', grid: extra.gridHtml || '', pager: extra.pagerHtml || '',
-    footer: extra.footerHtml || '', demoteHero: !!extra.headHtml
+    footer: extra.footerHtml || '', demoteHero: !!extra.headHtml, bodyClass: extra.bodyClass || ''
   });
 }
 

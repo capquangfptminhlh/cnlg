@@ -133,3 +133,17 @@
 .rv-submit { width: 100%; height: 48px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #ff6a3d, #f2471d); color: #fff; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
 .rv-submit:disabled { opacity: .6; }
 .rv-err { color: #dc2626; margin-top: 8px; }
+
+/* Trang danh mục: khung tiêu đề máy chủ = khung .cat-view-head của JS (cùng chỗ, cùng cỡ) → không xô lệch khi thay */
+body.is-category-view .ssr-head { margin: 14px 0 10px; padding: 14px 16px; background: #fff; border: 1px solid #eef0f4; border-radius: 14px; box-shadow: 0 4px 18px rgba(30, 38, 65, .04); }
+body.is-category-view .ssr-head .ssr-crumbs { margin: 0; }
+body.is-category-view .ssr-head h1 { font-size: 22px; line-height: 1.2; margin: 10px 0 2px; color: #222734; }
+body.is-category-view .ssr-head p { font-size: 13px; color: #667085; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.is-category-view .ssr-sublinks { flex-wrap: nowrap; overflow-x: auto; margin-top: 12px; padding-bottom: 4px; scrollbar-width: thin; }
+body.is-category-view .ssr-sublinks li { flex: 0 0 auto; }
+@media (max-width: 768px) {
+  body.is-category-view .ssr-head { margin: 10px 0 8px; padding: 12px; border-radius: 12px; }
+  body.is-category-view .ssr-head h1 { font-size: 18px; }
+}
+body.is-category-view .ssr-head p { margin-bottom: 22px; }
+body.is-category-view .ssr-sublinks { min-height: 40px; box-sizing: border-box; }

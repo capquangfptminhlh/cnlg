@@ -320,6 +320,47 @@ function renderInfoPage({ slug, base, cfg, stats, footerHtml = '', assetVersion 
 </html>`;
 }
 
+/**
+ * Trang 404 (mã 404 thật để Google bỏ URL cũ nhanh; noindex). Gợi ý tìm kiếm + danh mục phổ biến để khách không thoát.
+ * categories: [{ name, path }]
+ */
+function renderNotFoundPage({ footerHtml = '', assetVersion = '', categories = [], product = false }) {
+  const v = assetVersion ? `?${assetVersion}` : '';
+  const title = product ? 'Sản phẩm không còn bán' : 'Không tìm thấy trang';
+  return `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${esc(title)} | BESI</title>
+  <meta name="robots" content="noindex, follow">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/seo-ssr.css${v}">
+</head>
+<body class="info-body">
+  <header class="info-top">
+    <div class="info-wrap">
+      <a class="info-logo" href="/" aria-label="BESI – Trang chủ"><b>be</b><span>si.</span></a>
+      <nav aria-label="Điều hướng"><a href="/">Mua sắm</a><a href="/?tra-cuu=1">Theo dõi đơn</a><a href="/lien-he">Liên hệ</a></nav>
+    </div>
+  </header>
+  <main class="info-wrap info-main">
+    <article class="info-article">
+      <h1>${esc(title)}</h1>
+      <p>${product ? 'Sản phẩm này đã ngừng bán hoặc đường link đã thay đổi.' : 'Đường link có thể đã cũ hoặc gõ nhầm.'} Bạn thử tìm sản phẩm khác nhé:</p>
+      <form action="/" method="get" role="search" style="display:flex;gap:8px;margin:12px 0 18px;max-width:520px">
+        <input type="search" name="q" placeholder="Tìm sạc dự phòng, tai nghe, cáp sạc…" aria-label="Tìm sản phẩm" style="flex:1;min-width:0;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px">
+        <button type="submit" style="padding:10px 16px;border:0;border-radius:10px;background:#ee4d2d;color:#fff;font-weight:700;font-size:15px">Tìm</button>
+      </form>
+      ${categories.length ? `<h2>Danh mục được xem nhiều</h2><ul>${categories.map(c => `<li><a href="${esc(c.path)}">${esc(c.name)}</a></li>`).join('')}</ul>` : ''}
+      <p><a href="/">← Về trang chủ BESI</a></p>
+    </article>
+  </main>
+  <footer class="info-footer">${footerHtml}<p class="info-wrap">© ${new Date().getFullYear()} BESI · besi.com.vn</p></footer>
+</body>
+</html>`;
+}
+
 /** Hỏi đáp nhanh dưới mỗi trang SP (bot AI đọc được câu trả lời gắn với đúng sản phẩm). */
 function productQaHtml(product, cfg) {
   const info = infoOf(cfg);
@@ -365,5 +406,5 @@ ${brands.map(b => `- [${b.name}](${base}${pages.brandPath(b.name)})`).join('\n')
 
 module.exports = {
   POLICY, PAGES, SLUGS, pagePath, supportLinks, normalizeStoreInfo, infoOf,
-  renderInfoPage, productQaHtml, llmsTxt, organizationLd, returnPolicyLd, faqItems
+  renderInfoPage, renderNotFoundPage, productQaHtml, llmsTxt, organizationLd, returnPolicyLd, faqItems
 };

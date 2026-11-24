@@ -200,3 +200,10 @@ body.show-adv-filters #advFilters > .besi-universal-finder { margin-top: 4px; }
 .besi-copy ul { padding-left: 20px; margin: 6px 0; }
 .besi-copy li { margin: 3px 0; }
 .desc-origin-title { font-size: 15px; margin: 22px 0 8px; padding-top: 14px; border-top: 1px dashed #e5e7eb; color: #6b7280; }
+
+/* Thanh lọc: ngắt dòng cố định + chỗ dành sẵn cho huy hiệu cập nhật → không xô lệch khi số liệu về */
+.filter-left .fl-break { display: none; }
+@media (max-width: 768px) {
+  .filter-left .fl-break { display: block; flex-basis: 100%; height: 0; }
+  .filter-left .live-sync-badge { margin-left: 0; }
+}

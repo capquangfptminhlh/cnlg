@@ -105,3 +105,14 @@
 @media(prefers-reduced-motion:reduce){
  .market-main-banner .banner-catalog-count,#productGrid .btn-buy-instant{transition:none !important}
 }
+
+/* Điện thoại: giữ sẵn chỗ cho dải gợi ý dưới banner (hiện sau khi tải SP) → trang không bị đẩy xuống */
+@media(max-width:700px){
+ body:not(.is-category-view) .market-banner-side{
+  display:block !important;min-height:79px;margin:8px 0 0 !important;width:100%
+ }
+ .market-banner-side:not(.has-besi-picks) > .market-mini-promo{display:none !important}
+ .market-banner-side:not(.has-besi-picks){
+  border-radius:10px;background:linear-gradient(90deg,#f1f3f6,#f8f9fb,#f1f3f6)
+ }
+}

@@ -160,6 +160,12 @@ const MAX_QTY_PER_ITEM = 50;
 if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
 app.disable('x-powered-by');
 app.use(forceHttps);
+app.use((req, res, next) => {
+  if ((req.method === 'GET' || req.method === 'HEAD') && /^www\.besi\.com\.vn(?::\d+)?$/i.test(String(req.get('host') || ''))) {
+    return res.redirect(301, 'https://besi.com.vn' + (req.originalUrl || '/'));
+  }
+  next();
+});
 app.use(securityHeaders);
 // Narrow CORS exception for the explicitly paired Chrome helper. Requests
 // still need a valid one-time bearer token and a real staged Taobao product.
@@ -188,7 +194,20 @@ const SSR_PER_PAGE = 40;
 const guestPrice = list => { const rules = customerPriceRules(); return list.map(p => customerPricing.retailizeItem(p, rules)); };
 const ssrPage = req => Math.min(500, Math.max(1, parseInt(req.query.page, 10) || 1));
 // Có tham số lọc/sắp xếp (không phải ?page=) → trang trùng nội dung: không cho lập chỉ mục
-const hasFilterQuery = req => Object.keys(req.query || {}).some(k => k !== 'page');
+const TRACKING_PARAM = /^(utm_[a-z_]+|fbclid|gclid|gbraid|wbraid|msclkid|zarsrc|_gl|mc_cid|mc_eid|srsltid|igshid|ttclid|ref)$/i;
+const hasFilterQuery = req => Object.keys(req.query || {}).some(k => k !== 'page' && !TRACKING_PARAM.test(k));
+/** Trang 404 thật (Google bỏ URL cũ nhanh), có ô tìm kiếm + danh mục phổ biến để khách không thoát. */
+function sendNotFound(req, res, { product = false } = {}) {
+  let categories = [];
+  try {
+    ensureCatalogCaches();
+    categories = cachedCategoriesList.filter(c => !c.parent_id && c.product_count > 0)
+      .sort((a, b) => b.product_count - a.product_count).slice(0, 8)
+      .map(c => ({ name: c.name, path: seoPages.categoryPath(c) }));
+  } catch (e) {}
+  res.status(404).type('html').set('Cache-Control', 'no-store')
+    .send(infoPages.renderNotFoundPage({ footerHtml: cachedFooterHtml, assetVersion: seo.ASSET_VERSION, categories, product }));
+}
 function categoryCrumbs(cat) {
   const byId = new Map(cachedCategoriesList.map(c => [Number(c.id), c]));
   const chain = [];
@@ -263,7 +282,10 @@ app.get(/^\/(?:(?:danh-muc|thuong-hieu|tim-kiem)\/[^/]{1,120}\/?){1,3}$/, (req, 
     path = seoPages.categoryPath(cat);
     crumbs = categoryCrumbs(cat);
     h1 = cat.name;
-    links = cachedCategoriesList.filter(c => Number(c.parent_id) === catId && c.product_count > 0).map(c => ({ name: c.name, url: seoPages.categoryPath(c) }));
+    extra.bodyClass = 'is-category-view';
+    const rootId = cat.parent_id ? Number(cat.parent_id) : catId;
+    links = cachedCategoriesList.filter(c => Number(c.parent_id) === rootId && c.product_count > 0)
+      .sort((a, b) => (b.product_count || 0) - (a.product_count || 0)).map(c => ({ name: c.name, url: seoPages.categoryPath(c) }));
   } else {
     list = cachedSellable.filter(p => p.brand && seoPages.slug(p.brand) === brandSlug);
     path = seoPages.brandPath(brand);
@@ -642,9 +664,9 @@ app.post('/api/admin/taobao/sync',requireAdmin,rateLimit('taobao-admin-sync',360
 app.get('/sp/:slugId', async (req, res) => {
   try {
     const id = parseInt(String(req.params.slugId), 10);
-    if (!Number.isFinite(id) || id <= 0) return res.redirect(302, '/');
+    if (!Number.isFinite(id) || id <= 0) return sendNotFound(req, res, { product: true });
     const product = storeCatalog.findProduct(id);
-    if (!product || product.removed_from_dropbuy) return res.redirect(302, '/');
+    if (!product || product.removed_from_dropbuy) return sendNotFound(req, res, { product: true });
 
     // Kiểm tra nếu là Bot (ZaloBot, Facebook, Telegram, Google, etc.)
     const userAgent = String(req.get('user-agent') || '').toLowerCase();
@@ -684,9 +706,12 @@ app.get('/sp/:slugId', async (req, res) => {
     let descHtml = '';
     try { descHtml = detail?.description ? stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(detail.description))) : ''; } catch (e) {}
     const rv = reviews.forProduct(productIdsOf(product), { limit: 5 });
+    const ready = cachedProductDetail(id);
+    if (!ready) productDetailData(id).catch(() => {});
+    const boot = ready ? `<script type="application/json" id="ssrProductData">${JSON.stringify({ ...ready, description: '' }).replace(/</g, '\\u003c')}</script>` : '';
     res.type('html').send(seo.renderProductPage(req, shown, detail, readConfig(), {
       crumbs, category: cat, footerHtml: cachedFooterHtml, reviews: rv, summary: ownCopy ? ownCopy.summary : '',
-      articleHtml: seoPages.productArticleHtml({ product: shown, crumbs, descHtml, related, category: cat, qaHtml: infoPages.productQaHtml(shown, readConfig()) })
+      articleHtml: seoPages.productArticleHtml({ product: shown, crumbs, descHtml, related, category: cat, qaHtml: infoPages.productQaHtml(shown, readConfig()) }) + boot
     }));
   } catch (err) {
     res.redirect(302, '/');
@@ -1571,19 +1596,35 @@ app.use(/^\/api\/products\/(\d+)$/, (req, res, next) => {
   next();
 });
 
+/** Chi tiết SP đã dựng sẵn (còn hạn) hoặc null. */
+function cachedProductDetail(id) {
+  const c = productDetailCache.get(id);
+  return c && Date.now() - c.at < PRODUCT_DETAIL_TTL_MS ? c.data : null;
+}
+const detailInflight = new Map();
+/** Chi tiết SP cho khách (null = không có SP). Cùng lúc nhiều yêu cầu cho 1 SP → chỉ dựng 1 lần. */
+function productDetailData(id) {
+  const hit = cachedProductDetail(id);
+  if (hit) return Promise.resolve(hit);
+  if (detailInflight.has(id)) return detailInflight.get(id);
+  const job = buildProductDetail(id).finally(() => detailInflight.delete(id));
+  detailInflight.set(id, job);
+  return job;
+}
 app.get('/api/products/:id', async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    const cached = productDetailCache.get(id);
-    if (cached && Date.now() - cached.at < PRODUCT_DETAIL_TTL_MS) {
-      res.setHeader('Cache-Control', 'public, max-age=30');
-      return res.json({ success: true, data: cached.data });
-    }
-
+    const data = await productDetailData(parseInt(req.params.id, 10));
+    if (!data) return res.status(404).json({ success: false, error: 'Sản phẩm không tồn tại hoặc đã ngừng kinh doanh' });
+    res.setHeader('Cache-Control', 'public, max-age=30');
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+async function buildProductDetail(id) {
+  {
     const product = storeCatalog.findProduct(id);
-    if (!product || product.removed_from_dropbuy) {
-      return res.status(404).json({ success: false, error: 'Sản phẩm không tồn tại hoặc đã ngừng kinh doanh' });
-    }
+    if (!product || product.removed_from_dropbuy) return null;
     const src = storeCatalog.sourceOf(id);
     if (src) {
       // Nguồn sỉ khác: kiểm tra trực tiếp giá đại lý + tồn kho (chạy nền, tối đa 1 lần / 30s mỗi SP)
@@ -1613,8 +1654,7 @@ app.get('/api/products/:id', async (req, res) => {
         variants
       };
       setProductDetailCache(id, responseData);
-      res.setHeader('Cache-Control', 'public, max-age=30');
-      return res.json({ success: true, data: responseData });
+      return responseData;
     }
     const isDropbuy = !product.supplier || product.supplier === 'dropbuy';
     if (isDropbuy) {
@@ -1685,12 +1725,9 @@ app.get('/api/products/:id', async (req, res) => {
     }
     delete merged.variations;
     setProductDetailCache(id, merged);
-    res.setHeader('Cache-Control', 'public, max-age=30');
-    res.json({ success: true, data: merged });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    return merged;
   }
-});
+}
 
 app.get('/api/address/wards', async (req, res) => {
   try {
@@ -2907,6 +2944,10 @@ app.post('/api/admin/customer-pricing', requireAdmin, (req, res) => {
 
 app.use('/api', (req, res) => {
   res.status(404).json({ success: false, error: 'Endpoint không tồn tại' });
+});
+app.use((req, res, next) => {
+  if ((req.method !== 'GET' && req.method !== 'HEAD') || /\.[a-z0-9]{2,5}$/i.test(req.path)) return next();
+  sendNotFound(req, res);
 });
 
 // Middleware xử lý ngoại lệ toàn cục (chống lộ stack trace / đường dẫn file)
