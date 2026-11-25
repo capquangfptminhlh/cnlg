@@ -207,3 +207,7 @@ body.show-adv-filters #advFilters > .besi-universal-finder { margin-top: 4px; }
   .filter-left .fl-break { display: block; flex-basis: 100%; height: 0; }
   .filter-left .live-sync-badge { margin-left: 0; }
 }
+
+/* Trong lúc Font Awesome đang tải (sau lần hiện đầu – services/seo.js): giữ chỗ cho biểu tượng.
+   :where() = độ ưu tiên 0 → mọi quy tắc sẵn có của shop/Font Awesome vẫn thắng; tải xong thì gỡ class. */
+:where(html.fa-pending) :where(i.fa-solid, i.fa-regular, i.fa-brands, i.fa) { display: inline-block; min-width: 1em; min-height: 1em; line-height: 1; }

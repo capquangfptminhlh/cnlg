@@ -92,3 +92,17 @@ test('trang SP dựng sẵn: ảnh chính là ảnh lớn của bộ ảnh chi t
   assert.equal(main, '/cdn/md/s-1/p-1/a-1-1024x1024.jpg');
   assert.doesNotMatch(html, /dropbuy/i);
 });
+
+test('<head>: bundle.css đứng đầu; Font Awesome tải sau lần hiện đầu, chèn trước bundle (giữ thứ tự cascade), có giữ chỗ biểu tượng', () => {
+  const seo = require('../services/seo');
+  const req = { protocol: 'https', socket: { remoteAddress: '127.0.0.1' }, query: {}, originalUrl: '/', get: h => (h.toLowerCase() === 'host' ? 'besi.com.vn' : '') };
+  const html = seo.renderHomePage(req, {}, 10, { canonicalPath: '/' });
+  const head = html.slice(0, html.indexOf('</head>'));
+  const firstLink = head.match(/<link rel="stylesheet" href="([^"]+)"/)[1];
+  assert.match(firstLink, /^\/bundle\.css\?v=/);
+  assert.doesNotMatch(head, /<link rel="stylesheet" href="https:\/\/cdnjs[^"]+font-awesome[^"]+"(?![^<]*<\/noscript>)[^>]*media=/);
+  assert.match(head, /requestAnimationFrame\(function\(\)\{setTimeout\(go,0\)\}\)/);
+  assert.match(head, /document\.head\.insertBefore\(l,b\|\|null\)/);
+  assert.match(head, /<noscript><link rel="stylesheet" href="https:\/\/cdnjs[^"]+font-awesome/);
+  assert.match(read('public/besi-clean.css'), /:where\(html\.fa-pending\) :where\(i\.fa-solid/);
+});
