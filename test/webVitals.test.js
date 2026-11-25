@@ -106,3 +106,9 @@ test('<head>: bundle.css đứng đầu; Font Awesome tải sau lần hiện đ�
   assert.match(head, /<noscript><link rel="stylesheet" href="https:\/\/cdnjs[^"]+font-awesome/);
   assert.match(read('public/besi-clean.css'), /:where\(html\.fa-pending\) :where\(i\.fa-solid/);
 });
+
+test('khung chi tiết SP có sẵn kích thước cuối ngay lúc đang tải (không bung ra gây xô lệch)', () => {
+  const css = read('public/besi-clean.css');
+  assert.match(css, /#productDetailModal \.product-modal-dialog \{ min-height: calc\(100dvh - 36px\); \}/);
+  assert.match(css, /@media \(max-width: 760px\) \{\n  #productDetailModal \.product-modal-dialog \{ min-height: calc\(100dvh - 8px\); \}/);
+});

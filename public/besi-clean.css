@@ -211,3 +211,9 @@ body.show-adv-filters #advFilters > .besi-universal-finder { margin-top: 4px; }
 /* Trong lúc Font Awesome đang tải (sau lần hiện đầu – services/seo.js): giữ chỗ cho biểu tượng.
    :where() = độ ưu tiên 0 → mọi quy tắc sẵn có của shop/Font Awesome vẫn thắng; tải xong thì gỡ class. */
 :where(html.fa-pending) :where(i.fa-solid, i.fa-regular, i.fa-brands, i.fa) { display: inline-block; min-width: 1em; min-height: 1em; line-height: 1; }
+
+/* Khung chi tiết SP: lúc "Đang tải…" đã có đúng kích thước cuối (trước đây hộp nhỏ rồi bung ra → trang nhảy 0,73) */
+#productDetailModal .product-modal-dialog { min-height: calc(100dvh - 36px); }
+@media (max-width: 760px) {
+  #productDetailModal .product-modal-dialog { min-height: calc(100dvh - 8px); }
+}
