@@ -711,7 +711,7 @@ app.get('/sp/:slugId', async (req, res) => {
     const boot = ready ? `<script type="application/json" id="ssrProductData">${JSON.stringify({ ...ready, description: '' }).replace(/</g, '\\u003c')}</script>` : '';
     res.type('html').send(seo.renderProductPage(req, shown, detail, readConfig(), {
       crumbs, category: cat, footerHtml: cachedFooterHtml, reviews: rv, summary: ownCopy ? ownCopy.summary : '',
-      articleHtml: seoPages.productArticleHtml({ product: shown, crumbs, descHtml, related, category: cat, qaHtml: infoPages.productQaHtml(shown, readConfig()) }) + boot
+      articleHtml: seoPages.productArticleHtml({ product: shown, gallery: detail?.gallery, crumbs, descHtml, related, category: cat, qaHtml: infoPages.productQaHtml(shown, readConfig()) }) + boot
     }));
   } catch (err) {
     res.redirect(302, '/');

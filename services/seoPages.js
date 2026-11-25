@@ -74,14 +74,15 @@ function listingHeadHtml({ path, crumbs, h1, intro, links = [] }) {
 }
 
 /** Bài sản phẩm đầy đủ (bot đọc được; khách dùng JS vẫn thấy popup như cũ). */
-function productArticleHtml({ product: p, crumbs, descHtml, related = [], category, qaHtml = '' }) {
+function productArticleHtml({ product: p, gallery: detailGallery, crumbs, descHtml, related = [], category, qaHtml = '' }) {
   const name = cleanName(p.name);
   const variants = Array.isArray(p.variants) && p.variants.length > 1 ? p.variants : [];
   const prices = variants.length ? variants.map(v => Number(v.price) || 0).filter(x => x > 0) : [Number(p.price) || 0];
   const lo = Math.min(...prices);
   const hi = Math.max(...prices);
   const disc = Number(p.discount_percent) > 0 && Number(p.original_price) > Number(p.price);
-  const gallery = [imageOf(p), ...((p.gallery || []).map(g => maskMediaUrl(g.url || g)).filter(Boolean))]
+  const big = [...(detailGallery || []), ...(p.gallery || [])].map(g => (typeof g === 'string' ? g : g && g.url)).filter(u => typeof u === 'string' && u).map(maskMediaUrl).filter(Boolean);
+  const gallery = [...big, maskMediaUrl(p.image_hd || ''), imageOf(p)]
     .filter((u, i, a) => u && a.indexOf(u) === i).slice(0, 6);
   return `<article class="ssr-product" id="ssrProduct">
     ${crumbsHtml(crumbs)}

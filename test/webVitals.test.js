@@ -80,3 +80,15 @@ test('CSP cho phép thống kê Cloudflare Web Analytics', () => {
   assert.match(sec, /script-src 'self' 'unsafe-inline' https:\/\/cdnjs\.cloudflare\.com https:\/\/static\.cloudflareinsights\.com/);
   assert.match(sec, /connect-src 'self' ws: wss: https:\/\/cloudflareinsights\.com/);
 });
+
+test('trang SP dựng sẵn: ảnh chính là ảnh lớn của bộ ảnh chi tiết, không phải ảnh nhỏ 128px của thẻ', () => {
+  const seoPages = require('../services/seoPages');
+  const html = seoPages.productArticleHtml({
+    product: { id: 1, name: 'Giá đỡ K72', slug: 'k72', price: 22000, image: 'https://r6i.pen.dropbuy.vn/md/s-1/p-1/a-1-128x128.jpg' },
+    gallery: [{ url: 'https://r6i.pen.dropbuy.vn/md/s-1/p-1/a-1-1024x1024.jpg', thumb: 'https://r6i.pen.dropbuy.vn/md/s-1/p-1/a-1-128x128.jpg' }],
+    crumbs: [{ name: 'Trang chủ', url: '/' }], descHtml: ''
+  });
+  const main = html.match(/class="ssr-product-media">\s*<img src="([^"]+)"/)[1];
+  assert.equal(main, '/cdn/md/s-1/p-1/a-1-1024x1024.jpg');
+  assert.doesNotMatch(html, /dropbuy/i);
+});
