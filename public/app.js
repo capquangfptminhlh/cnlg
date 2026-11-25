@@ -1011,7 +1011,10 @@ function setProductHash(prod) {
   if (location.pathname !== url) history.pushState({ productId: prod.id }, '', url);
   document.title = `${prod.name} | ${STORE_BRAND}`;
 }
+// Rời trang /sp/ (đóng khung chi tiết): trở lại bố cục cửa hàng bình thường
+function leaveProductView() { document.body.classList.remove('is-product-view'); }
 function clearProductHash() {
+  leaveProductView();
   const targetUrl = typeof buildFilterUrl === 'function' ? buildFilterUrl() : '/';
   if (location.pathname.startsWith('/sp/') || location.hash.startsWith('#/sp/')) history.pushState(null, '', targetUrl);
   document.title = (state.searchQuery ? `Kết quả cho "${state.searchQuery}" | BESI` : HOME_TITLE);
@@ -1021,6 +1024,7 @@ function openFromHash() {
   const m = location.pathname.match(/^\/sp\/(\d+)/) || location.hash.match(/^#\/sp\/(\d+)/);
   if (m && state.activeDetailProduct?.id !== Number(m[1])) openProductDetail(Number(m[1]));
   else if (!m && productDetailModal.classList.contains('open')) {
+    leaveProductView();
     productDetailModal.classList.remove('open');
     state.activeDetailProduct = null;
     document.title = HOME_TITLE;

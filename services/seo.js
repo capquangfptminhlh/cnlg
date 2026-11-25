@@ -44,12 +44,26 @@ function bustAssets(html) {
  */
 const LOCAL_CSS_RE = /^[ \t]*<link rel="stylesheet" href="(\/[a-zA-Z0-9_.-]+\.css)">[ \t]*\n/gm;
 let cssBundle = null;
+/**
+ * Rút gọn CSS an toàn (không bỏ quy tắc nào): bỏ chú thích, gộp khoảng trắng, bỏ khoảng trắng quanh { } ; ,
+ * KHÔNG đụng dấu ":" (khoảng trắng trước ":" trong bộ chọn có nghĩa) và không đụng + - trong calc().
+ * HM_CSS_RAW=1 → giữ nguyên (để so sánh).
+ */
+function minifyCss(css) {
+  if (process.env.HM_CSS_RAW === '1') return css;
+  return css
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*([{};,])\s*/g, '$1')
+    .replace(/;}/g, '}')
+    .trim();
+}
 function getCssBundle() {
   const mtime = fs.statSync(INDEX_FILE).mtimeMs;
   if (cssBundle && cssBundle.mtime === mtime) return cssBundle;
   const html = fs.readFileSync(INDEX_FILE, 'utf8').replace(/\r\n/g, '\n');
   const files = [...html.matchAll(LOCAL_CSS_RE)].map(m => m[1]);
-  const css = files.map(f => `/* ${f} */\n${fs.readFileSync(path.join(__dirname, '..', 'public', f.slice(1)), 'utf8')}`).join('\n');
+  const css = minifyCss(files.map(f => fs.readFileSync(path.join(__dirname, '..', 'public', f.slice(1)), 'utf8')).join('\n'));
   const version = crypto.createHash('sha256').update(css).digest('hex').slice(0, 12);
   cssBundle = { mtime, files, css, version };
   return cssBundle;
@@ -186,7 +200,7 @@ function renderProductPage(req, product, detail, config, extra = {}) {
 
   ${ld}
   <script>window.__INITIAL_PRODUCT_ID__ = ${Number(product.id)};</script>`;
-  return inject(getTemplate(), { head, top: extra.articleHtml || '', footer: extra.footerHtml || '', demoteHero: true });
+  return inject(getTemplate(), { head, top: extra.articleHtml || '', footer: extra.footerHtml || '', demoteHero: true, bodyClass: 'is-product-view' });
 }
 
 /** HTML trang chủ kèm meta mô tả cửa hàng (tự động đổi theo từ khoá tìm kiếm / bộ lọc) */

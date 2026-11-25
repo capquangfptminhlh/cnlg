@@ -147,3 +147,10 @@ body.is-category-view .ssr-sublinks li { flex: 0 0 auto; }
 }
 body.is-category-view .ssr-head p { margin-bottom: 22px; }
 body.is-category-view .ssr-sublinks { min-height: 40px; box-sizing: border-box; }
+
+/* Trang /sp/: bài SP dựng sẵn ở máy chủ nằm ngay đầu trang (ảnh lớn hiện sớm = LCP sớm); đóng khung chi tiết → app.js gỡ class */
+body.is-product-view #discovery,
+body.is-product-view .market-shortcuts,
+body.is-product-view #siGuaranteeBar,
+body.is-product-view #flashSaleSection,
+body.is-product-view #featuredSection { display: none !important; }

@@ -55,3 +55,28 @@ test('www.besi.com.vn chuyển 301 về besi.com.vn; tham số theo dõi (utm, f
   for (const k of ['utm_source', 'utm_campaign', 'fbclid', 'gclid', 'zarsrc']) assert.ok(re.test(k), k);
   for (const k of ['q', 'brand', 'min', 'sort']) assert.ok(!re.test(k), k);
 });
+
+test('trang /sp/: bố cục "xem sản phẩm" từ máy chủ (bài SP ở đầu trang), đóng khung chi tiết thì gỡ', () => {
+  const seo = read('services/seo.js');
+  assert.match(seo, /demoteHero: true, bodyClass: 'is-product-view'/);
+  assert.match(read('public/seo-ssr.css'), /body\.is-product-view #discovery/);
+  const app = read('public/app.js');
+  assert.match(app, /function clearProductHash\(\) \{\n\s*leaveProductView\(\);/);
+});
+
+test('bundle.css rút gọn an toàn: không còn chú thích, nhỏ hơn bản gốc, giữ nguyên quy tắc', () => {
+  const seo = require('../services/seo');
+  const { css } = seo.getCssBundle();
+  assert.doesNotMatch(css, /\/\*/);
+  const files = [...index.matchAll(/<link rel="stylesheet" href="(\/[a-zA-Z0-9_.-]+\.css)">/g)].map(m => m[1]);
+  const raw = files.map(f => read('public' + f)).join('\n');
+  assert.ok(css.length < raw.length * 0.9, `bundle ${css.length} B phải nhỏ hơn bản gốc ${raw.length} B`);
+  const count = s => (s.replace(/\/\*[\s\S]*?\*\//g, '').match(/\{/g) || []).length;
+  assert.equal(count(css), count(raw), 'số khối quy tắc phải giữ nguyên');
+});
+
+test('CSP cho phép thống kê Cloudflare Web Analytics', () => {
+  const sec = read('services/security.js');
+  assert.match(sec, /script-src 'self' 'unsafe-inline' https:\/\/cdnjs\.cloudflare\.com https:\/\/static\.cloudflareinsights\.com/);
+  assert.match(sec, /connect-src 'self' ws: wss: https:\/\/cloudflareinsights\.com/);
+});

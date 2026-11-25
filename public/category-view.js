@@ -97,7 +97,8 @@
     end.innerHTML = inView
       ? `<i class="fa-solid fa-circle-check"></i> Đã hiển thị hết ${fmt(total)} sản phẩm của <strong>${escH(catById(id).name)}</strong>`
       : `<i class="fa-solid fa-circle-check"></i> Đã hiển thị hết ${fmt(total)} sản phẩm`;
-    document.title = inView ? `${catById(id).name} | ${window.STORE_BRAND || 'BESI'}` : (window.HOME_TITLE || document.title);
+    // Đang mở trang SP (/sp/…): tiêu đề là tên SP – không ghi đè
+    if (!document.getElementById('productDetailModal')?.classList.contains('open')) document.title = inView ? `${catById(id).name} | ${window.STORE_BRAND || 'BESI'}` : (window.HOME_TITLE || document.title);
   }
 
   // --- Chọn danh mục (dùng chung cho danh mục bên trái, chip, bảng Danh mục, đường dẫn, danh mục con) ---
