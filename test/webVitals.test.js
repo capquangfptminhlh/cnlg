@@ -112,3 +112,13 @@ test('khung chi tiết SP có sẵn kích thước cuối ngay lúc đang tải 
   assert.match(css, /#productDetailModal \.product-modal-dialog \{ min-height: calc\(100dvh - 36px\); \}/);
   assert.match(css, /@media \(max-width: 760px\) \{\n  #productDetailModal \.product-modal-dialog \{ min-height: calc\(100dvh - 8px\); \}/);
 });
+
+test('làm nóng ảnh SP: dùng đúng ảnh chính của trang SSR + đúng khoá bộ nhớ đệm của route /cdn; tắt được', () => {
+  const seoPages = require('../services/seoPages');
+  const g = seoPages.productGallery({ id: 1, image: 'https://r6i.pen.dropbuy.vn/md/s-1/p-1/a-1-128x128.jpg' }, [{ url: 'https://r6i.pen.dropbuy.vn/md/s-1/p-1/a-1-1024x1024.jpg' }]);
+  assert.equal(g[0], '/cdn/md/s-1/p-1/a-1-1024x1024.jpg');
+  assert.match(server, /const job = cdnMediaJob\(seoPages\.productGallery\(p, savedProductDetail\(p\.id, p\)\?\.gallery\)\[0\]\);/);
+  assert.match(server, /if \(imageOptimizer\.isCached\(job\.id\)\) \{ imgWarm\.cached\+\+; continue; \}/);
+  assert.match(server, /process\.env\.HM_IMG_WARM !== '0'/);
+  assert.equal(typeof require('../services/imageOptimizer').isCached, 'function');
+});

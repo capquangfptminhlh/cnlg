@@ -137,4 +137,7 @@ function startPruning() {
   return setInterval(tick, 6 * 3600e3).unref();
 }
 
-module.exports = { available, optimized, toWebp, prune, startPruning, MAX_SIDE };
+/** Ảnh `id` đã nén sẵn trên ổ đĩa chưa (không đọc nội dung). */
+const isCached = id => { try { return fs.existsSync(fileOf(keyOf(id))); } catch (e) { return false; } };
+
+module.exports = { available, optimized, isCached, toWebp, prune, startPruning, MAX_SIDE };

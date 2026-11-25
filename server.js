@@ -682,13 +682,7 @@ app.get('/sp/:slugId', async (req, res) => {
     }
 
     // Chỉ dùng chi tiết đã cache (không gọi DropBuy cho mỗi lượt bot Google/Facebook)
-    let detail = null;
-    const src = storeCatalog.sourceOf(id);
-    if (src) detail = src.detail(product);
-    else try {
-      const f = path.join(DATA_DIR, 'products_detail', `${id}.json`);
-      if (fs.existsSync(f)) detail = JSON.parse(fs.readFileSync(f, 'utf8'));
-    } catch (e) {}
+    let detail = savedProductDetail(id, product);
     ensureCatalogCaches();
     const ownCopy = copyOf(product, id);
     if (ownCopy) detail = { ...(detail || {}), description: productCopy.compose(ownCopy, detail?.description || '') };
@@ -1087,6 +1081,57 @@ app.get('/api/catalog-image/:id', async (req, res) => {
     return res.status(503).type('text/plain').send('Ảnh tạm thời không tải được');
   }
 });
+
+/** Chi tiết SP đã lưu sẵn (nguồn sỉ khác: bộ nhớ; DropBuy: data/products_detail) – không gọi mạng. */
+function savedProductDetail(id, product) {
+  const src = storeCatalog.sourceOf(id);
+  if (src) { try { return src.detail(product); } catch (e) { return null; } }
+  try {
+    const f = path.join(DATA_DIR, 'products_detail', `${id}.json`);
+    if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8'));
+  } catch (e) {}
+  return null;
+}
+
+/** Đường dẫn ảnh /cdn/… → { id, load } giống hệt route phục vụ ảnh (cùng khoá bộ nhớ đệm). */
+function cdnMediaJob(url) {
+  const dec = v => { try { return decodeURIComponent(v); } catch (e) { return v; } };
+  let m = String(url || '').match(/^\/cdn\/((?:md2?|p[1-4])\/.+)$/);
+  if (m) { const rel = dec(m[1]); return { id: rel, load: () => catalogImage.mediaFromCdnPath(rel) }; }
+  m = String(url || '').match(/^\/cdn\/x\/([A-Za-z0-9_-]{16})\/([A-Za-z0-9_-]{8,1700})\.(?:jpg|png|webp|gif)$/);
+  const href = m && catalogImage.externalFromSigned(m[1], m[2]);
+  return href ? { id: 'x:' + href, load: () => catalogImage.mediaFromExternal(href) } : null;
+}
+
+/**
+ * Làm nóng ảnh chính trang SP (chạy nền, từng ảnh một): khách ĐẦU TIÊN mở 1 SP trước đây phải chờ máy chủ tải ảnh
+ * gốc + nén WebP (~0,8 s; ảnh trên máy chủ nước ngoài có khi > 10 s rồi lỗi). Thứ tự = trang chủ, chỉ SP còn hàng;
+ * ảnh đã có trên ổ đĩa bỏ qua ngay. Tắt: HM_IMG_WARM=0 (thử: HM_IMG_WARM_LIMIT, HM_IMG_WARM_DELAY_MS).
+ */
+const imgWarm = { running: false, warmed: 0, cached: 0, failed: 0, skipped: 0, at: null };
+async function warmProductImages() {
+  if (imgWarm.running || !imageOptimizer.available()) return;
+  Object.assign(imgWarm, { running: true, warmed: 0, cached: 0, failed: 0, skipped: 0 });
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  try {
+    ensureCatalogCaches();
+    const list = (cachedDefaultMixed || []).filter(p => p.in_stock !== false).slice(0, Number(process.env.HM_IMG_WARM_LIMIT) || Infinity);
+    for (const p of list) {
+      const job = cdnMediaJob(seoPages.productGallery(p, savedProductDetail(p.id, p)?.gallery)[0]);
+      if (!job) { imgWarm.skipped++; continue; }
+      if (imageOptimizer.isCached(job.id)) { imgWarm.cached++; continue; }
+      try {
+        await Promise.race([imageOptimizer.optimized(job.id, job.load), sleep(30000).then(() => { throw new Error('timeout'); })]);
+        imgWarm.warmed++;
+      } catch (e) { imgWarm.failed++; }
+      await sleep(250);
+    }
+  } finally {
+    imgWarm.running = false;
+    imgWarm.at = new Date().toISOString();
+    console.log(`[Ảnh] Làm nóng ảnh SP xong: mới ${imgWarm.warmed}, có sẵn ${imgWarm.cached}, lỗi ${imgWarm.failed}, không có ảnh ${imgWarm.skipped}.`);
+  }
+}
 
 /**
  * Gửi ảnh /cdn/…: trình duyệt nhận được WebP → ảnh đã thu nhỏ + nén (lưu sẵn trên ổ đĩa),
@@ -2992,6 +3037,10 @@ if (require.main === module) {
     orderExpiry.startOrderExpiry(io, readConfig);
     backup.startBackups();
     imageOptimizer.startPruning();
+    if (process.env.HM_IMG_WARM !== '0') {
+      setTimeout(() => warmProductImages().catch(() => {}), Number(process.env.HM_IMG_WARM_DELAY_MS) || 3 * 60e3).unref();
+      setInterval(() => warmProductImages().catch(() => {}), 12 * 3600e3).unref();
+    }
     funnel.start();
     watchdog.startWatchdog(io);
     notify.startZaloBotPolling();

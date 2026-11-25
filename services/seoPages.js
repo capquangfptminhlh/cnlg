@@ -73,6 +73,12 @@ function listingHeadHtml({ path, crumbs, h1, intro, links = [] }) {
   </header>`;
 }
 
+/** Bộ ảnh trang SP (tối đa 6, đã che nguồn): ảnh lớn của chi tiết SP trước; p.image (ảnh nhỏ của thẻ) chỉ là dự phòng. */
+function productGallery(p, detailGallery) {
+  const big = [...(detailGallery || []), ...(p.gallery || [])].map(g => (typeof g === 'string' ? g : g && g.url)).filter(u => typeof u === 'string' && u).map(maskMediaUrl).filter(Boolean);
+  return [...big, maskMediaUrl(p.image_hd || ''), imageOf(p)].filter((u, i, a) => u && a.indexOf(u) === i).slice(0, 6);
+}
+
 /** Bài sản phẩm đầy đủ (bot đọc được; khách dùng JS vẫn thấy popup như cũ). */
 function productArticleHtml({ product: p, gallery: detailGallery, crumbs, descHtml, related = [], category, qaHtml = '' }) {
   const name = cleanName(p.name);
@@ -81,9 +87,7 @@ function productArticleHtml({ product: p, gallery: detailGallery, crumbs, descHt
   const lo = Math.min(...prices);
   const hi = Math.max(...prices);
   const disc = Number(p.discount_percent) > 0 && Number(p.original_price) > Number(p.price);
-  const big = [...(detailGallery || []), ...(p.gallery || [])].map(g => (typeof g === 'string' ? g : g && g.url)).filter(u => typeof u === 'string' && u).map(maskMediaUrl).filter(Boolean);
-  const gallery = [...big, maskMediaUrl(p.image_hd || ''), imageOf(p)]
-    .filter((u, i, a) => u && a.indexOf(u) === i).slice(0, 6);
+  const gallery = productGallery(p, detailGallery);
   return `<article class="ssr-product" id="ssrProduct">
     ${crumbsHtml(crumbs)}
     <div class="ssr-product-main">
@@ -184,6 +188,6 @@ function ldScript(nodes) {
 
 module.exports = {
   esc, money, plainText, slug, productPath, categoryPath, brandPath, abs, imageOf,
-  crumbsHtml, cardsHtml, pagerHtml, listingHeadHtml, productArticleHtml, footerLinksHtml,
+  crumbsHtml, cardsHtml, pagerHtml, listingHeadHtml, productArticleHtml, productGallery, footerLinksHtml,
   orgLd, websiteLd, breadcrumbLd, itemListLd, productLd, ldScript
 };
