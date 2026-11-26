@@ -1,0 +1,29 @@
+# K0 keyword intelligence decision — 2026-11-21
+# This is a documented HOLD, not a substitute for K0 evidence or approval.
+project_repo: capquangfptminhlh/cnlg
+central_source_repo: capquangfptminhlh/seo-web
+central_source_commit_sha: 6d0b7c7c4d8458746f552704ce8d6fe517d9c847
+assessment_date: 2026-11-21
+status: HOLD
+release_authorized: false
+scope: "B2B wholesale accessories; protect supplier provenance and private source URLs"
+verified_facts:
+  bootstrap_pr: "fix/seo-alpha-bootstrap-20261121"
+  prior_k0_decision_record_at_this_path: MISSING_ON_PR_BRANCH
+  central_manifest_version: "1.4.0"
+not_verified:
+  - production_domain_and_article_inventory
+  - current_serp_and_gsc_90_day_baseline
+  - keyword_to_intent_cluster_mapping
+  - canonical_url_owner_and_cannibalization_resolution
+  - verified_official_sources_for_article_facts
+  - image_and_mobile_rendering
+  - website_os_enforcement_engine_result
+  - human_review_and_owner_release_approval
+required_next_actions:
+  - verify_live_domain_and_existing_canonical_pages
+  - collect observed keyword_serp_and_primary_source_evidence
+  - map each target query to one existing_or_proposed_canonical_owner
+  - verify website_os_engine_and_editorial_release_gates
+  - obtain applicable human approvals_before_production
+notes: "No keyword volume, rankings, publication, HTTP 200, CI PASS, or owner approval is asserted by this record."
