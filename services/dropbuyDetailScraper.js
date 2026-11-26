@@ -103,7 +103,7 @@ async function fetchProductFullDetail(product, downloadImagesLocally = false, { 
       'Sec-Fetch-Dest': 'document'
     };
     if (cookieHeader) reqHeaders['Cookie'] = cookieHeader;
-    const res = await fetch(dropbuyUrl, { headers: reqHeaders });
+    const res = await fetch(dropbuyUrl, { headers: reqHeaders, signal: AbortSignal.timeout(10000) }); // không để khách chờ DropBuy quá 10 s
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const html = await res.text();

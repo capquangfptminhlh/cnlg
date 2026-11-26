@@ -700,9 +700,20 @@ app.get('/sp/:slugId', async (req, res) => {
     let descHtml = '';
     try { descHtml = detail?.description ? stripSupplierText(catalogImage.maskMediaHtml(sanitizeHtml(detail.description))) : ''; } catch (e) {}
     const rv = reviews.forProduct(productIdsOf(product), { limit: 5 });
+    // Dữ liệu nhúng cho khung chi tiết (vẽ ngay, không chờ API – API có lúc chờ DropBuy ~30 s).
+    // Có chi tiết đầy đủ trong bộ nhớ đệm thì dùng; chưa có thì bản rút gọn từ catalog (ảnh, tên, giá, phân loại).
+    // Bộ nhớ đệm giữ GIÁ GỐC → áp giá theo loại khách y như API (services/customerPricing.priceResponses).
     const ready = cachedProductDetail(id);
     if (!ready) productDetailData(id).catch(() => {});
-    const boot = ready ? `<script type="application/json" id="ssrProductData">${JSON.stringify({ ...ready, description: '' }).replace(/</g, '\\u003c')}</script>` : '';
+    const bootBase = ready || {
+      ...publicProduct(product), description: '',
+      gallery: (detail?.gallery || []).map(g => ({ url: catalogImage.maskMediaUrl(g.url || g), thumb: catalogImage.maskMediaUrl(g.thumb || g.url || g) })).filter(g => typeof g.url === 'string' && g.url)
+    };
+    const tier = customerPricing.tierOf(req);
+    const priceRules = customerPriceRules();
+    const bootData = tier === 'wholesale' || !priceRules.enabled ? bootBase : customerPricing.retailizeDeep(bootBase, priceRules);
+    if (tier === 'wholesale') res.set('Cache-Control', 'private, no-store');
+    const boot = `<script type="application/json" id="ssrProductData">${JSON.stringify({ ...bootData, description: '' }).replace(/</g, '\\u003c')}</script>`;
     res.type('html').send(seo.renderProductPage(req, shown, detail, readConfig(), {
       crumbs, category: cat, footerHtml: cachedFooterHtml, reviews: rv, summary: ownCopy ? ownCopy.summary : '',
       articleHtml: seoPages.productArticleHtml({ product: shown, gallery: detail?.gallery, crumbs, descHtml, related, category: cat, qaHtml: infoPages.productQaHtml(shown, readConfig()) }) + boot

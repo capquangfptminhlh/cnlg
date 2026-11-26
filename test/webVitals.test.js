@@ -122,3 +122,22 @@ test('làm nóng ảnh SP: dùng đúng ảnh chính của trang SSR + đúng kh
   assert.match(server, /process\.env\.HM_IMG_WARM !== '0'/);
   assert.equal(typeof require('../services/imageOptimizer').isCached, 'function');
 });
+
+test('dữ liệu nhúng trang /sp/: luôn áp giá theo loại khách (không lộ giá gốc/giá sỉ) và luôn có để khung chi tiết vẽ ngay', () => {
+  const ssr = server.slice(server.indexOf("app.get('/sp/:slugId'"), server.indexOf("app.get('/bundle.css'"));
+  assert.match(ssr, /const tier = customerPricing\.tierOf\(req\);/);
+  assert.match(ssr, /const bootData = tier === 'wholesale' \|\| !priceRules\.enabled \? bootBase : customerPricing\.retailizeDeep\(bootBase, priceRules\);/);
+  assert.match(ssr, /JSON\.stringify\(\{ \.\.\.bootData, description: '' \}\)/);
+  assert.doesNotMatch(ssr, /JSON\.stringify\(\{ \.\.\.ready/);
+  assert.match(ssr, /if \(tier === 'wholesale'\) res\.set\('Cache-Control', 'private, no-store'\);/);
+  const cp = require('../services/customerPricing');
+  const rules = cp.normalizeRules(null);
+  const priced = cp.retailizeDeep({ price: 100000, variants: [{ price: 100000 }] }, rules);
+  assert.ok(!rules.enabled || (priced.price > 100000 && priced.variants[0].price > 100000), 'giá khách lẻ phải cao hơn giá gốc khi bật quy tắc');
+});
+
+test('gọi DropBuy khi khách đang chờ có giới hạn thời gian; đồng bộ cả danh mục không bị giới hạn', () => {
+  assert.match(read('services/variants.js'), /scraper\.fetchWholesalePrices\(.*, config, \{ timeoutMs: 8000 \}\);/);
+  assert.match(read('services/dropbuyScraper.js'), /\.\.\.\(timeoutMs \? \{ signal: AbortSignal\.timeout\(timeoutMs\) \} : \{\}\)/);
+  assert.match(read('services/dropbuyDetailScraper.js'), /signal: AbortSignal\.timeout\(10000\)/);
+});

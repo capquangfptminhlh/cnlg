@@ -22,7 +22,8 @@ async function wholesaleFor(productId, variantIds, config, { force = false } = {
     else need.push(id);
   }
   if (need.length) {
-    const map = await scraper.fetchWholesalePrices(need.map(id => ({ unique_id: id, product_id: productId })), config);
+    // Khách đang chờ trang chi tiết: DropBuy treo thì sau 8 s dùng giá dự phòng (như khi DropBuy lỗi)
+    const map = await scraper.fetchWholesalePrices(need.map(id => ({ unique_id: id, product_id: productId })), config, { timeoutMs: 8000 });
     for (const [id, v] of map) {
       wholesaleCache.set(id, { cost: v.cost, public_price: v.public_price || 0, fs_program_code: v.fs_program_code || null, at: Date.now() });
       out.set(id, v.cost);

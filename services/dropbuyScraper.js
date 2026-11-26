@@ -174,7 +174,7 @@ async function fetchAllSearchItems(config = getConfig(), { maxPages = 200, pageS
  * (cần phiên đăng nhập DropBuy). `unique_id` của item tìm kiếm chính là variation_id của biến thể chính.
  * Trả về Map<variation_id, { cost, source, fs_program_code }>. Không đăng nhập → Map rỗng.
  */
-async function fetchWholesalePrices(items, config = getConfig()) {
+async function fetchWholesalePrices(items, config = getConfig(), { timeoutMs = 0 } = {}) {
   const map = new Map();
   if (!config.dropbuy?.cookieHeader) return map;
   const session = await dropbuySession.ensureSession(config).catch(() => null);
@@ -189,7 +189,7 @@ async function fetchWholesalePrices(items, config = getConfig()) {
   await mapLimit(batches, 3, async i => {
     if (expired) return;
     try {
-      const res = await fetch(DROPBUY_API_PRICE, { method: 'POST', headers: dropbuyHeaders(config), body: JSON.stringify({ items: reqItems.slice(i, i + 50) }) });
+      const res = await fetch(DROPBUY_API_PRICE, { method: 'POST', headers: dropbuyHeaders(config), body: JSON.stringify({ items: reqItems.slice(i, i + 50) }), ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}) }); // timeoutMs: chỉ trang chi tiết (khách đang chờ) – đồng bộ cả danh mục không giới hạn
       const json = await res.json().catch(() => null);
       if (!json?.success || !Array.isArray(json.data)) {
         console.warn(`[Scraper] Không lấy được giá sỉ (lô ${i / 50 + 1}): ${json?.message || res.status}`);
